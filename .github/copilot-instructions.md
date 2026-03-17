@@ -1,0 +1,5 @@
+- [x] Projet HustleGo initialisé (Vite + React + TS + PWA)
+- [x] Structure clean, composants clés migrés
+- [x] README complet
+- [x] Prêt pour Supabase et Vercel
+- [ ] Finaliser la documentation et tests
