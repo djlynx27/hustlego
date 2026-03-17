@@ -45,6 +45,19 @@ Pour connecter Supabase, ajoute les variables d'environnement dans Vercel :
 
 Remplace les icônes et adapte le manifest dans vite.config.ts si besoin.
 
+## Tests
+
+### Lancer les tests unitaires
+
+```bash
+npm run test
+```
+
+Ce projet utilise [Vitest](https://vitest.dev/) et [Testing Library](https://testing-library.com/docs/react-testing-library/intro/) pour les tests React.
+
+- Les fichiers de test se terminent par `.test.tsx` ou `.test.ts` dans `src/`.
+- Exemple : voir `src/App.test.tsx`.
+
 ---
 
 # React + TypeScript + Vite
