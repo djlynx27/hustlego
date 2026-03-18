@@ -28,12 +28,16 @@ export function getDefaultLearningAgents(): LearningAgent[] {
       name: 'Trend Agent',
       description: 'Adapte la prédiction selon la tendance historique de la zone',
       weight: 0.55,
-      predict: (_zone, baseScore) => {
-        // trend logic omitted for unused param
-        return Math.min(100, Math.max(0, baseScore));
+      predict: (zone, baseScore) => {
+        const trend = zone.name.toLowerCase().includes('centre') ? 8 : 0; // placeholder
+        return Math.min(100, Math.max(0, baseScore + trend));
       },
-      learn: (_history) => {
-        return { zoneWeightAdjustments: {}, lastUpdated: new Date().toISOString() };
+      learn: (history) => {
+        const adj: Record<string, number> = {};
+        for (const item of history) {
+          adj[item.zoneId] = (adj[item.zoneId] || 0) + (item.observedScore - item.expectedScore) * 0.03;
+        }
+        return { zoneWeightAdjustments: adj, lastUpdated: new Date().toISOString() };
       },
     },
     {
@@ -41,17 +45,35 @@ export function getDefaultLearningAgents(): LearningAgent[] {
       name: 'Rush Hour Agent',
       description: 'Renforce les demandes en heure de pointe',
       weight: 0.45,
-      predict: (_zone, baseScore) => {
+      predict: (zone, baseScore) => {
         const hour = new Date().getHours();
         const modifier = (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 19) ? 1.12 : 1;
         return Math.min(100, Math.max(0, Math.round(baseScore * modifier)));
       },
-      learn: (_history) => ({ zoneWeightAdjustments: {}, lastUpdated: new Date().toISOString() }),
+      learn: (history) => ({ zoneWeightAdjustments: {}, lastUpdated: new Date().toISOString() }),
     },
   ];
 }
 
-export function applyLearningAgents(_zones: Zone[], baseScores: Map<string, number>, _history: ZoneHistory[] = []): Map<string, number> {
-  // ...existing code for applying learning agents...
-  return new Map(baseScores);
+export function applyLearningAgents(zones: Zone[], baseScores: Map<string, number>, history: ZoneHistory[] = []): Map<string, number> {
+  const agents = getDefaultLearningAgents();
+  const adjusted = new Map<string, number>(baseScores);
+
+  for (const agent of agents) {
+    const state = agent.learn(history); // on met à jour l'état (type prototype)
+    for (const zone of zones) {
+      const zoneBase = adjusted.get(zone.id) ?? 50;
+      const predicted = agent.predict(zone, zoneBase);
+      // application d'un mix pondéré simple
+      const mix = zoneBase * (1 - agent.weight) + predicted * agent.weight;
+      adjusted.set(zone.id, Math.min(100, Math.max(0, Math.round(mix))));
+
+      // respect des historic adjustments si disponible
+      if (state.zoneWeightAdjustments && state.zoneWeightAdjustments[zone.id] != null) {
+        adjusted.set(zone.id, Math.min(100, Math.max(0, adjusted.get(zone.id)! + state.zoneWeightAdjustments[zone.id])));
+      }
+    }
+  }
+
+  return adjusted;
 }

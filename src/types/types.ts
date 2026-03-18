@@ -1,1 +1,2 @@
-// ...existing code from GeoHustle types/types.ts...
+// Types supplémentaires du projet
+export {};

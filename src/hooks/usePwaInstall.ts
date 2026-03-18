@@ -1,28 +1,39 @@
-import { useEffect, useState } from 'react';
+import { useState, useEffect } from 'react';
+
+interface BeforeInstallPromptEvent extends Event {
+  prompt: () => Promise<void>;
+  userChoice: Promise<{ outcome: 'accepted' | 'dismissed' }>;
+}
 
 export function usePwaInstall() {
-  const [canInstall, setCanInstall] = useState(false);
-  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [deferredPrompt, setDeferredPrompt] = useState<BeforeInstallPromptEvent | null>(null);
+  const [isInstalled, setIsInstalled] = useState(false);
 
   useEffect(() => {
-    const handler = (e: any) => {
+    // Check if already installed
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      setIsInstalled(true);
+      return;
+    }
+
+    const handler = (e: Event) => {
       e.preventDefault();
-      setCanInstall(true);
-      setDeferredPrompt(e);
+      setDeferredPrompt(e as BeforeInstallPromptEvent);
     };
+
     window.addEventListener('beforeinstallprompt', handler);
+    window.addEventListener('appinstalled', () => setIsInstalled(true));
+
     return () => window.removeEventListener('beforeinstallprompt', handler);
   }, []);
 
-  const install = () => {
-    if (deferredPrompt) {
-      deferredPrompt.prompt();
-      deferredPrompt.userChoice.then(() => {
-        setCanInstall(false);
-        setDeferredPrompt(null);
-      });
-    }
+  const install = async () => {
+    if (!deferredPrompt) return false;
+    await deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    setDeferredPrompt(null);
+    return outcome === 'accepted';
   };
 
-  return { canInstall, install };
+  return { canInstall: !!deferredPrompt && !isInstalled, isInstalled, install };
 }

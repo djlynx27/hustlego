@@ -1,1 +1,2 @@
-// ...existing code from GeoHustle types/index.ts...
+// Re-exports des types centraux du projet
+export * from './models';
