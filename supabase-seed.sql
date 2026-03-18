@@ -155,11 +155,27 @@ ON CONFLICT (report_date) DO UPDATE SET
   dead_time_pct = EXCLUDED.dead_time_pct,
   ai_recommendation = EXCLUDED.ai_recommendation;
 
+-- ── Sécurité RLS (idempotente — peut être relancée sans erreur) ─
+ALTER TABLE cities       ENABLE ROW LEVEL SECURITY;
+ALTER TABLE zones        ENABLE ROW LEVEL SECURITY;
+ALTER TABLE daily_reports ENABLE ROW LEVEL SECURITY;
+ALTER TABLE events       ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "public read" ON cities;
+DROP POLICY IF EXISTS "public read" ON zones;
+DROP POLICY IF EXISTS "public read" ON daily_reports;
+DROP POLICY IF EXISTS "public read" ON events;
+
+CREATE POLICY "public read" ON cities       FOR SELECT USING (true);
+CREATE POLICY "public read" ON zones        FOR SELECT USING (true);
+CREATE POLICY "public read" ON daily_reports FOR SELECT USING (true);
+CREATE POLICY "public read" ON events       FOR SELECT USING (true);
+
 -- ── Fin de migration ─────────────────────────────────────────
 
 -- ── Événements de démonstration (Mars 2026 — Montréal) ──────
 -- Exécuter cette section pour peupler la page Événements.
--- Les UUIDs fixes permettent de relancer sans dupliquer.
+-- Les UUIDs valides permettent de relancer sans dupliquer.
 
 INSERT INTO public.events (
   id, name, venue, city_id,
@@ -168,56 +184,56 @@ INSERT INTO public.events (
   capacity, demand_impact, boost_multiplier, boost_radius_km,
   boost_zone_types, category, is_holiday
 ) VALUES
-  ('evt-mtl-0001-0001-0001-000000000001',
+  ('e0ca0001-cafe-4001-8001-000000000001',
    'Canadiens vs Maple Leafs', 'Centre Bell', 'mtl',
    45.4957, -73.5693,
    '2026-03-18 23:00:00+00', '2026-03-19 02:30:00+00',
    21288, 5, 2.5, 3.0,
    ARRAY['nightlife','commercial'], 'hockey', false),
 
-  ('evt-mtl-0001-0001-0001-000000000002',
+  ('e0ca0001-cafe-4001-8001-000000000002',
    'Festival MTL en Lumière – Clôture', 'Place des Arts', 'mtl',
    45.5088, -73.5682,
    '2026-03-19 21:00:00+00', '2026-03-20 03:00:00+00',
    8000, 4, 2.0, 2.5,
    ARRAY['nightlife','commercial','tourisme'], 'festival', false),
 
-  ('evt-mtl-0001-0001-0001-000000000003',
+  ('e0ca0001-cafe-4001-8001-000000000003',
    'Concert OSM — Beethoven', 'Maison Symphonique', 'mtl',
    45.5085, -73.5689,
    '2026-03-20 01:00:00+00', '2026-03-20 03:00:00+00',
    2100, 3, 1.8, 1.5,
    ARRAY['commercial'], 'event', false),
 
-  ('evt-mtl-0001-0001-0001-000000000004',
+  ('e0ca0001-cafe-4001-8001-000000000004',
    'Match CF Montréal', 'Saputo Stadium', 'mtl',
    45.5635, -73.5525,
    '2026-03-21 19:00:00+00', '2026-03-21 21:30:00+00',
    13034, 4, 2.2, 2.5,
    ARRAY['commercial','transport','événements'], 'event', false),
 
-  ('evt-mtl-0001-0001-0001-000000000005',
+  ('e0ca0001-cafe-4001-8001-000000000005',
    'Salon de l''Auto de Montréal', 'Palais des Congrès', 'mtl',
    45.5052, -73.5618,
    '2026-03-22 14:00:00+00', '2026-03-23 00:00:00+00',
    12000, 3, 1.6, 1.8,
    ARRAY['commercial','transport'], 'event', false),
 
-  ('evt-mtl-0001-0001-0001-000000000006',
+  ('e0ca0001-cafe-4001-8001-000000000006',
    'Nuit Blanche Montréal', 'Centre-ville', 'mtl',
    45.5048, -73.5741,
    '2026-03-22 05:00:00+00', '2026-03-22 11:00:00+00',
    40000, 5, 3.0, 5.0,
    ARRAY['nightlife','commercial','tourisme','événements'], 'festival', false),
 
-  ('evt-mtl-0001-0001-0001-000000000007',
+  ('e0ca0001-cafe-4001-8001-000000000007',
    'Canadiens vs Sénateurs', 'Centre Bell', 'mtl',
    45.4957, -73.5693,
    '2026-03-24 23:00:00+00', '2026-03-25 02:30:00+00',
    21288, 5, 2.5, 3.0,
    ARRAY['nightlife','commercial'], 'hockey', false),
 
-  ('evt-lvl-0001-0001-0001-000000000001',
+  ('e0ca00bb-cafe-4001-8001-000000000001',
    'Carrefour Laval — Exposition Printemps', 'Carrefour Laval', 'lvl',
    45.5585, -73.7469,
    '2026-03-22 13:00:00+00', '2026-03-22 23:00:00+00',
