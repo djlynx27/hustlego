@@ -81,7 +81,9 @@ export default function TodayScreen() {
   const heroZone = rankedZones[0] ?? null;
   const nextZones = rankedZones.slice(1, 4);
 
-  const [driverMode, setDriverMode] = useState<'rideshare' | 'delivery' | 'all'>('all');
+  const [driverMode, setDriverMode] = useState<
+    'rideshare' | 'delivery' | 'all'
+  >('all');
 
   const getDistance = (zone: any) => {
     if (!userLocation || !zone) return null;
