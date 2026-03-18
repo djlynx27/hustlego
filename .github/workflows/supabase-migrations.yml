@@ -106,9 +106,6 @@ PY
           echo "SUPABASE_PROJECT_REF=$ref" >> "$GITHUB_ENV"
           echo "Resolved Supabase project ref: $ref"
 
-      - name: Link to Supabase project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
-
       - name: Push migrations to Supabase
         run: supabase db push --project-id "$SUPABASE_PROJECT_REF"
 
