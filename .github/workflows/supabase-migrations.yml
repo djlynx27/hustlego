@@ -57,12 +57,49 @@ jobs:
             ref="$(echo "$clean" | grep -Eo '[a-z0-9]{20}' | head -n 1 || true)"
           fi
 
+          # 5) Fallback: infer from Supabase account projects if secret is invalid.
+          if [[ -z "$ref" ]]; then
+            echo "SUPABASE_PROJECT_ID not directly parseable, trying account project lookup..."
+            projects_json="$(supabase projects list --output json || true)"
+            inferred_ref="$(PROJECTS_JSON="$projects_json" python3 - <<'PY'
+import json
+import os
+
+raw = os.environ.get("PROJECTS_JSON", "")
+try:
+    data = json.loads(raw)
+except Exception:
+    print("")
+    raise SystemExit
+
+items = data if isinstance(data, list) else data.get("projects", []) if isinstance(data, dict) else []
+refs = []
+for item in items:
+    if not isinstance(item, dict):
+        continue
+    for key in ("id", "ref", "project_ref", "reference_id"):
+        value = item.get(key)
+        if isinstance(value, str) and len(value) == 20 and value.isalnum() and value == value.lower():
+            refs.append(value)
+
+unique_refs = list(dict.fromkeys(refs))
+print(unique_refs[0] if len(unique_refs) == 1 else "")
+PY
+            )"
+
+            if [[ -n "$inferred_ref" ]]; then
+              ref="$inferred_ref"
+              echo "Using inferred project ref from account projects list."
+            fi
+          fi
+
           if [[ ! "$ref" =~ ^[a-z0-9]{20}$ ]]; then
             echo "Invalid SUPABASE_PROJECT_ID format: '$raw'"
             echo "Expected one of:"
             echo "- project ref: abcdefghijklmnopqrst"
             echo "- API URL: https://abcdefghijklmnopqrst.supabase.co"
             echo "- Dashboard URL: https://app.supabase.com/project/abcdefghijklmnopqrst"
+            echo "Tip: if your token can access exactly one project, this workflow can auto-detect it."
             exit 1
           fi
 
