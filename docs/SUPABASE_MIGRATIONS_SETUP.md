@@ -32,7 +32,7 @@ Pour que le workflow auto-applique les migrations à chaque push sur `main`, tu 
 
 - ✅ Déclenche à chaque push sur `main` touchant migrations/seed
 - ✅ Installe Supabase CLI dans GitHub
-- ✅ Pushes les migrations depuis `supabase/migrations/` via `--project-id`
+- ✅ Lie le projet Supabase puis push les migrations depuis `supabase/migrations/`
 - ✅ Applique le seed de démo depuis `supabase-seed.sql`
 - ✅ Log le succès/erreur
 

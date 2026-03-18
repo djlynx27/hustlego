@@ -69,12 +69,15 @@ jobs:
           echo "SUPABASE_PROJECT_REF=$ref" >> "$GITHUB_ENV"
           echo "Resolved Supabase project ref: $ref"
 
+      - name: Link to Supabase project
+        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+
       - name: Push migrations to Supabase
-        run: supabase db push --project-id "$SUPABASE_PROJECT_REF"
+        run: supabase db push
 
       - name: Run seed SQL (optional demo data)
         run: |
-          supabase db execute --file supabase-seed.sql --project-id "$SUPABASE_PROJECT_REF"
+          supabase db execute --file supabase-seed.sql
 
       - name: Log migration status
         run: echo "✅ Supabase migrations applied successfully"
