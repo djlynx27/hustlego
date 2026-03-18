@@ -10,8 +10,8 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { useI18n } from '@/contexts/I18nContext';
-import { useCityId } from '@/hooks/useCityId';
 import { useAutoCity } from '@/hooks/useAutoCity';
+import { useCityId } from '@/hooks/useCityId';
 import { useCities, useZones } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { useWeather } from '@/hooks/useWeather';
@@ -23,7 +23,14 @@ import {
   normalize24hTime,
 } from '@/lib/demandUtils';
 import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
-import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FormEvent,
+} from 'react';
 
 const TIME_LABELS = generate96TimeLabels();
 
@@ -141,18 +148,6 @@ export default function PlanningScreen() {
 
   const fmtTime = normalize24hTime;
 
-  // Auto-scroll to current time once slots are loaded
-  const hasAutoScrolled = useRef(false);
-  useEffect(() => {
-    if (slots.length > 0 && !hasAutoScrolled.current) {
-      hasAutoScrolled.current = true;
-      const timer = setTimeout(() => {
-        scrollAndHighlight(formatTime24h(new Date()));
-      }, 150);
-      return () => clearTimeout(timer);
-    }
-  }, [slots.length, scrollAndHighlight]);
-
   const scrollAndHighlight = useCallback((time: string) => {
     const target = normalize24hTime(time);
     let bestEl: HTMLDivElement | null = null;
@@ -174,6 +169,18 @@ export default function PlanningScreen() {
     setHighlightTime(target);
     setTimeout(() => setHighlightTime(null), 3000);
   }, []);
+
+  // Auto-scroll to current time once slots are loaded
+  const hasAutoScrolled = useRef(false);
+  useEffect(() => {
+    if (slots.length > 0 && !hasAutoScrolled.current) {
+      hasAutoScrolled.current = true;
+      const timer = setTimeout(() => {
+        scrollAndHighlight(formatTime24h(new Date()));
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [slots.length, scrollAndHighlight]);
 
   const handleJumpSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
