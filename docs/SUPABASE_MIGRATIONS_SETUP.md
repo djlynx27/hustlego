@@ -16,10 +16,11 @@ Pour que le workflow auto-applique les migrations à chaque push sur `main`, tu 
 1. Va sur GitHub → Ton repo HustleGo → **Settings** → **Secrets and variables** → **Actions**
 2. Clique **New repository secret** et ajoute:
 
-| Secret Name             | Valeur                                                                                                                             |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------- |
-| `SUPABASE_ACCESS_TOKEN` | Le token que tu viens de copier                                                                                                    |
+| Secret Name             | Valeur                                                                                                                                                   |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `SUPABASE_ACCESS_TOKEN` | Le token que tu viens de copier                                                                                                                          |
 | `SUPABASE_PROJECT_ID`   | Le project ref exact (20 caractères alphanumériques), l'URL API `https://<ref>.supabase.co`, ou l'URL dashboard `https://app.supabase.com/project/<ref>` |
+| `SUPABASE_DB_PASSWORD`  | Le mot de passe de la base Postgres Supabase (Database password dans Project Settings)                                                                  |
 
 ### 3. Test automatique
 
@@ -38,12 +39,13 @@ Pour que le workflow auto-applique les migrations à chaque push sur `main`, tu 
 
 ## Troubleshooting
 
-| Problème                     | Solution                                                                                                |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------- |
-| "Invalid access token"       | Assure-toi d'avoir copié le token complet depuis Supabase (Settings → Access tokens)                    |
+| Problème                     | Solution                                                                                                                      |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| "Invalid access token"       | Assure-toi d'avoir copié le token complet depuis Supabase (Settings → Access tokens)                                          |
 | "Invalid project ref format" | Mets `SUPABASE_PROJECT_ID` avec le project ref exact (20 caractères alphanumériques), l'URL API, ou l'URL dashboard du projet |
-| "Project not found"          | Vérifie que `SUPABASE_PROJECT_ID` correspond bien au bon projet Supabase                                |
-| "Migrations failed"          | Regarde les logs du workflow pour l'erreur SQL exacte → corrige `supabase/migrations/`                  |
+| "password authentication failed for user postgres" | Ajoute/mettre à jour `SUPABASE_DB_PASSWORD` avec le mot de passe DB du projet (Settings → Database)                 |
+| "Project not found"          | Vérifie que `SUPABASE_PROJECT_ID` correspond bien au bon projet Supabase                                                      |
+| "Migrations failed"          | Regarde les logs du workflow pour l'erreur SQL exacte → corrige `supabase/migrations/`                                        |
 
 ## Désactiver temporairement
 

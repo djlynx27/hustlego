@@ -15,6 +15,7 @@ jobs:
     env:
       SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
       SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+      SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -30,6 +31,11 @@ jobs:
           raw="${SUPABASE_PROJECT_ID:-}"
           if [[ -z "$raw" ]]; then
             echo "SUPABASE_PROJECT_ID secret is empty"
+            exit 1
+          fi
+
+          if [[ -z "${SUPABASE_DB_PASSWORD:-}" ]]; then
+            echo "SUPABASE_DB_PASSWORD secret is empty"
             exit 1
           fi
 
@@ -79,7 +85,7 @@ jobs:
 
           for candidate in "${candidates[@]}"; do
             echo "Trying project ref candidate (len=${#candidate})"
-            if supabase link --project-ref "$candidate" >/tmp/supabase_link.log 2>&1; then
+            if supabase link --project-ref "$candidate" --password "$SUPABASE_DB_PASSWORD" >/tmp/supabase_link.log 2>&1; then
               linked_ref="$candidate"
               break
             fi
@@ -93,7 +99,7 @@ jobs:
           fi
 
           echo "Linked Supabase project ref length: ${#linked_ref}"
-          supabase db push
+          supabase db push --password "$SUPABASE_DB_PASSWORD"
           supabase db execute --file supabase-seed.sql
 
       - name: Log migration status
