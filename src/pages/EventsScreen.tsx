@@ -177,7 +177,7 @@ export default function EventsScreen() {
 
   return (
     <div className="flex flex-col h-full pb-36 overflow-y-auto">
-      <div className="px-3 pt-3 pb-2 space-y-2">
+      <div className="px-3 pt-3 pb-2 space-y-2 pr-12">
         <div className="flex items-center justify-between gap-2">
           <h1 className="text-[22px] font-display font-bold">{t('events')}</h1>
           <div className="w-[150px] flex-shrink-0">

@@ -17,11 +17,7 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { useCities } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
-import {
-  formatTime24h,
-  getCurrentSlotTime,
-  getDemandClass,
-} from '@/lib/demandUtils';
+import { getCurrentSlotTime, getDemandClass } from '@/lib/demandUtils';
 import { getActiveTimeBoosts } from '@/lib/timeBoosts';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
 import {
@@ -113,18 +109,15 @@ export default function TodayScreen() {
   }, [rankedZones]);
 
   return (
-    <div className="flex flex-col h-full pb-36">
+    <div className="flex flex-col h-full pb-20">
       {/* 1. Compact header */}
-      <div className="flex items-center gap-2 px-3 pt-2 pb-1 h-12">
-        <div className="w-[140px] flex-shrink-0">
+      <div className="flex items-center gap-2 px-3 pt-2 pb-1 h-12 pr-20">
+        <div className="w-[130px] flex-shrink-0">
           <CitySelect cities={cities} value={cityId} onChange={setCityId} />
         </div>
         <div className="flex-1 min-w-0">
           <WeatherWidget cityId={cityId} />
         </div>
-        <span className="text-[14px] text-muted-foreground font-body flex-shrink-0">
-          {formatTime24h(now)}
-        </span>
       </div>
 
       {/* Dead Time Timer + Weekly Goal */}
