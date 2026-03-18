@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface UserLocation {
   latitude: number;
@@ -45,7 +45,8 @@ export function useUserLocation(intervalMs = 30000): UserLocationResult {
         setLocation({
           latitude: pos.coords.latitude,
           longitude: pos.coords.longitude,
-          heading: typeof pos.coords.heading === 'number' ? pos.coords.heading : null,
+          heading:
+            typeof pos.coords.heading === 'number' ? pos.coords.heading : null,
           speed: typeof pos.coords.speed === 'number' ? pos.coords.speed : null,
         });
         setStatus('success');
@@ -69,12 +70,19 @@ export function useUserLocation(intervalMs = 30000): UserLocationResult {
 }
 
 /** Haversine distance in km */
-export function haversineKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+export function haversineKm(
+  lat1: number,
+  lon1: number,
+  lat2: number,
+  lon2: number
+): number {
   const R = 6371;
   const dLat = ((lat2 - lat1) * Math.PI) / 180;
   const dLon = ((lon2 - lon1) * Math.PI) / 180;
   const a =
     Math.sin(dLat / 2) ** 2 +
-    Math.cos((lat1 * Math.PI) / 180) * Math.cos((lat2 * Math.PI) / 180) * Math.sin(dLon / 2) ** 2;
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) ** 2;
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }

@@ -1,27 +1,30 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { I18nProvider } from "@/contexts/I18nContext";
-import { ThemeProvider } from "next-themes";
-import { BottomNav } from "@/components/BottomNav";
-import { NearestHotspot } from "@/components/NearestHotspot";
-import { LangToggle } from "@/components/LangToggle";
-import TodayScreen from "@/pages/TodayScreen";
-import DriveScreen from "@/pages/DriveScreen";
-import PlanningScreen from "@/pages/PlanningScreen";
-import ZonesScreen from "@/pages/ZonesScreen";
-import AdminScreen from "@/pages/AdminScreen";
-import EventsScreen from "@/pages/EventsScreen";
-import NotFound from "./pages/NotFound.tsx";
-import { Component, ErrorInfo, ReactNode } from "react";
+import { BottomNav } from '@/components/BottomNav';
+import { LangToggle } from '@/components/LangToggle';
+import { NearestHotspot } from '@/components/NearestHotspot';
+import { Toaster as Sonner } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { I18nProvider } from '@/contexts/I18nContext';
+import AdminScreen from '@/pages/AdminScreen';
+import DriveScreen from '@/pages/DriveScreen';
+import EventsScreen from '@/pages/EventsScreen';
+import PlanningScreen from '@/pages/PlanningScreen';
+import TodayScreen from '@/pages/TodayScreen';
+import ZonesScreen from '@/pages/ZonesScreen';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ThemeProvider } from 'next-themes';
+import { Component, ErrorInfo, ReactNode } from 'react';
+import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
+import NotFound from './pages/NotFound.tsx';
 
 const queryClient = new QueryClient();
 
 type ErrorBoundaryProps = { children: ReactNode };
 type ErrorBoundaryState = { hasError: boolean };
 
-class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+class AppErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   state: ErrorBoundaryState = { hasError: false };
 
   static getDerivedStateFromError(): ErrorBoundaryState {
@@ -29,7 +32,7 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error("App crashed:", error, info);
+    console.error('App crashed:', error, info);
   }
 
   render() {
@@ -37,9 +40,12 @@ class AppErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState>
       return (
         <div className="min-h-screen flex items-center justify-center bg-background text-foreground px-4">
           <div className="max-w-sm text-center space-y-3">
-            <h1 className="text-xl font-display font-bold">Un problème est survenu</h1>
+            <h1 className="text-xl font-display font-bold">
+              Un problème est survenu
+            </h1>
             <p className="text-sm text-muted-foreground">
-              L&apos;application a rencontré une erreur inattendue. Relance la page pour continuer ton shift.
+              L&apos;application a rencontré une erreur inattendue. Relance la
+              page pour continuer ton shift.
             </p>
             <button
               className="mt-2 inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
