@@ -11,6 +11,7 @@ import {
 } from '@/components/ui/select';
 import { useI18n } from '@/contexts/I18nContext';
 import { useCityId } from '@/hooks/useCityId';
+import { useAutoCity } from '@/hooks/useAutoCity';
 import { useCities, useZones } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { useWeather } from '@/hooks/useWeather';
@@ -22,7 +23,7 @@ import {
   normalize24hTime,
 } from '@/lib/demandUtils';
 import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
-import { useCallback, useMemo, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 
 const TIME_LABELS = generate96TimeLabels();
 
@@ -37,6 +38,7 @@ export default function PlanningScreen() {
   const listRef = useRef<HTMLDivElement>(null);
   const slotRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const { location: userLocation } = useUserLocation();
+  useAutoCity(setCityId, userLocation?.latitude, userLocation?.longitude);
 
   const [navZone, setNavZone] = useState<{
     name: string;
@@ -138,6 +140,18 @@ export default function PlanningScreen() {
   }, [zones, cityId, date, userLocation, weather]);
 
   const fmtTime = normalize24hTime;
+
+  // Auto-scroll to current time once slots are loaded
+  const hasAutoScrolled = useRef(false);
+  useEffect(() => {
+    if (slots.length > 0 && !hasAutoScrolled.current) {
+      hasAutoScrolled.current = true;
+      const timer = setTimeout(() => {
+        scrollAndHighlight(formatTime24h(new Date()));
+      }, 150);
+      return () => clearTimeout(timer);
+    }
+  }, [slots.length, scrollAndHighlight]);
 
   const scrollAndHighlight = useCallback((time: string) => {
     const target = normalize24hTime(time);
@@ -255,8 +269,7 @@ export default function PlanningScreen() {
             >
               <div className="flex-1 min-w-0">
                 <span className="text-[14px] text-muted-foreground font-body block">
-                  {fmtTime(slot.start_time).split(':')[0]}:00 –{' '}
-                  {fmtTime(slot.start_time).split(':')[0]}:59
+                  {fmtTime(slot.start_time)} – {slot.end_time}
                 </span>
                 <span className="text-[18px] font-display font-semibold leading-tight block break-words">
                   {zone?.name}

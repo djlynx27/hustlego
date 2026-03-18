@@ -9,6 +9,7 @@ import { WeatherWidget } from '@/components/WeatherWidget';
 import { WeeklyGoalDisplay } from '@/components/WeeklyGoal';
 import { useI18n } from '@/contexts/I18nContext';
 import { useCityId } from '@/hooks/useCityId';
+import { useAutoCity } from '@/hooks/useAutoCity';
 import { useDemandScores } from '@/hooks/useDemandScores';
 import { useHabsGame } from '@/hooks/useHabsGame';
 import { useHoliday } from '@/hooks/useHoliday';
@@ -41,14 +42,28 @@ const CITY_CENTERS: Record<string, [number, number]> = {
 
 // Score multipliers by zone type, depending on driver mode
 const RIDESHARE_BOOST: Record<string, number> = {
-  tourisme: 1.30, 'événements': 1.25, nightlife: 1.25, 'aéroport': 1.20,
-  'université': 1.15, transport: 1.10, commercial: 1.05, 'médical': 1.05,
-  'métro': 1.05, 'résidentiel': 0.75,
+  tourisme: 1.3,
+  événements: 1.25,
+  nightlife: 1.25,
+  aéroport: 1.2,
+  université: 1.15,
+  transport: 1.1,
+  commercial: 1.05,
+  médical: 1.05,
+  métro: 1.05,
+  résidentiel: 0.75,
 };
 const DELIVERY_BOOST: Record<string, number> = {
-  commercial: 1.30, 'résidentiel': 1.20, 'métro': 0.95, transport: 0.85,
-  'université': 0.80, 'médical': 0.75, tourisme: 0.75, nightlife: 0.70,
-  'événements': 0.70, 'aéroport': 0.65,
+  commercial: 1.3,
+  résidentiel: 1.2,
+  métro: 0.95,
+  transport: 0.85,
+  université: 0.8,
+  médical: 0.75,
+  tourisme: 0.75,
+  nightlife: 0.7,
+  événements: 0.7,
+  aéroport: 0.65,
 };
 
 export default function TodayScreen() {
@@ -60,6 +75,7 @@ export default function TodayScreen() {
   const isOnline = useOnlineStatus();
   const { enabled: notifEnabled, requestPermission } = useNotifications(cityId);
   const { location: userLocation } = useUserLocation();
+  useAutoCity(setCityId, userLocation?.latitude, userLocation?.longitude);
   const [navZone, setNavZone] = useState<{
     name: string;
     lat: number;
@@ -79,7 +95,9 @@ export default function TodayScreen() {
   const { data: habsGame } = useHabsGame(getCurrentSlotTime(now).date);
   const timeBoosts = useMemo(() => getActiveTimeBoosts(now), [now]);
 
-  const [driverMode, setDriverMode] = useState<'rideshare' | 'delivery' | 'all'>('all');
+  const [driverMode, setDriverMode] = useState<
+    'rideshare' | 'delivery' | 'all'
+  >('all');
 
   // Ranked zones by score descending
   const rankedZones = useMemo(() => {
@@ -91,9 +109,13 @@ export default function TodayScreen() {
   // Reweight scores based on driver objective (personnes / livraison / les deux)
   const modeZones = useMemo(() => {
     if (driverMode === 'all') return rankedZones;
-    const boostMap = driverMode === 'rideshare' ? RIDESHARE_BOOST : DELIVERY_BOOST;
+    const boostMap =
+      driverMode === 'rideshare' ? RIDESHARE_BOOST : DELIVERY_BOOST;
     return [...rankedZones]
-      .map((z) => ({ ...z, score: Math.min(Math.round(z.score * (boostMap[z.type] ?? 1.0)), 100) }))
+      .map((z) => ({
+        ...z,
+        score: Math.min(Math.round(z.score * (boostMap[z.type] ?? 1.0)), 100),
+      }))
       .sort((a, b) => b.score - a.score);
   }, [rankedZones, driverMode]);
 
@@ -285,9 +307,12 @@ export default function TodayScreen() {
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-4 h-4 text-muted-foreground" />
             <span className="text-[14px] text-muted-foreground font-body uppercase tracking-wide">
-              {driverMode === 'rideshare' ? '🚗 Meilleure zone passagers' :
-               driverMode === 'delivery' ? '📦 Meilleure zone livraison' :
-               t('bestZoneNow')} · {start}–{end}
+              {driverMode === 'rideshare'
+                ? '🚗 Meilleure zone passagers'
+                : driverMode === 'delivery'
+                  ? '📦 Meilleure zone livraison'
+                  : t('bestZoneNow')}{' '}
+              · {start}–{end}
             </span>
           </div>
 

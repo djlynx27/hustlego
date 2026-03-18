@@ -40,6 +40,9 @@ export function useZones(cityId: string) {
       return data as Zone[];
     },
     enabled: !!cityId,
+    staleTime: 5 * 60 * 1000,        // consider fresh for 5 min
+    refetchInterval: 5 * 60 * 1000,   // auto-refresh every 5 min
+    refetchOnWindowFocus: true,        // re-fetch when user returns to tab
   });
 }
 

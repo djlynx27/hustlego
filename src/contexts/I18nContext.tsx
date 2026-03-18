@@ -9,8 +9,8 @@ import React, {
 type Lang = 'en' | 'fr';
 
 const translations: Record<string, Record<Lang, string>> = {
-  today: { en: 'Today', fr: "Aujourd'hui" },
-  planning: { en: 'Planning', fr: 'Planification' },
+  today: { en: 'Today', fr: "Auj." },
+  planning: { en: 'Planning', fr: 'Planning' },
   zones: { en: 'Zones', fr: 'Zones' },
   admin: { en: 'Admin', fr: 'Admin' },
   selectCity: { en: 'Select city', fr: 'Sélectionner la ville' },
@@ -51,7 +51,7 @@ const translations: Record<string, Record<Lang, string>> = {
   addCity: { en: 'Add City', fr: 'Ajouter une ville' },
   simulated: { en: 'Simulated', fr: 'Simulé' },
   edit: { en: 'Edit', fr: 'Modifier' },
-  events: { en: 'Events', fr: 'Événements' },
+  events: { en: 'Events', fr: 'Évén.' },
   noEventsToday: { en: 'No events today', fr: "Aucun événement aujourd'hui" },
   next7Days: { en: 'Next 7 days', fr: '7 prochains jours' },
   noUpcomingEvents: { en: 'No upcoming events', fr: 'Aucun événement à venir' },

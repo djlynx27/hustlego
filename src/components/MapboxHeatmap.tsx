@@ -62,7 +62,11 @@ function DriverDot() {
     <div className="relative flex items-center justify-center">
       <span className="absolute w-9 h-9 rounded-full bg-blue-500/20 animate-ping" />
       <span
-        style={{ fontSize: '26px', lineHeight: 1, filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.9))' }}
+        style={{
+          fontSize: '26px',
+          lineHeight: 1,
+          filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.9))',
+        }}
         role="img"
         aria-label="Ma position"
       >
@@ -170,20 +174,48 @@ export function MapboxHeatmap({
     // In delivery mode: commercial (restaurant pickup) + résidentiel (drop-off) are priority
     if (driverMode === 'delivery') {
       if (t === 'commercial' || t === 'résidentiel')
-        return { borderColor: '#facc15', backgroundColor: 'rgba(250,204,21,0.9)' };
-      return { borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.45)' };
+        return {
+          borderColor: '#facc15',
+          backgroundColor: 'rgba(250,204,21,0.9)',
+        };
+      return {
+        borderColor: '#60a5fa',
+        backgroundColor: 'rgba(96,165,250,0.45)',
+      };
     }
     // In rideshare mode: nightlife, events, tourism, airport, commercial are priority
     if (driverMode === 'rideshare') {
-      if (['nightlife', 'événements', 'tourisme', 'aéroport', 'commercial', 'transport', 'université'].includes(t))
-        return { borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.9)' };
-      return { borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.45)' };
+      if (
+        [
+          'nightlife',
+          'événements',
+          'tourisme',
+          'aéroport',
+          'commercial',
+          'transport',
+          'université',
+        ].includes(t)
+      )
+        return {
+          borderColor: '#22c55e',
+          backgroundColor: 'rgba(34,197,94,0.9)',
+        };
+      return {
+        borderColor: '#60a5fa',
+        backgroundColor: 'rgba(96,165,250,0.45)',
+      };
     }
     // All mode: color by category
     if (['nightlife', 'événements', 'tourisme', 'aéroport'].includes(t))
-      return { borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.85)' }; // green = passenger hotspots
+      return {
+        borderColor: '#22c55e',
+        backgroundColor: 'rgba(34,197,94,0.85)',
+      }; // green = passenger hotspots
     if (['commercial', 'résidentiel'].includes(t))
-      return { borderColor: '#facc15', backgroundColor: 'rgba(250,204,21,0.85)' }; // yellow = commercial/delivery
+      return {
+        borderColor: '#facc15',
+        backgroundColor: 'rgba(250,204,21,0.85)',
+      }; // yellow = commercial/delivery
     return { borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.85)' }; // blue = transport/other
   };
 
@@ -200,15 +232,24 @@ export function MapboxHeatmap({
         <div className="rounded-md border border-white/20 bg-black/40 p-2 text-xs text-white">
           <div className="font-semibold mb-1">Légende</div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#22c55e' }} />
+            <span
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: '#22c55e' }}
+            />
             Passagers
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#facc15' }} />
+            <span
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: '#facc15' }}
+            />
             Commercial / Livraison
           </div>
           <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#60a5fa' }} />
+            <span
+              className="w-2 h-2 rounded-full"
+              style={{ backgroundColor: '#60a5fa' }}
+            />
             Transport / Autre
           </div>
         </div>
