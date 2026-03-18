@@ -1,6 +1,6 @@
-import { useEffect, useRef } from 'react';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
+import { useEffect, useRef } from 'react';
 
 interface ZoneMarker {
   id: string;
@@ -25,7 +25,13 @@ function getMarkerColor(score: number): string {
   return '#ef4444';
 }
 
-export function LeafletMap({ center, zoom = 12, markers, driverPosition, className = '' }: LeafletMapProps) {
+export function LeafletMap({
+  center,
+  zoom = 12,
+  markers,
+  driverPosition,
+  className = '',
+}: LeafletMapProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const driverMarkerRef = useRef<L.Marker | null>(null);
@@ -42,7 +48,8 @@ export function LeafletMap({ center, zoom = 12, markers, driverPosition, classNa
       });
 
       L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+        attribution:
+          '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
         maxZoom: 19,
       }).addTo(mapRef.current);
     }
@@ -67,13 +74,13 @@ export function LeafletMap({ center, zoom = 12, markers, driverPosition, classNa
     if (!mapRef.current) return;
 
     // Remove existing markers
-    mapRef.current.eachLayer(layer => {
+    mapRef.current.eachLayer((layer) => {
       if (layer instanceof L.CircleMarker) {
         mapRef.current!.removeLayer(layer);
       }
     });
 
-    markers.forEach(m => {
+    markers.forEach((m) => {
       const score = m.demandScore ?? 50;
       const color = getMarkerColor(score);
 
@@ -98,15 +105,22 @@ export function LeafletMap({ center, zoom = 12, markers, driverPosition, classNa
 
     if (driverPosition) {
       if (!driverMarkerRef.current) {
-        driverMarkerRef.current = L.marker([driverPosition.lat, driverPosition.lng], {
-          icon: L.divIcon({
-            className: 'driver-dot-marker',
-            html: '<div style="width:16px;height:16px;border-radius:50%;background:#ec4899;border:2px solid white;box-shadow:0 0 8px rgba(236,72,153,0.7);"></div>',
-            iconSize: [16, 16],
-          }),
-        }).addTo(mapRef.current!);
+        driverMarkerRef.current = L.marker(
+          [driverPosition.lat, driverPosition.lng],
+          {
+            icon: L.divIcon({
+              className: 'driver-car-marker',
+              html: '<div style="font-size:26px;line-height:1;filter:drop-shadow(0 2px 5px rgba(0,0,0,0.9));text-align:center">🚗</div>',
+              iconSize: [30, 30],
+              iconAnchor: [15, 15],
+            }),
+          }
+        ).addTo(mapRef.current!);
       } else {
-        driverMarkerRef.current.setLatLng([driverPosition.lat, driverPosition.lng]);
+        driverMarkerRef.current.setLatLng([
+          driverPosition.lat,
+          driverPosition.lng,
+        ]);
       }
     } else if (driverMarkerRef.current) {
       driverMarkerRef.current.remove();

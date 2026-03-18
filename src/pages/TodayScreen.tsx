@@ -39,12 +39,24 @@ const CITY_CENTERS: Record<string, [number, number]> = {
   lng: [45.5252, -73.5205],
 };
 
+// Score multipliers by zone type, depending on driver mode
+const RIDESHARE_BOOST: Record<string, number> = {
+  tourisme: 1.30, 'événements': 1.25, nightlife: 1.25, 'aéroport': 1.20,
+  'université': 1.15, transport: 1.10, commercial: 1.05, 'médical': 1.05,
+  'métro': 1.05, 'résidentiel': 0.75,
+};
+const DELIVERY_BOOST: Record<string, number> = {
+  commercial: 1.30, 'résidentiel': 1.20, 'métro': 0.95, transport: 0.85,
+  'université': 0.80, 'médical': 0.75, tourisme: 0.75, nightlife: 0.70,
+  'événements': 0.70, 'aéroport': 0.65,
+};
+
 export default function TodayScreen() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
   const [now, setNow] = useState(new Date());
-  const { canInstall, install } = usePwaInstall();
+  const { canInstall, install, dismiss: dismissInstall } = usePwaInstall();
   const isOnline = useOnlineStatus();
   const { enabled: notifEnabled, requestPermission } = useNotifications(cityId);
   const { location: userLocation } = useUserLocation();
@@ -67,6 +79,8 @@ export default function TodayScreen() {
   const { data: habsGame } = useHabsGame(getCurrentSlotTime(now).date);
   const timeBoosts = useMemo(() => getActiveTimeBoosts(now), [now]);
 
+  const [driverMode, setDriverMode] = useState<'rideshare' | 'delivery' | 'all'>('all');
+
   // Ranked zones by score descending
   const rankedZones = useMemo(() => {
     return zones
@@ -74,12 +88,17 @@ export default function TodayScreen() {
       .sort((a, b) => b.score - a.score);
   }, [zones, scores]);
 
-  const heroZone = rankedZones[0] ?? null;
-  const nextZones = rankedZones.slice(1, 4);
+  // Reweight scores based on driver objective (personnes / livraison / les deux)
+  const modeZones = useMemo(() => {
+    if (driverMode === 'all') return rankedZones;
+    const boostMap = driverMode === 'rideshare' ? RIDESHARE_BOOST : DELIVERY_BOOST;
+    return [...rankedZones]
+      .map((z) => ({ ...z, score: Math.min(Math.round(z.score * (boostMap[z.type] ?? 1.0)), 100) }))
+      .sort((a, b) => b.score - a.score);
+  }, [rankedZones, driverMode]);
 
-  const [driverMode, setDriverMode] = useState<
-    'rideshare' | 'delivery' | 'all'
-  >('all');
+  const heroZone = modeZones[0] ?? null;
+  const nextZones = modeZones.slice(1, 4);
 
   const getDistance = (zone: any) => {
     if (!userLocation || !zone) return null;
@@ -98,7 +117,7 @@ export default function TodayScreen() {
     : (CITY_CENTERS[cityId] ?? CITY_CENTERS.mtl);
 
   const mapMarkers = useMemo(() => {
-    return rankedZones.map((z) => ({
+    return modeZones.map((z) => ({
       id: z.id,
       name: z.name,
       type: z.type,
@@ -106,12 +125,12 @@ export default function TodayScreen() {
       longitude: z.longitude,
       demandScore: z.score,
     }));
-  }, [rankedZones]);
+  }, [modeZones]);
 
   return (
     <div className="flex flex-col h-full pb-20">
       {/* 1. Compact header */}
-      <div className="flex items-center gap-2 px-3 pt-2 pb-1 h-12 pr-20">
+      <div className="flex items-center gap-2 px-3 pt-2 pb-1 h-12">
         <div className="w-[130px] flex-shrink-0">
           <CitySelect cities={cities} value={cityId} onChange={setCityId} />
         </div>
@@ -162,13 +181,25 @@ export default function TodayScreen() {
           </div>
         )}
         {canInstall && (
-          <Button
-            onClick={install}
-            variant="outline"
-            className="w-full gap-2 border-primary/40 text-primary hover:bg-primary/10 h-12"
-          >
-            <Download className="w-5 h-5" /> {t('installApp')}
-          </Button>
+          <div className="flex items-center gap-2 bg-primary/10 border border-primary/40 rounded-lg px-3 py-2">
+            <Download className="w-4 h-4 text-primary flex-shrink-0" />
+            <span className="flex-1 min-w-0 text-[13px] font-body text-primary font-medium">
+              {t('installApp')}
+            </span>
+            <button
+              onClick={() => install()}
+              className="bg-primary text-primary-foreground rounded-lg h-8 px-3 text-[12px] font-display font-semibold shrink-0 hover:bg-primary/90 transition-colors"
+            >
+              Installer
+            </button>
+            <button
+              onClick={dismissInstall}
+              className="text-muted-foreground hover:text-foreground transition-colors p-1 shrink-0 text-lg leading-none"
+              aria-label="Fermer"
+            >
+              ×
+            </button>
+          </div>
         )}
         {!notifEnabled && (
           <Button
@@ -254,7 +285,9 @@ export default function TodayScreen() {
           <div className="flex items-center gap-2 mb-2">
             <Clock className="w-4 h-4 text-muted-foreground" />
             <span className="text-[14px] text-muted-foreground font-body uppercase tracking-wide">
-              {t('bestZoneNow')} · {start}–{end}
+              {driverMode === 'rideshare' ? '🚗 Meilleure zone passagers' :
+               driverMode === 'delivery' ? '📦 Meilleure zone livraison' :
+               t('bestZoneNow')} · {start}–{end}
             </span>
           </div>
 
@@ -339,6 +372,7 @@ export default function TodayScreen() {
             onZoneClick={(z) =>
               setNavZone({ name: z.name, lat: z.latitude, lng: z.longitude })
             }
+            driverMode={driverMode}
           />
         </Suspense>
       </div>

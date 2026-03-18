@@ -28,6 +28,7 @@ interface MapboxHeatmapProps {
   markers: HeatmapZone[];
   onZoneClick?: (zone: HeatmapZone) => void;
   className?: string;
+  driverMode?: 'rideshare' | 'delivery' | 'all';
 }
 
 class MapErrorBoundary extends Component<
@@ -59,25 +60,14 @@ class MapErrorBoundary extends Component<
 function DriverDot() {
   return (
     <div className="relative flex items-center justify-center">
-      <span className="absolute w-8 h-8 rounded-full bg-pink-500/30 animate-ping" />
-      <div className="relative w-7 h-7 rounded-full bg-pink-500 border-2 border-white shadow-lg flex items-center justify-center">
-        <svg
-          viewBox="0 0 24 24"
-          className="w-4 h-4 text-white"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        >
-          <circle cx="12" cy="12" r="9" />
-          <circle cx="12" cy="12" r="3" />
-          <line x1="12" y1="3" x2="12" y2="5" />
-          <line x1="12" y1="19" x2="12" y2="21" />
-          <line x1="3" y1="12" x2="5" y2="12" />
-          <line x1="19" y1="12" x2="21" y2="12" />
-        </svg>
-      </div>
+      <span className="absolute w-9 h-9 rounded-full bg-blue-500/20 animate-ping" />
+      <span
+        style={{ fontSize: '26px', lineHeight: 1, filter: 'drop-shadow(0 2px 5px rgba(0,0,0,0.9))' }}
+        role="img"
+        aria-label="Ma position"
+      >
+        🚗
+      </span>
     </div>
   );
 }
@@ -88,6 +78,7 @@ export function MapboxHeatmap({
   markers,
   onZoneClick,
   className = '',
+  driverMode = 'all',
 }: MapboxHeatmapProps) {
   const { t } = useI18n();
   const mapRef = useRef<MapRef>(null);
@@ -175,23 +166,25 @@ export function MapboxHeatmap({
   };
 
   const getTypeStyle = (type: string) => {
-    if (type.toLowerCase().includes('delivery'))
-      return {
-        borderColor: '#facc15',
-        backgroundColor: 'rgba(250, 204, 21, 0.85)',
-      };
-    if (
-      type.toLowerCase().includes('commercial') ||
-      type.toLowerCase().includes('passenger')
-    )
-      return {
-        borderColor: '#22c55e',
-        backgroundColor: 'rgba(34, 197, 94, 0.85)',
-      };
-    return {
-      borderColor: '#60a5fa',
-      backgroundColor: 'rgba(96, 165, 250, 0.85)',
-    };
+    const t = type.toLowerCase();
+    // In delivery mode: commercial (restaurant pickup) + résidentiel (drop-off) are priority
+    if (driverMode === 'delivery') {
+      if (t === 'commercial' || t === 'résidentiel')
+        return { borderColor: '#facc15', backgroundColor: 'rgba(250,204,21,0.9)' };
+      return { borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.45)' };
+    }
+    // In rideshare mode: nightlife, events, tourism, airport, commercial are priority
+    if (driverMode === 'rideshare') {
+      if (['nightlife', 'événements', 'tourisme', 'aéroport', 'commercial', 'transport', 'université'].includes(t))
+        return { borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.9)' };
+      return { borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.45)' };
+    }
+    // All mode: color by category
+    if (['nightlife', 'événements', 'tourisme', 'aéroport'].includes(t))
+      return { borderColor: '#22c55e', backgroundColor: 'rgba(34,197,94,0.85)' }; // green = passenger hotspots
+    if (['commercial', 'résidentiel'].includes(t))
+      return { borderColor: '#facc15', backgroundColor: 'rgba(250,204,21,0.85)' }; // yellow = commercial/delivery
+    return { borderColor: '#60a5fa', backgroundColor: 'rgba(96,165,250,0.85)' }; // blue = transport/other
   };
 
   return (
@@ -205,27 +198,18 @@ export function MapboxHeatmap({
           📍 Me localiser
         </button>
         <div className="rounded-md border border-white/20 bg-black/40 p-2 text-xs text-white">
-          <div className="font-semibold mb-1">Hotspots</div>
+          <div className="font-semibold mb-1">Légende</div>
           <div className="flex items-center gap-2">
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: '#22c55e' }}
-            />{' '}
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#22c55e' }} />
             Passagers
           </div>
           <div className="flex items-center gap-2">
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: '#facc15' }}
-            />{' '}
-            Livraison
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#facc15' }} />
+            Commercial / Livraison
           </div>
           <div className="flex items-center gap-2">
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: '#60a5fa' }}
-            />{' '}
-            Autre
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: '#60a5fa' }} />
+            Transport / Autre
           </div>
         </div>
       </div>

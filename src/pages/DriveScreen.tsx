@@ -109,7 +109,7 @@ export default function DriveScreen() {
     <div className="flex flex-col h-full pb-36 bg-background text-foreground overflow-y-auto">
       {/* Header */}
       {!fullScreen && (
-        <div className="px-4 pt-3 pb-2 flex items-center gap-3 pr-12">
+        <div className="px-4 pt-3 pb-2 flex items-center gap-3">
           <div className="flex-1 min-w-0">
             <h1 className="text-[20px] font-display font-bold flex items-center gap-2">
               🚗 {t('driveMode')}

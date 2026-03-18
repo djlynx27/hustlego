@@ -135,7 +135,7 @@ export default function ZonesScreen() {
   return (
     <div className="flex flex-col h-full pb-36">
       <div className="px-4 pt-4 pb-3 space-y-3">
-        <div className="flex items-center justify-between pr-12">
+        <div className="flex items-center justify-between">
           <h1 className="text-xl font-display font-bold">{t('zones')}</h1>
           <Button size="sm" onClick={openAdd} className="gap-1">
             <Plus className="w-4 h-4" /> {t('addZone')}
