@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(xargs -I{} sh -c \"grep -L \"\"useI18n\\\\|const { t }\\\\|const t \"\" \"\"{}\"\" 2>/dev/null && echo \"\"{} MISSING_USEII8N\"\" || true\")",
+      "Bash(xargs -I{} sh -c \"echo \"\"=== {} ===\"\"; grep -n \"\"useI18n\\\\|const { t\\\\|t\\(''''\"\" \"\"{}\"\"\")",
+      "Bash(xargs grep:*)",
+      "Bash(grep -v \"const { t\\\\|let t\\\\|var t\\\\|function t\\\\|import\\\\|//\\\\|\\\\.t\\\\b\\\\|t\\\\.\\\\|t,\\\\|= t\\\\b\\\\|return t\\\\b\\\\|typeof t\\\\|t =>\\\\|t \\)\\\\|t]\\\\|t |\\\\|t;\\\\|\"\"t\"\"\\\\|''''t''''\\\\|\\\\\\(t\\\\b\")",
+      "Bash(find D:/Documents/HustleGo/src -name *.tsx -newer D:/Documents/HustleGo/src/main.tsx)",
+      "Bash(grep:*)",
+      "Bash(npx tsc:*)",
+      "Bash(find D:/Documents/HustleGo/src -name *.js -o -name *.jsx)",
+      "Bash(npm run:*)"
+    ]
+  }
+}

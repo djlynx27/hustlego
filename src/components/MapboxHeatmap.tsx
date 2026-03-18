@@ -2,11 +2,11 @@ import { useI18n } from '@/contexts/I18nContext';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import {
   Component,
-  ReactNode,
   useCallback,
   useEffect,
   useRef,
   useState,
+  type ReactNode,
 } from 'react';
 import Map, { Layer, Marker, Source, type MapRef } from 'react-map-gl';
 import { LeafletMap } from './LeafletMap';
@@ -54,12 +54,6 @@ class MapErrorBoundary extends Component<
     }
     return this.props.children;
   }
-}
-
-function getMarkerColor(score: number): string {
-  if (score >= 70) return 'hsl(142, 71%, 45%)';
-  if (score >= 40) return 'hsl(48, 96%, 53%)';
-  return 'hsl(0, 84%, 60%)';
 }
 
 function DriverDot() {
@@ -164,7 +158,7 @@ export function MapboxHeatmap({
             longitude: m.longitude,
             demandScore: m.demandScore,
           }))}
-          driverPosition={driverPos}
+          driverPosition={driverPos ?? undefined}
           className="mt-2 h-[calc(100%-2.125rem)]"
         />
       </div>
@@ -305,7 +299,6 @@ export function MapboxHeatmap({
 
           {/* Zone circle markers */}
           {markers.map((m) => {
-            const score = m.demandScore ?? 50;
             return (
               <Marker
                 key={m.id}

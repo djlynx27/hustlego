@@ -1,30 +1,48 @@
-import { useState, useMemo, useRef, useCallback, type FormEvent } from 'react';
-import { useI18n } from '@/contexts/I18nContext';
 import { CitySelect } from '@/components/CitySelect';
 import { DemandBadge } from '@/components/DemandBadge';
-import { useCities, useZones } from '@/hooks/useSupabase';
-import { generate96TimeLabels, getDemandClass, getSlotOrderMinutes, normalize24hTime, formatTime24h } from '@/lib/demandUtils';
-import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
-import { useWeather } from '@/hooks/useWeather';
-import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useUserLocation, haversineKm } from '@/hooks/useUserLocation';
 import { NavigationSheet } from '@/components/NavigationSheet';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useI18n } from '@/contexts/I18nContext';
 import { useCityId } from '@/hooks/useCityId';
+import { useCities, useZones } from '@/hooks/useSupabase';
+import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
+import { useWeather } from '@/hooks/useWeather';
+import {
+  formatTime24h,
+  generate96TimeLabels,
+  getDemandClass,
+  getSlotOrderMinutes,
+  normalize24hTime,
+} from '@/lib/demandUtils';
+import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
+import { useCallback, useMemo, useRef, useState, type FormEvent } from 'react';
 
 const TIME_LABELS = generate96TimeLabels();
 
 export default function PlanningScreen() {
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
-  const [date, setDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState(
+    () => new Date().toISOString().split('T')[0]
+  );
   const [jumpTime, setJumpTime] = useState('');
   const [highlightTime, setHighlightTime] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   const slotRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const { location: userLocation } = useUserLocation();
 
-  const [navZone, setNavZone] = useState<{ name: string; lat: number; lng: number } | null>(null);
+  const [navZone, setNavZone] = useState<{
+    name: string;
+    lat: number;
+    lng: number;
+  } | null>(null);
 
   const { data: cities = [] } = useCities();
   const { data: zones = [] } = useZones(cityId);
@@ -33,7 +51,13 @@ export default function PlanningScreen() {
   const slots = useMemo(() => {
     if (zones.length === 0) return [];
 
-    const weatherCond: WeatherCondition | null = weather ? { weatherId: weather.weatherId, temp: weather.temp, demandBoostPoints: weather.demandBoostPoints } : null;
+    const weatherCond: WeatherCondition | null = weather
+      ? {
+          weatherId: weather.weatherId,
+          temp: weather.temp,
+          demandBoostPoints: weather.demandBoostPoints,
+        }
+      : null;
     const timeLabels = generate96TimeLabels();
     const items: any[] = [];
 
@@ -74,7 +98,10 @@ export default function PlanningScreen() {
       const bestPerZone = new Map<string, (typeof items)[0]>();
       for (const item of group) {
         const existing = bestPerZone.get(item.zone_id);
-        if (!existing || (item.demand_score ?? 0) > (existing.demand_score ?? 0)) {
+        if (
+          !existing ||
+          (item.demand_score ?? 0) > (existing.demand_score ?? 0)
+        ) {
           bestPerZone.set(item.zone_id, item);
         }
       }
@@ -83,8 +110,18 @@ export default function PlanningScreen() {
         const scoreDiff = (b.demand_score ?? 0) - (a.demand_score ?? 0);
         if (scoreDiff !== 0) return scoreDiff;
         if (userLocation) {
-          const dA = haversineKm(userLocation.latitude, userLocation.longitude, a.zones.latitude, a.zones.longitude);
-          const dB = haversineKm(userLocation.latitude, userLocation.longitude, b.zones.latitude, b.zones.longitude);
+          const dA = haversineKm(
+            userLocation.latitude,
+            userLocation.longitude,
+            a.zones.latitude,
+            a.zones.longitude
+          );
+          const dB = haversineKm(
+            userLocation.latitude,
+            userLocation.longitude,
+            b.zones.latitude,
+            b.zones.longitude
+          );
           return dA - dB;
         }
         return 0;
@@ -93,7 +130,8 @@ export default function PlanningScreen() {
     }
 
     return result.sort((a, b) => {
-      const timeDiff = getSlotOrderMinutes(a.start_time) - getSlotOrderMinutes(b.start_time);
+      const timeDiff =
+        getSlotOrderMinutes(a.start_time) - getSlotOrderMinutes(b.start_time);
       if (timeDiff !== 0) return timeDiff;
       return (b.demand_score ?? 0) - (a.demand_score ?? 0);
     });
@@ -115,7 +153,10 @@ export default function PlanningScreen() {
       }
     });
 
-    bestEl?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    (bestEl as HTMLDivElement | null)?.scrollIntoView({
+      behavior: 'smooth',
+      block: 'start',
+    });
     setHighlightTime(target);
     setTimeout(() => setHighlightTime(null), 3000);
   }, []);
@@ -138,7 +179,12 @@ export default function PlanningScreen() {
         <h1 className="text-[22px] font-display font-bold">{t('planning')}</h1>
         <div className="grid grid-cols-2 gap-2">
           <CitySelect cities={cities} value={cityId} onChange={setCityId} />
-          <Input type="date" value={date} onChange={e => setDate(e.target.value)} className="bg-card border-border font-body text-[14px] h-11" />
+          <Input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="bg-card border-border font-body text-[14px] h-11"
+          />
         </div>
 
         <div className="grid grid-cols-2 gap-2">
@@ -147,8 +193,10 @@ export default function PlanningScreen() {
               <SelectValue placeholder="⏱ Aller à..." />
             </SelectTrigger>
             <SelectContent className="bg-card border-border max-h-60">
-              {TIME_LABELS.map(label => (
-                <SelectItem key={label} value={label}>{label}</SelectItem>
+              {TIME_LABELS.map((label) => (
+                <SelectItem key={label} value={label}>
+                  {label}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -156,39 +204,67 @@ export default function PlanningScreen() {
             <Input
               placeholder="ex: 19:30"
               value={jumpTime}
-              onChange={e => setJumpTime(e.target.value)}
+              onChange={(e) => setJumpTime(e.target.value)}
               className="bg-card border-border font-body text-[14px] h-11"
             />
           </form>
         </div>
 
-        <p className="text-[14px] text-muted-foreground font-body">{t('schedule')} · {date}</p>
+        <p className="text-[14px] text-muted-foreground font-body">
+          {t('schedule')} · {date}
+        </p>
       </div>
 
-      <div ref={listRef} className="flex-1 overflow-y-auto px-3 space-y-1.5 pb-4">
+      <div
+        ref={listRef}
+        className="flex-1 overflow-y-auto px-3 space-y-1.5 pb-4"
+      >
         {slots.map((slot, index) => {
-          const zone = slot.zones ?? zones.find(z => z.id === slot.zone_id);
+          const zone = slot.zones ?? zones.find((z) => z.id === slot.zone_id);
           const dc = getDemandClass(slot.demand_score);
           const timeKey = fmtTime(slot.start_time);
-          const isHighlighted = highlightTime !== null && timeKey === highlightTime;
-          const dist = userLocation && zone
-            ? haversineKm(userLocation.latitude, userLocation.longitude, zone.latitude, zone.longitude)
-            : null;
+          const isHighlighted =
+            highlightTime !== null && timeKey === highlightTime;
+          const dist =
+            userLocation && zone
+              ? haversineKm(
+                  userLocation.latitude,
+                  userLocation.longitude,
+                  zone.latitude,
+                  zone.longitude
+                )
+              : null;
 
           return (
             <div
               key={slot.id || index}
-              ref={el => setSlotRef(timeKey, el)}
-              onClick={() => zone && setNavZone({ name: zone.name, lat: zone.latitude, lng: zone.longitude })}
+              ref={(el) => setSlotRef(timeKey, el)}
+              onClick={() =>
+                zone &&
+                setNavZone({
+                  name: zone.name,
+                  lat: zone.latitude,
+                  lng: zone.longitude,
+                })
+              }
               className={`flex items-center justify-between bg-card rounded-xl border-l-4 ${dc.border} border border-border p-4 gap-3 transition-all duration-500 cursor-pointer active:scale-[0.98] ${
-                isHighlighted ? 'ring-2 ring-primary bg-primary/20 border-primary shadow-lg shadow-primary/30' : ''
+                isHighlighted
+                  ? 'ring-2 ring-primary bg-primary/20 border-primary shadow-lg shadow-primary/30'
+                  : ''
               }`}
             >
               <div className="flex-1 min-w-0">
-                <span className="text-[14px] text-muted-foreground font-body block">{fmtTime(slot.start_time).split(':')[0]}:00 – {fmtTime(slot.start_time).split(':')[0]}:59</span>
+                <span className="text-[14px] text-muted-foreground font-body block">
+                  {fmtTime(slot.start_time).split(':')[0]}:00 –{' '}
+                  {fmtTime(slot.start_time).split(':')[0]}:59
+                </span>
                 <span className="text-[18px] font-display font-semibold leading-tight block break-words">
                   {zone?.name}
-                  {dist !== null && <span className="text-muted-foreground text-[14px] font-body ml-2">· {dist.toFixed(1)} km</span>}
+                  {dist !== null && (
+                    <span className="text-muted-foreground text-[14px] font-body ml-2">
+                      · {dist.toFixed(1)} km
+                    </span>
+                  )}
                 </span>
               </div>
               <div className="flex-shrink-0">

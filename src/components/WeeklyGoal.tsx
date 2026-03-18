@@ -1,8 +1,8 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
 import { Progress } from '@/components/ui/progress';
+import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 import { Target } from 'lucide-react';
+import { useState } from 'react';
 
 const LS_KEY = 'geohustle_weekly_goal';
 
@@ -33,14 +33,17 @@ function useWeekTripsEarnings() {
         .gte('started_at', `${from}T00:00:00`)
         .lte('started_at', `${to}T23:59:59`);
       if (error) throw error;
-      return (data ?? []).reduce((sum, t) => sum + Number(t.earnings || 0) + Number(t.tips || 0), 0);
+      return (data ?? []).reduce(
+        (sum, t) => sum + Number(t.earnings || 0) + Number(t.tips || 0),
+        0
+      );
     },
     staleTime: 60_000,
   });
 }
 
 export function WeeklyGoalDisplay() {
-  const [goal, setGoal] = useState(() => {
+  const [goal] = useState(() => {
     const saved = localStorage.getItem(LS_KEY);
     return saved ? Number(saved) : 0;
   });
@@ -66,13 +69,19 @@ export function WeeklyGoalDisplay() {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <Target className="w-4 h-4 text-primary" />
-          <span className="text-[14px] font-body text-muted-foreground">Objectif semaine</span>
+          <span className="text-[14px] font-body text-muted-foreground">
+            Objectif semaine
+          </span>
         </div>
-        <span className={`text-[14px] font-display font-bold ${status.color}`}>{status.label}</span>
+        <span className={`text-[14px] font-display font-bold ${status.color}`}>
+          {status.label}
+        </span>
       </div>
       <Progress value={pct} className="h-2.5" />
       <div className="flex justify-between text-[13px] font-body">
-        <span className="text-foreground font-display font-bold">${weekEarnings.toFixed(0)} / ${goal}</span>
+        <span className="text-foreground font-display font-bold">
+          ${weekEarnings.toFixed(0)} / ${goal}
+        </span>
         <span className="text-muted-foreground">{pct}%</span>
       </div>
     </div>
@@ -93,11 +102,13 @@ export function WeeklyGoalSetting() {
   return (
     <div className="flex items-center gap-2">
       <Target className="w-4 h-4 text-primary flex-shrink-0" />
-      <span className="text-[14px] font-body text-muted-foreground whitespace-nowrap">Objectif semaine $</span>
+      <span className="text-[14px] font-body text-muted-foreground whitespace-nowrap">
+        Objectif semaine $
+      </span>
       <input
         type="number"
         value={goal}
-        onChange={e => save(e.target.value)}
+        onChange={(e) => save(e.target.value)}
         placeholder="ex: 1500"
         className="flex-1 bg-background border border-border rounded-md px-2 py-1.5 text-[14px] font-display"
       />

@@ -1,14 +1,25 @@
-import { useState, useEffect, useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import {
+  getActiveEvents,
+  getEndingSoonEvents,
+  getStartingSoonEvents,
+  useEvents,
+} from '@/hooks/useEvents';
 import { useZones } from '@/hooks/useSupabase';
+import {
+  getRelevantTmEvents,
+  useTicketmasterEvents,
+} from '@/hooks/useTicketmaster';
 import { useWeather } from '@/hooks/useWeather';
-import { useEvents, getActiveEvents, getEndingSoonEvents, getStartingSoonEvents } from '@/hooks/useEvents';
-import { useTicketmasterEvents, getRelevantTmEvents } from '@/hooks/useTicketmaster';
 import { useZoneScores } from '@/hooks/useZoneScores';
 import { supabase } from '@/integrations/supabase/client';
-import { scoreAllZonesWithLearning, type WeatherCondition, type ActiveEventBoost } from '@/lib/scoringEngine';
-import { haversineKm } from '@/hooks/useUserLocation';
 import { type ZoneHistory } from '@/lib/aiAgents';
+import {
+  scoreAllZonesWithLearning,
+  type ActiveEventBoost,
+  type WeatherCondition,
+} from '@/lib/scoringEngine';
+import { useQuery } from '@tanstack/react-query';
+import { useEffect, useMemo, useState } from 'react';
 
 export interface ScoreFactors {
   hasWeatherBoost: boolean;
@@ -61,12 +72,22 @@ export function useDemandScores(cityId: string) {
     if (!tripLogs || tripLogs.length === 0 || zones.length === 0) return [];
     return tripLogs
       .map((trip: any) => {
-        const zone = zones.find(z => z.id === trip.zone_id);
+        const zone = zones.find((z) => z.id === trip.zone_id);
         if (!zone) return null;
         const started = new Date(trip.started_at);
-        const avgHourly = (Number(trip.earnings || 0) + Number(trip.tips || 0)) / Math.max(1, (new Date(trip.ended_at).getTime() - started.getTime()) / 3600000);
-        const observedScore = Math.min(100, Math.max(0, Math.round((avgHourly / 60) * 100)));
-        const expectedScore = Number(trip.zone_score ?? (zone.current_score || 50));
+        const avgHourly =
+          (Number(trip.earnings || 0) + Number(trip.tips || 0)) /
+          Math.max(
+            1,
+            (new Date(trip.ended_at).getTime() - started.getTime()) / 3600000
+          );
+        const observedScore = Math.min(
+          100,
+          Math.max(0, Math.round((avgHourly / 60) * 100))
+        );
+        const expectedScore = Number(
+          trip.zone_score ?? (zone.current_score || 50)
+        );
         return {
           zoneId: zone.id,
           observedScore,
@@ -77,13 +98,25 @@ export function useDemandScores(cityId: string) {
       .filter((entry): entry is ZoneHistory => entry !== null);
   }, [tripLogs, zones]);
 
-  const activeEvents = useMemo(() => getActiveEvents(events, now), [events, now]);
-  const endingSoon = useMemo(() => getEndingSoonEvents(events, now, 60), [events, now]);
-  const startingSoon = useMemo(() => getStartingSoonEvents(events, now, 90), [events, now]);
-  const relevantTmEvents = useMemo(() => getRelevantTmEvents(tmEvents, now, 3), [tmEvents, now]);
+  const activeEvents = useMemo(
+    () => getActiveEvents(events, now),
+    [events, now]
+  );
+  const endingSoon = useMemo(
+    () => getEndingSoonEvents(events, now, 60),
+    [events, now]
+  );
+  const startingSoon = useMemo(
+    () => getStartingSoonEvents(events, now, 90),
+    [events, now]
+  );
+  const relevantTmEvents = useMemo(
+    () => getRelevantTmEvents(tmEvents, now, 3),
+    [tmEvents, now]
+  );
 
   const eventBoosts: ActiveEventBoost[] = useMemo(() => {
-    const dbBoosts: ActiveEventBoost[] = activeEvents.map(e => ({
+    const dbBoosts: ActiveEventBoost[] = activeEvents.map((e) => ({
       latitude: e.latitude,
       longitude: e.longitude,
       boost_multiplier: e.boost_multiplier,
@@ -91,7 +124,7 @@ export function useDemandScores(cityId: string) {
       boost_zone_types: e.boost_zone_types,
     }));
 
-    const tmBoosts: ActiveEventBoost[] = relevantTmEvents.map(e => ({
+    const tmBoosts: ActiveEventBoost[] = relevantTmEvents.map((e) => ({
       latitude: e.latitude,
       longitude: e.longitude,
       boost_multiplier: 1 + e.boostPoints / 50,
@@ -105,7 +138,7 @@ export function useDemandScores(cityId: string) {
   // Build score maps: prefer DB scores, fallback to client-side
   const { scores, factors } = useMemo(() => {
     // DB scores indexed by zone_id
-    const dbScoreMap = new Map(dbScores.map(s => [s.zone_id, s]));
+    const dbScoreMap = new Map(dbScores.map((s) => [s.zone_id, s]));
 
     if (dbScoreMap.size > 0) {
       // Use DB scores as primary
@@ -125,7 +158,12 @@ export function useDemandScores(cityId: string) {
         } else {
           // Zone has no DB score yet, use current_score from zone
           scores.set(zone.id, (zone as any).current_score ?? 50);
-          factors.set(zone.id, { hasWeatherBoost: false, hasEventBoost: false, weatherBoostPoints: 0, eventBoostPoints: 0 });
+          factors.set(zone.id, {
+            hasWeatherBoost: false,
+            hasEventBoost: false,
+            weatherBoostPoints: 0,
+            eventBoostPoints: 0,
+          });
         }
       }
 
@@ -133,8 +171,24 @@ export function useDemandScores(cityId: string) {
     }
 
     // Fallback: client-side calculated with learning agents from trip history
-    return scoreAllZonesWithLearning(zones, now, weatherCondition, eventBoosts, tripHistory);
+    return scoreAllZonesWithLearning(
+      zones,
+      now,
+      weatherCondition,
+      eventBoosts,
+      tripHistory
+    );
   }, [zones, dbScores, now, weatherCondition, eventBoosts]);
 
-  return { scores, factors, zones, weather, now, activeEvents, endingSoon, startingSoon, relevantTmEvents };
+  return {
+    scores,
+    factors,
+    zones,
+    weather,
+    now,
+    activeEvents,
+    endingSoon,
+    startingSoon,
+    relevantTmEvents,
+  };
 }

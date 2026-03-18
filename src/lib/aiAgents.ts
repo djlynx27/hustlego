@@ -26,7 +26,8 @@ export function getDefaultLearningAgents(): LearningAgent[] {
     {
       id: 'trendAgent',
       name: 'Trend Agent',
-      description: 'Adapte la prédiction selon la tendance historique de la zone',
+      description:
+        'Adapte la prédiction selon la tendance historique de la zone',
       weight: 0.55,
       predict: (zone, baseScore) => {
         const trend = zone.name.toLowerCase().includes('centre') ? 8 : 0; // placeholder
@@ -35,9 +36,14 @@ export function getDefaultLearningAgents(): LearningAgent[] {
       learn: (history) => {
         const adj: Record<string, number> = {};
         for (const item of history) {
-          adj[item.zoneId] = (adj[item.zoneId] || 0) + (item.observedScore - item.expectedScore) * 0.03;
+          adj[item.zoneId] =
+            (adj[item.zoneId] || 0) +
+            (item.observedScore - item.expectedScore) * 0.03;
         }
-        return { zoneWeightAdjustments: adj, lastUpdated: new Date().toISOString() };
+        return {
+          zoneWeightAdjustments: adj,
+          lastUpdated: new Date().toISOString(),
+        };
       },
     },
     {
@@ -45,17 +51,25 @@ export function getDefaultLearningAgents(): LearningAgent[] {
       name: 'Rush Hour Agent',
       description: 'Renforce les demandes en heure de pointe',
       weight: 0.45,
-      predict: (zone, baseScore) => {
+      predict: (_zone, baseScore) => {
         const hour = new Date().getHours();
-        const modifier = (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 19) ? 1.12 : 1;
+        const modifier =
+          (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 19) ? 1.12 : 1;
         return Math.min(100, Math.max(0, Math.round(baseScore * modifier)));
       },
-      learn: (history) => ({ zoneWeightAdjustments: {}, lastUpdated: new Date().toISOString() }),
+      learn: (_history) => ({
+        zoneWeightAdjustments: {},
+        lastUpdated: new Date().toISOString(),
+      }),
     },
   ];
 }
 
-export function applyLearningAgents(zones: Zone[], baseScores: Map<string, number>, history: ZoneHistory[] = []): Map<string, number> {
+export function applyLearningAgents(
+  zones: Zone[],
+  baseScores: Map<string, number>,
+  history: ZoneHistory[] = []
+): Map<string, number> {
   const agents = getDefaultLearningAgents();
   const adjusted = new Map<string, number>(baseScores);
 
@@ -69,8 +83,20 @@ export function applyLearningAgents(zones: Zone[], baseScores: Map<string, numbe
       adjusted.set(zone.id, Math.min(100, Math.max(0, Math.round(mix))));
 
       // respect des historic adjustments si disponible
-      if (state.zoneWeightAdjustments && state.zoneWeightAdjustments[zone.id] != null) {
-        adjusted.set(zone.id, Math.min(100, Math.max(0, adjusted.get(zone.id)! + state.zoneWeightAdjustments[zone.id])));
+      if (
+        state.zoneWeightAdjustments &&
+        state.zoneWeightAdjustments[zone.id] != null
+      ) {
+        adjusted.set(
+          zone.id,
+          Math.min(
+            100,
+            Math.max(
+              0,
+              adjusted.get(zone.id)! + state.zoneWeightAdjustments[zone.id]
+            )
+          )
+        );
       }
     }
   }

@@ -1,22 +1,22 @@
-import { useEffect, useMemo, useRef } from 'react';
+import { CitySelect } from '@/components/CitySelect';
+import { DeadTimeTimer } from '@/components/DeadTimeTimer';
+import { DemandBadge } from '@/components/DemandBadge';
+import { Button } from '@/components/ui/button';
+import { WeeklyGoalDisplay } from '@/components/WeeklyGoal';
 import { useI18n } from '@/contexts/I18nContext';
 import { useCityId } from '@/hooks/useCityId';
 import { useDemandScores } from '@/hooks/useDemandScores';
-import { useUserLocation, haversineKm } from '@/hooks/useUserLocation';
-import { CitySelect } from '@/components/CitySelect';
 import { useCities } from '@/hooks/useSupabase';
-import { DemandBadge } from '@/components/DemandBadge';
+import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
-import { Button } from '@/components/ui/button';
 import { Navigation } from 'lucide-react';
-import { DeadTimeTimer } from '@/components/DeadTimeTimer';
-import { WeeklyGoalDisplay } from '@/components/WeeklyGoal';
+import { useEffect, useMemo, useRef } from 'react';
 
 export default function DriveScreen() {
-  const { t, lang } = useI18n();
+  const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
   const { data: cities = [] } = useCities();
-  const { scores, factors, zones } = useDemandScores(cityId);
+  const { scores, zones } = useDemandScores(cityId);
   const { location, status } = useUserLocation(15000);
 
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
@@ -24,18 +24,16 @@ export default function DriveScreen() {
   useEffect(() => {
     let cancelled = false;
     async function requestWakeLock() {
-      if (typeof navigator === "undefined") return;
-      // @ts-expect-error: wakeLock is not yet in TS lib
-      if (!("wakeLock" in navigator)) return;
+      if (typeof navigator === 'undefined') return;
+      if (!('wakeLock' in navigator)) return;
       try {
-        // @ts-expect-error: wakeLock is not yet in TS lib
-        const wl = await navigator.wakeLock.request("screen");
+        const wl = await (navigator as any).wakeLock.request('screen');
         if (cancelled) {
           wl.release();
           return;
         }
         wakeLockRef.current = wl;
-        wl.addEventListener("release", () => {
+        wl.addEventListener('release', () => {
           if (wakeLockRef.current === wl) {
             wakeLockRef.current = null;
           }
@@ -45,12 +43,12 @@ export default function DriveScreen() {
       }
     }
 
-    if (document.visibilityState === "visible") {
+    if (document.visibilityState === 'visible') {
       requestWakeLock();
     }
 
     const handleVisibility = () => {
-      if (document.visibilityState === "visible") {
+      if (document.visibilityState === 'visible') {
         requestWakeLock();
       } else if (wakeLockRef.current) {
         wakeLockRef.current.release();
@@ -58,11 +56,11 @@ export default function DriveScreen() {
       }
     };
 
-    document.addEventListener("visibilitychange", handleVisibility);
+    document.addEventListener('visibilitychange', handleVisibility);
 
     return () => {
       cancelled = true;
-      document.removeEventListener("visibilitychange", handleVisibility);
+      document.removeEventListener('visibilitychange', handleVisibility);
       if (wakeLockRef.current) {
         wakeLockRef.current.release();
         wakeLockRef.current = null;
@@ -72,15 +70,21 @@ export default function DriveScreen() {
 
   const rankedZones = useMemo(() => {
     return zones
-      .map(z => ({ ...z, score: scores.get(z.id) ?? 0 }))
+      .map((z) => ({ ...z, score: scores.get(z.id) ?? 0 }))
       .sort((a, b) => b.score - a.score);
   }, [zones, scores]);
 
   const heroZone = rankedZones[0] ?? null;
 
-  const heroDistance = heroZone && location
-    ? haversineKm(location.latitude, location.longitude, heroZone.latitude, heroZone.longitude)
-    : null;
+  const heroDistance =
+    heroZone && location
+      ? haversineKm(
+          location.latitude,
+          location.longitude,
+          heroZone.latitude,
+          heroZone.longitude
+        )
+      : null;
 
   const statusLabel =
     status === 'loading'
@@ -98,9 +102,7 @@ export default function DriveScreen() {
         </div>
         <div className="flex-1 min-w-0">
           <p className="text-[13px] text-muted-foreground font-body truncate">
-            {statusLabel || (heroZone
-              ? t('readyToDrive')
-              : t('loadingZones'))}
+            {statusLabel || (heroZone ? t('readyToDrive') : t('loadingZones'))}
           </p>
         </div>
       </div>
@@ -144,7 +146,11 @@ export default function DriveScreen() {
                   className="w-full h-16 text-[18px] font-display font-bold gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
                 >
                   <a
-                    href={getGoogleMapsNavUrl(heroZone.name, heroZone.latitude, heroZone.longitude)}
+                    href={getGoogleMapsNavUrl(
+                      heroZone.name,
+                      heroZone.latitude,
+                      heroZone.longitude
+                    )}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -158,7 +164,11 @@ export default function DriveScreen() {
                   className="w-full h-16 text-[18px] font-display font-bold gap-2"
                 >
                   <a
-                    href={getWazeNavUrl(heroZone.name, heroZone.latitude, heroZone.longitude)}
+                    href={getWazeNavUrl(
+                      heroZone.name,
+                      heroZone.latitude,
+                      heroZone.longitude
+                    )}
                     target="_blank"
                     rel="noopener noreferrer"
                   >
@@ -177,4 +187,3 @@ export default function DriveScreen() {
     </div>
   );
 }
-

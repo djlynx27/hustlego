@@ -133,7 +133,7 @@ function EventCard({ event, isToday }: { event: AppEvent; isToday: boolean }) {
 }
 
 export default function EventsScreen() {
-  const { t, locale } = useI18n();
+  const { t } = useI18n();
   const { data: events = [] } = useEvents('mtl');
 
   // Build stable date boundaries for today (local timezone)

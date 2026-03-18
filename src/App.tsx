@@ -12,7 +12,7 @@ import TodayScreen from '@/pages/TodayScreen';
 import ZonesScreen from '@/pages/ZonesScreen';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
-import { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, type ErrorInfo, type ReactNode } from 'react';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
 import NotFound from './pages/NotFound.tsx';
 
