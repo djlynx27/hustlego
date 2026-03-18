@@ -81,6 +81,8 @@ export default function TodayScreen() {
   const heroZone = rankedZones[0] ?? null;
   const nextZones = rankedZones.slice(1, 4);
 
+  const [driverMode, setDriverMode] = useState<'rideshare' | 'delivery' | 'all'>('all');
+
   const getDistance = (zone: any) => {
     if (!userLocation || !zone) return null;
     return haversineKm(
@@ -127,6 +129,31 @@ export default function TodayScreen() {
       <div className="px-3 mt-2 space-y-2">
         <DeadTimeTimer nearestZoneName={heroZone?.name} />
         <WeeklyGoalDisplay />
+      </div>
+
+      {/* Mode filter tabs */}
+      <div className="px-3 mt-2">
+        <div className="flex rounded-xl border border-border bg-muted/30 p-1 gap-1">
+          {(
+            [
+              { key: 'all', label: '🌐 Les deux' },
+              { key: 'rideshare', label: '🚗 Personnes' },
+              { key: 'delivery', label: '📦 Livraison' },
+            ] as const
+          ).map(({ key, label }) => (
+            <button
+              key={key}
+              onClick={() => setDriverMode(key)}
+              className={`flex-1 text-[13px] font-display font-semibold py-2 rounded-lg transition-colors ${
+                driverMode === key
+                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Alerts */}
@@ -323,7 +350,7 @@ export default function TodayScreen() {
 
       {/* Multi-App Status */}
       <div className="px-3 mt-3">
-        <MultiAppStatus cityId={cityId} />
+        <MultiAppStatus cityId={cityId} mode={driverMode} />
       </div>
 
       {/* 4. PROCHAINS CRÉNEAUX */}

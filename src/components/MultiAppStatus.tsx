@@ -7,6 +7,7 @@ interface AppRec {
   icon: string;
   on: boolean;
   reason: string;
+  category: 'rideshare' | 'delivery';
 }
 
 function getRecommendations(hour: number, dayOfWeek: number, isBadWeather: boolean): AppRec[] {
@@ -18,8 +19,9 @@ function getRecommendations(hour: number, dayOfWeek: number, isBadWeather: boole
 
   return [
     {
-      name: 'Lyft',
+      name: 'Uber',
       icon: '🚗',
+      category: 'rideshare' as const,
       on: isMorningRush || isAfternoonRush || isLateNight || isBadWeather || isWeekend,
       reason: isBadWeather ? 'Mauvais temps = forte demande' :
         isLateNight ? 'Forte demande nocturne' :
@@ -27,8 +29,27 @@ function getRecommendations(hour: number, dayOfWeek: number, isBadWeather: boole
         isWeekend ? 'Weekend actif' : 'Demande faible',
     },
     {
+      name: 'Lyft',
+      icon: '🚕',
+      category: 'rideshare' as const,
+      on: isMorningRush || isAfternoonRush || isLateNight || isBadWeather || isWeekend,
+      reason: isBadWeather ? 'Mauvais temps = forte demande' :
+        isLateNight ? 'Forte demande nocturne' :
+        isMorningRush || isAfternoonRush ? 'Heure de pointe' :
+        isWeekend ? 'Weekend actif' : 'Demande faible',
+    },
+    {
+      name: 'EVA',
+      icon: '🚙',
+      category: 'rideshare' as const,
+      on: isMorningRush || isAfternoonRush || isWeekend,
+      reason: isMorningRush || isAfternoonRush ? 'Heure de pointe' :
+        isWeekend ? 'Weekend actif' : 'Demande limitée',
+    },
+    {
       name: 'Skip',
       icon: '🍔',
+      category: 'delivery' as const,
       on: isMealTime || isBadWeather,
       reason: isMealTime ? 'Heure de repas' :
         isBadWeather ? 'Livraisons en hausse' : 'Hors heures de repas',
@@ -36,32 +57,40 @@ function getRecommendations(hour: number, dayOfWeek: number, isBadWeather: boole
     {
       name: 'DoorDash',
       icon: '🛵',
+      category: 'delivery' as const,
       on: isMealTime || isBadWeather || isWeekend,
       reason: isMealTime ? 'Heure de repas' :
         isBadWeather ? 'Mauvais temps boost' :
         isWeekend ? 'Weekend chargé' : 'Hors heures de pointe',
     },
     {
-      name: 'EVA',
-      icon: '🚕',
-      on: isMorningRush || isAfternoonRush || isWeekend,
-      reason: isMorningRush || isAfternoonRush ? 'Heure de pointe' :
-        isWeekend ? 'Weekend actif' : 'Demande limitée',
+      name: 'Instacart',
+      icon: '🛒',
+      category: 'delivery' as const,
+      on: isBadWeather || isWeekend,
+      reason: isBadWeather ? 'Épicerie en hausse' :
+        isWeekend ? 'Courses du weekend' : 'Demande faible',
     },
   ];
 }
 
 interface Props {
   cityId: string;
+  mode?: 'rideshare' | 'delivery' | 'all';
 }
 
-export function MultiAppStatus({ cityId }: Props) {
+export function MultiAppStatus({ cityId, mode = 'all' }: Props) {
   const { data: weather } = useWeather(cityId);
   const now = new Date();
 
-  const apps = useMemo(() => {
+  const allApps = useMemo(() => {
     return getRecommendations(now.getHours(), now.getDay(), weather?.isBadWeather ?? false);
   }, [now.getHours(), now.getDay(), weather?.isBadWeather]);
+
+  const apps = useMemo(() => {
+    if (mode === 'all') return allApps;
+    return allApps.filter(a => a.category === (mode === 'rideshare' ? 'rideshare' : 'delivery'));
+  }, [allApps, mode]);
 
   return (
     <div className="bg-card rounded-xl border border-border p-4 space-y-3">

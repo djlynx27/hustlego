@@ -75,6 +75,8 @@ const translations: Record<string, Record<Lang, string>> = {
     fr: 'Notifications activées',
   },
   readyToDrive: { en: 'Ready to drive', fr: 'Prêt à rouler' },
+  driveMode: { en: 'Drive Mode', fr: 'Mode Conduite' },
+  screenActive: { en: 'Screen active', fr: 'Écran actif' },
   close: { en: 'Close', fr: 'Fermer' },
   goGoogleMaps: { en: 'GO — Google Maps', fr: 'GO — Google Maps' },
   waze: { en: 'Waze', fr: 'Waze' },
@@ -188,6 +190,8 @@ const translations: Record<string, Record<Lang, string>> = {
   agentRunning: { en: 'Running', fr: 'Exécution' },
   agentNotAvailable: { en: 'No history yet', fr: 'Aucun historique' },
   bestZoneNow: { en: 'Best zone now', fr: 'Meilleure zone maintenant' },
+  searchZone: { en: 'Search a zone…', fr: 'Rechercher une zone…' },
+  noResults: { en: 'No matching zones', fr: 'Aucune zone trouvée' },
   loadingZones: { en: 'Loading zones…', fr: 'Chargement des zones…' },
   loadingZonesEllipsis: {
     en: 'Loading zones...',

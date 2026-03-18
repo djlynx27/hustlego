@@ -1,23 +1,41 @@
-import { useState, lazy, Suspense } from 'react';
-import { useI18n } from '@/contexts/I18nContext';
 import { CitySelect } from '@/components/CitySelect';
-import { useCities, useZones, useAddZone, useUpdateZone, useDeleteZone, type Zone } from '@/hooks/useSupabase';
 import { Button } from '@/components/ui/button';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
-import { toast } from 'sonner';
-import { Constants } from '@/integrations/supabase/types';
-const MapboxHeatmap = lazy(() => import('@/components/MapboxHeatmap'));
-import { useCityId } from '@/hooks/useCityId';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { ZonePerformanceHeatmap } from '@/components/ZonePerformanceHeatmap';
+import { useI18n } from '@/contexts/I18nContext';
+import { useCityId } from '@/hooks/useCityId';
+import {
+  useAddZone,
+  useCities,
+  useDeleteZone,
+  useUpdateZone,
+  useZones,
+  type Zone,
+} from '@/hooks/useSupabase';
+import { Constants } from '@/integrations/supabase/types';
+import { Pencil, Plus, Trash2 } from 'lucide-react';
+import { lazy, Suspense, useState } from 'react';
+import { toast } from 'sonner';
+const MapboxHeatmap = lazy(() => import('@/components/MapboxHeatmap'));
 
 const ZONE_TYPES = Constants.public.Enums.zone_type;
 
 const CITY_CENTERS: Record<string, [number, number]> = {
   mtl: [45.5017, -73.5673],
-  qc: [46.8139, -71.2080],
+  qc: [46.8139, -71.208],
   ott: [45.4215, -75.6972],
 };
 
@@ -32,7 +50,13 @@ export default function ZonesScreen() {
 
   const [editing, setEditing] = useState<Zone | null>(null);
   const [showDialog, setShowDialog] = useState(false);
-  const [form, setForm] = useState({ name: '', type: 'commercial' as string, latitude: '', longitude: '' });
+  const [search, setSearch] = useState('');
+  const [form, setForm] = useState({
+    name: '',
+    type: 'commercial' as string,
+    latitude: '',
+    longitude: '',
+  });
 
   function openAdd() {
     setEditing(null);
@@ -42,7 +66,12 @@ export default function ZonesScreen() {
 
   function openEdit(zone: Zone) {
     setEditing(zone);
-    setForm({ name: zone.name, type: zone.type, latitude: String(zone.latitude), longitude: String(zone.longitude) });
+    setForm({
+      name: zone.name,
+      type: zone.type,
+      latitude: String(zone.latitude),
+      longitude: String(zone.longitude),
+    });
     setShowDialog(true);
   }
 
@@ -82,11 +111,20 @@ export default function ZonesScreen() {
     }
   }
 
-  const mapCenter = zones.length > 0
-    ? [zones[0].latitude, zones[0].longitude] as [number, number]
-    : CITY_CENTERS[cityId] ?? CITY_CENTERS.mtl;
+  const mapCenter =
+    zones.length > 0
+      ? ([zones[0].latitude, zones[0].longitude] as [number, number])
+      : (CITY_CENTERS[cityId] ?? CITY_CENTERS.mtl);
 
-  const mapMarkers = zones.map(zone => ({
+  const filteredZones = search.trim()
+    ? zones.filter(
+        (z) =>
+          z.name.toLowerCase().includes(search.trim().toLowerCase()) ||
+          z.type.toLowerCase().includes(search.trim().toLowerCase())
+      )
+    : zones;
+
+  const mapMarkers = zones.map((zone) => ({
     id: zone.id,
     name: zone.name,
     type: zone.type,
@@ -99,16 +137,26 @@ export default function ZonesScreen() {
       <div className="px-4 pt-4 pb-3 space-y-3">
         <div className="flex items-center justify-between">
           <h1 className="text-xl font-display font-bold">{t('zones')}</h1>
-          <Button size="sm" onClick={openAdd} className="gap-1"><Plus className="w-4 h-4" /> {t('addZone')}</Button>
+          <Button size="sm" onClick={openAdd} className="gap-1">
+            <Plus className="w-4 h-4" /> {t('addZone')}
+          </Button>
         </div>
         <CitySelect cities={cities} value={cityId} onChange={setCityId} />
+        <Input
+          placeholder={`🔍 ${t('searchZone')}`}
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          className="bg-background border-border h-10"
+        />
       </div>
 
       <div className="flex-1 overflow-y-auto px-4 pb-4">
         <div className="relative z-[1] h-[220px] w-full overflow-hidden rounded-lg border border-border">
           <Suspense
             fallback={
-              <div className="flex items-center justify-center h-full text-sm text-muted-foreground">Chargement de la carte…</div>
+              <div className="flex items-center justify-center h-full text-sm text-muted-foreground">
+                Chargement de la carte…
+              </div>
             }
           >
             <MapboxHeatmap center={mapCenter} zoom={11} markers={mapMarkers} />
@@ -121,15 +169,39 @@ export default function ZonesScreen() {
         </div>
 
         <div className="relative z-[1] mt-4 space-y-2">
-          {zones.map(zone => (
-            <div key={zone.id} className="flex items-center justify-between bg-card rounded-md border border-border px-3 py-2 gap-2">
+          {filteredZones.length === 0 && search.trim() && (
+            <p className="text-[14px] text-muted-foreground font-body text-center py-4">
+              {t('noResults')}
+            </p>
+          )}
+          {filteredZones.map((zone) => (
+            <div
+              key={zone.id}
+              className="flex items-center justify-between bg-card rounded-md border border-border px-3 py-2 gap-2 transition-colors hover:bg-accent/10"
+            >
               <div className="min-w-0">
-                <span className="text-sm font-display font-medium break-words block">{zone.name}</span>
-                <span className="text-xs text-muted-foreground capitalize">{zone.type}</span>
+                <span className="text-sm font-display font-medium break-words block">
+                  {zone.name}
+                </span>
+                <span className="text-xs text-muted-foreground capitalize">
+                  {zone.type}
+                </span>
               </div>
               <div className="flex gap-1 flex-shrink-0">
-                <Button variant="ghost" size="icon" onClick={() => openEdit(zone)}><Pencil className="w-4 h-4" /></Button>
-                <Button variant="ghost" size="icon" onClick={() => handleDelete(zone.id)}><Trash2 className="w-4 h-4 text-destructive" /></Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => openEdit(zone)}
+                >
+                  <Pencil className="w-4 h-4" />
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => handleDelete(zone.id)}
+                >
+                  <Trash2 className="w-4 h-4 text-destructive" />
+                </Button>
               </div>
             </div>
           ))}
@@ -139,22 +211,54 @@ export default function ZonesScreen() {
       <Dialog open={showDialog} onOpenChange={setShowDialog}>
         <DialogContent className="bg-card border-border">
           <DialogHeader>
-            <DialogTitle className="font-display">{editing ? t('editZone') : t('addZone')}</DialogTitle>
+            <DialogTitle className="font-display">
+              {editing ? t('editZone') : t('addZone')}
+            </DialogTitle>
           </DialogHeader>
           <div className="space-y-3">
-            <Input placeholder={t('name')} value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} className="bg-background border-border" />
-            <Select value={form.type} onValueChange={value => setForm(f => ({ ...f, type: value }))}>
-              <SelectTrigger className="bg-background border-border"><SelectValue /></SelectTrigger>
+            <Input
+              placeholder={t('name')}
+              value={form.name}
+              onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+              className="bg-background border-border"
+            />
+            <Select
+              value={form.type}
+              onValueChange={(value) => setForm((f) => ({ ...f, type: value }))}
+            >
+              <SelectTrigger className="bg-background border-border">
+                <SelectValue />
+              </SelectTrigger>
               <SelectContent className="bg-card border-border">
-                {ZONE_TYPES.map(zoneType => <SelectItem key={zoneType} value={zoneType}>{zoneType}</SelectItem>)}
+                {ZONE_TYPES.map((zoneType) => (
+                  <SelectItem key={zoneType} value={zoneType}>
+                    {zoneType}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             <div className="grid grid-cols-2 gap-2">
-              <Input placeholder={t('latitude')} value={form.latitude} onChange={e => setForm(f => ({ ...f, latitude: e.target.value }))} className="bg-background border-border" />
-              <Input placeholder={t('longitude')} value={form.longitude} onChange={e => setForm(f => ({ ...f, longitude: e.target.value }))} className="bg-background border-border" />
+              <Input
+                placeholder={t('latitude')}
+                value={form.latitude}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, latitude: e.target.value }))
+                }
+                className="bg-background border-border"
+              />
+              <Input
+                placeholder={t('longitude')}
+                value={form.longitude}
+                onChange={(e) =>
+                  setForm((f) => ({ ...f, longitude: e.target.value }))
+                }
+                className="bg-background border-border"
+              />
             </div>
             <div className="flex gap-2 justify-end">
-              <Button variant="outline" onClick={() => setShowDialog(false)}>{t('cancel')}</Button>
+              <Button variant="outline" onClick={() => setShowDialog(false)}>
+                {t('cancel')}
+              </Button>
               <Button onClick={handleSave}>{t('save')}</Button>
             </div>
           </div>

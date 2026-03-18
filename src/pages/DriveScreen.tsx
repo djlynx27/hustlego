@@ -1,6 +1,8 @@
 import { CitySelect } from '@/components/CitySelect';
 import { DeadTimeTimer } from '@/components/DeadTimeTimer';
 import { DemandBadge } from '@/components/DemandBadge';
+import { NavigationSheet } from '@/components/NavigationSheet';
+import { ScoreFactorIcons } from '@/components/ScoreFactorIcons';
 import { Button } from '@/components/ui/button';
 import { WeeklyGoalDisplay } from '@/components/WeeklyGoal';
 import { useI18n } from '@/contexts/I18nContext';
@@ -8,16 +10,23 @@ import { useCityId } from '@/hooks/useCityId';
 import { useDemandScores } from '@/hooks/useDemandScores';
 import { useCities } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
+import { getDemandClass } from '@/lib/demandUtils';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
-import { Navigation } from 'lucide-react';
-import { useEffect, useMemo, useRef } from 'react';
+import { Crosshair, Maximize2, Minimize2, Navigation } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export default function DriveScreen() {
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
   const { data: cities = [] } = useCities();
-  const { scores, zones } = useDemandScores(cityId);
+  const { scores, factors, zones } = useDemandScores(cityId);
   const { location, status } = useUserLocation(15000);
+  const [fullScreen, setFullScreen] = useState(false);
+  const [navZone, setNavZone] = useState<{
+    name: string;
+    lat: number;
+    lng: number;
+  } | null>(null);
 
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
@@ -34,30 +43,21 @@ export default function DriveScreen() {
         }
         wakeLockRef.current = wl;
         wl.addEventListener('release', () => {
-          if (wakeLockRef.current === wl) {
-            wakeLockRef.current = null;
-          }
+          if (wakeLockRef.current === wl) wakeLockRef.current = null;
         });
       } catch {
-        // silently ignore wake lock failures
+        /* silently ignore */
       }
     }
-
-    if (document.visibilityState === 'visible') {
-      requestWakeLock();
-    }
-
+    if (document.visibilityState === 'visible') requestWakeLock();
     const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        requestWakeLock();
-      } else if (wakeLockRef.current) {
+      if (document.visibilityState === 'visible') requestWakeLock();
+      else if (wakeLockRef.current) {
         wakeLockRef.current.release();
         wakeLockRef.current = null;
       }
     };
-
     document.addEventListener('visibilitychange', handleVisibility);
-
     return () => {
       cancelled = true;
       document.removeEventListener('visibilitychange', handleVisibility);
@@ -75,47 +75,76 @@ export default function DriveScreen() {
   }, [zones, scores]);
 
   const heroZone = rankedZones[0] ?? null;
+  const nextZones = rankedZones.slice(1, 6);
 
-  const heroDistance =
-    heroZone && location
-      ? haversineKm(
-          location.latitude,
-          location.longitude,
-          heroZone.latitude,
-          heroZone.longitude
-        )
-      : null;
+  const getDistance = (
+    zone: { latitude: number; longitude: number } | null
+  ) => {
+    if (!location || !zone) return null;
+    return haversineKm(
+      location.latitude,
+      location.longitude,
+      zone.latitude,
+      zone.longitude
+    );
+  };
 
-  const statusLabel =
+  const heroDistance = getDistance(heroZone);
+
+  const gpsLabel =
     status === 'loading'
       ? t('gettingLocation')
       : status === 'error'
-        ? `${t('locationUnavailable')} - ${t('locationPermissionTip')}`
-        : '';
+        ? t('locationUnavailable')
+        : location
+          ? `GPS: lat ${location.latitude.toFixed(4)}, lng ${location.longitude.toFixed(4)}`
+          : t('gettingLocation');
+
+  const speedLabel =
+    location && 'speed' in location && (location as any).speed != null
+      ? ` · spd ${Math.round(((location as any).speed ?? 0) * 3.6)} km/h`
+      : '';
 
   return (
-    <div className="flex flex-col h-full pb-36 bg-background text-foreground">
-      {/* Top bar: city + status */}
-      <div className="px-4 pt-3 pb-2 flex items-center gap-3">
-        <div className="w-[160px] flex-shrink-0">
-          <CitySelect cities={cities} value={cityId} onChange={setCityId} />
+    <div className="flex flex-col h-full pb-36 bg-background text-foreground overflow-y-auto">
+      {/* Header */}
+      {!fullScreen && (
+        <div className="px-4 pt-3 pb-2 flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <h1 className="text-[20px] font-display font-bold flex items-center gap-2">
+              🚗 {t('driveMode')}
+              {document.fullscreenElement || wakeLockRef.current ? (
+                <span className="text-[13px] bg-primary/20 text-primary rounded-full px-2 py-0.5 font-body">
+                  🔒 {t('screenActive')}
+                </span>
+              ) : (
+                <span className="text-[13px] bg-primary/20 text-primary rounded-full px-2 py-0.5 font-body">
+                  🔒 {t('screenActive')}
+                </span>
+              )}
+            </h1>
+          </div>
+          <div className="w-[130px] flex-shrink-0">
+            <CitySelect cities={cities} value={cityId} onChange={setCityId} />
+          </div>
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-[13px] text-muted-foreground font-body truncate">
-            {statusLabel || (heroZone ? t('readyToDrive') : t('loadingZones'))}
-          </p>
+      )}
+
+      {/* Dead time + weekly goal */}
+      {!fullScreen && (
+        <div className="px-4 space-y-2 mb-2">
+          <DeadTimeTimer nearestZoneName={heroZone?.name} />
+          <WeeklyGoalDisplay />
         </div>
-      </div>
+      )}
 
-      {/* Dead time + weekly goal in compact form */}
-      <div className="px-4 space-y-2">
-        <DeadTimeTimer nearestZoneName={heroZone?.name} />
-        <WeeklyGoalDisplay />
-      </div>
-
-      {/* Full-screen hero card */}
-      <div className="flex-1 flex items-center justify-center px-4">
-        <div className="w-full max-w-md bg-card rounded-3xl border border-border px-5 py-6 space-y-4 shadow-lg">
+      {/* Hero zone card */}
+      <div
+        className={`px-4 ${fullScreen ? 'flex-1 flex items-center justify-center pt-6' : ''}`}
+      >
+        <div
+          className={`w-full bg-card rounded-3xl border border-border px-5 py-6 space-y-4 shadow-lg ${fullScreen ? 'max-w-md' : ''}`}
+        >
           <p className="text-[13px] font-body uppercase tracking-wide text-muted-foreground text-center">
             {t('bestZoneNow')}
           </p>
@@ -123,14 +152,17 @@ export default function DriveScreen() {
           {heroZone ? (
             <>
               <div className="flex flex-col items-center text-center space-y-1">
-                <h1 className="text-[32px] font-display font-bold leading-tight break-words">
+                <h1
+                  className={`font-display font-bold leading-tight break-words ${fullScreen ? 'text-[40px]' : 'text-[32px]'}`}
+                >
                   {heroZone.name}
                 </h1>
                 <p className="text-[16px] text-muted-foreground capitalize">
                   {heroZone.type}
+                  <ScoreFactorIcons factors={factors.get(heroZone.id)} />
                 </p>
                 {heroDistance !== null && (
-                  <p className="text-[20px] font-display font-semibold text-muted-foreground mt-1">
+                  <p className="text-[20px] font-display font-semibold text-muted-foreground">
                     📍 {heroDistance.toFixed(1)} km
                   </p>
                 )}
@@ -154,8 +186,7 @@ export default function DriveScreen() {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <Navigation className="w-5 h-5" />
-                    {t('goGoogleMaps')}
+                    <Navigation className="w-5 h-5" /> 🗺️ {t('goGoogleMaps')}
                   </a>
                 </Button>
                 <Button
@@ -184,6 +215,98 @@ export default function DriveScreen() {
           )}
         </div>
       </div>
+
+      {/* Full-screen toggle + GPS row */}
+      <div className="px-4 mt-3 space-y-2">
+        <Button
+          variant="outline"
+          className="w-full h-12 gap-2 font-display font-bold"
+          onClick={() => setFullScreen((v) => !v)}
+        >
+          {fullScreen ? (
+            <Minimize2 className="w-5 h-5" />
+          ) : (
+            <Maximize2 className="w-5 h-5" />
+          )}
+          {fullScreen ? '↙ Réduire' : '🚀 Mode Plein Écran'}
+        </Button>
+
+        <div className="flex items-center gap-3 bg-card rounded-xl border border-border px-4 py-3">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-1.5 flex-shrink-0 h-9"
+            onClick={() => {
+              if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                  () => {},
+                  () => {},
+                  { enableHighAccuracy: true }
+                );
+              }
+            }}
+          >
+            <Crosshair className="w-4 h-4" /> Localiser
+          </Button>
+          <div className="min-w-0 flex-1">
+            <p className="text-[12px] font-body text-muted-foreground truncate">
+              {location
+                ? `GPS: lat ${location.latitude.toFixed(4)}, lng ${location.longitude.toFixed(4)}${speedLabel}`
+                : gpsLabel}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Zones suivantes */}
+      {!fullScreen && nextZones.length > 0 && (
+        <div className="px-4 mt-4 pb-4 space-y-2">
+          <h3 className="text-[14px] font-display font-bold text-muted-foreground uppercase tracking-wide">
+            {t('nextSlots')}
+          </h3>
+          {nextZones.map((zone) => {
+            const dc = getDemandClass(zone.score);
+            const dist = getDistance(zone);
+            return (
+              <div
+                key={zone.id}
+                onClick={() =>
+                  setNavZone({
+                    name: zone.name,
+                    lat: zone.latitude,
+                    lng: zone.longitude,
+                  })
+                }
+                className={`flex items-center justify-between bg-card rounded-xl border-l-4 ${dc.border} border border-border px-4 py-3 gap-3 cursor-pointer active:scale-[0.98] transition-transform`}
+              >
+                <div className="flex-1 min-w-0">
+                  <span className="text-[17px] font-display font-semibold block leading-tight break-words">
+                    {zone.name}
+                  </span>
+                  <span className="text-[13px] text-muted-foreground font-body capitalize">
+                    {zone.type}
+                    {dist !== null && (
+                      <span className="ml-2">· {dist.toFixed(1)} km</span>
+                    )}
+                    <ScoreFactorIcons factors={factors.get(zone.id)} />
+                  </span>
+                </div>
+                <div className="flex-shrink-0">
+                  <DemandBadge score={zone.score} size="lg" />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      <NavigationSheet
+        open={!!navZone}
+        onClose={() => setNavZone(null)}
+        zoneName={navZone?.name ?? ''}
+        latitude={navZone?.lat ?? 0}
+        longitude={navZone?.lng ?? 0}
+      />
     </div>
   );
 }

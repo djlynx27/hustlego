@@ -1,6 +1,9 @@
+import { CitySelect } from '@/components/CitySelect';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/contexts/I18nContext';
+import { useCityId } from '@/hooks/useCityId';
 import { useEvents, type AppEvent } from '@/hooks/useEvents';
+import { useCities } from '@/hooks/useSupabase';
 import { Calendar, Clock, Navigation, Star, Users } from 'lucide-react';
 import { useMemo } from 'react';
 
@@ -134,7 +137,9 @@ function EventCard({ event, isToday }: { event: AppEvent; isToday: boolean }) {
 
 export default function EventsScreen() {
   const { t } = useI18n();
-  const { data: events = [] } = useEvents('mtl');
+  const [cityId, setCityId] = useCityId();
+  const { data: cities = [] } = useCities();
+  const { data: events = [] } = useEvents(cityId);
 
   // Build stable date boundaries for today (local timezone)
   const now = new Date();
@@ -172,8 +177,13 @@ export default function EventsScreen() {
 
   return (
     <div className="flex flex-col h-full pb-36 overflow-y-auto">
-      <div className="px-3 pt-3 pb-2">
-        <h1 className="text-[22px] font-display font-bold">{t('events')}</h1>
+      <div className="px-3 pt-3 pb-2 space-y-2">
+        <div className="flex items-center justify-between gap-2">
+          <h1 className="text-[22px] font-display font-bold">{t('events')}</h1>
+          <div className="w-[150px] flex-shrink-0">
+            <CitySelect cities={cities} value={cityId} onChange={setCityId} />
+          </div>
+        </div>
       </div>
 
       <div className="px-3 space-y-3">
