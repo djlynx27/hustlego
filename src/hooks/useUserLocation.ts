@@ -22,6 +22,12 @@ export function useUserLocation(intervalMs = 30000): UserLocationResult {
   const lastUpdateRef = useRef<number>(0);
 
   const update = useCallback(() => {
+    if (typeof navigator === 'undefined') {
+      setStatus('error');
+      setError('Navigator is not available in this environment');
+      return;
+    }
+
     if (!navigator.geolocation) {
       setStatus('error');
       setError('Geolocation is not supported on this device');

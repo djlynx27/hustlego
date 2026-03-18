@@ -1,7 +1,6 @@
-import { useEffect, useRef, useState, useCallback } from 'react';
 import { useDemandScores } from '@/hooks/useDemandScores';
-import { useUserLocation, haversineKm } from '@/hooks/useUserLocation';
-import { getEndingSoonEvents, getStartingSoonEvents, type AppEvent } from '@/hooks/useEvents';
+import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 const NOTIF_COOLDOWN_MS = 15 * 60_000; // 15 min per notification type
 const NOTIFIED_EVENTS_KEY = 'geohustle_notified_events';
@@ -10,7 +9,9 @@ function getNotifiedEvents(): Set<string> {
   try {
     const raw = localStorage.getItem(NOTIFIED_EVENTS_KEY);
     return raw ? new Set(JSON.parse(raw)) : new Set();
-  } catch { return new Set(); }
+  } catch {
+    return new Set();
+  }
 }
 
 function markEventNotified(eventId: string) {
@@ -19,7 +20,9 @@ function markEventNotified(eventId: string) {
   // Keep only last 200 to avoid unbounded growth
   const arr = [...set];
   if (arr.length > 200) arr.splice(0, arr.length - 200);
-  try { localStorage.setItem(NOTIFIED_EVENTS_KEY, JSON.stringify(arr)); } catch {}
+  try {
+    localStorage.setItem(NOTIFIED_EVENTS_KEY, JSON.stringify(arr));
+  } catch {}
 }
 
 interface NotifState {
@@ -34,6 +37,7 @@ function getGoogleMapsUrl(lat: number, lng: number) {
 }
 
 async function sendNotification(title: string, body: string, url?: string) {
+  if (typeof Notification === 'undefined') return;
   if (Notification.permission !== 'granted') return;
 
   // Try service worker notification first (works in background)
@@ -69,8 +73,13 @@ function findNearestZone(lat: number, lng: number, zones: any[]): any | null {
 }
 
 export function useNotifications(cityId: string) {
-  const [enabled, setEnabled] = useState(() => Notification.permission === 'granted');
-  const { scores, zones, weather, endingSoon, startingSoon } = useDemandScores(cityId);
+  const [enabled, setEnabled] = useState(
+    () =>
+      typeof Notification !== 'undefined' &&
+      Notification.permission === 'granted'
+  );
+  const { scores, zones, weather, endingSoon, startingSoon } =
+    useDemandScores(cityId);
   const { location: userLocation } = useUserLocation();
   const stateRef = useRef<NotifState>({
     lastDemandNotif: 0,
@@ -80,7 +89,8 @@ export function useNotifications(cityId: string) {
   });
 
   const requestPermission = useCallback(async () => {
-    if (!('Notification' in window)) return false;
+    if (typeof window === 'undefined' || !('Notification' in window))
+      return false;
     const result = await Notification.requestPermission();
     setEnabled(result === 'granted');
     return result === 'granted';
@@ -96,13 +106,18 @@ export function useNotifications(cityId: string) {
     for (const zone of zones) {
       const score = scores.get(zone.id) ?? 0;
       if (score < 85) continue;
-      const dist = haversineKm(userLocation.latitude, userLocation.longitude, zone.latitude, zone.longitude);
+      const dist = haversineKm(
+        userLocation.latitude,
+        userLocation.longitude,
+        zone.latitude,
+        zone.longitude
+      );
       if (dist > 5) continue;
 
       sendNotification(
         '🔴 Forte demande',
         `${zone.name} · Score ${score}/100 · ${dist.toFixed(1)} km`,
-        getGoogleMapsUrl(zone.latitude, zone.longitude),
+        getGoogleMapsUrl(zone.latitude, zone.longitude)
       );
       s.lastDemandNotif = now;
       break;
@@ -124,12 +139,15 @@ export function useNotifications(cityId: string) {
       const nearZone = findNearestZone(ev.latitude, ev.longitude, zones);
       const zoneName = nearZone?.name || 'la zone';
       const attendance = ev.capacity;
-      const attendanceText = attendance && attendance > 0 ? ` — ${attendance.toLocaleString()} personnes attendues` : '';
+      const attendanceText =
+        attendance && attendance > 0
+          ? ` — ${attendance.toLocaleString()} personnes attendues`
+          : '';
 
       sendNotification(
         `🎫 Événement dans ${minsUntil}min`,
         `${ev.name} à ${ev.venue}${attendanceText}. Positionnez-vous près de ${zoneName} pour la surge!`,
-        getGoogleMapsUrl(ev.latitude, ev.longitude),
+        getGoogleMapsUrl(ev.latitude, ev.longitude)
       );
       markEventNotified(ev.id);
       break; // one at a time
@@ -153,7 +171,7 @@ export function useNotifications(cityId: string) {
       sendNotification(
         `🏒 ${ev.name}`,
         `Se termine dans ${minsLeft}min - Positionnez-vous!`,
-        getGoogleMapsUrl(ev.latitude, ev.longitude),
+        getGoogleMapsUrl(ev.latitude, ev.longitude)
       );
       markEventNotified(endingKey);
       break;
@@ -176,7 +194,7 @@ export function useNotifications(cityId: string) {
         sendNotification(
           '🍺 Bars ferment dans 45min',
           'Crescent/St-Laurent au max',
-          getGoogleMapsUrl(45.4985, -73.5726), // Crescent St
+          getGoogleMapsUrl(45.4985, -73.5726) // Crescent St
         );
         s.lastBarNotif = Date.now();
       }
@@ -193,11 +211,15 @@ export function useNotifications(cityId: string) {
     const s = stateRef.current;
     const now = Date.now();
 
-    if (s.prevWeatherId !== null && s.prevWeatherId >= 700 && weather.weatherId < 700) {
+    if (
+      s.prevWeatherId !== null &&
+      s.prevWeatherId >= 700 &&
+      weather.weatherId < 700
+    ) {
       if (now - s.lastWeatherNotif >= NOTIF_COOLDOWN_MS) {
         sendNotification(
           '🌧️ Précipitations détectées',
-          'Demande en hausse partout',
+          'Demande en hausse partout'
         );
         s.lastWeatherNotif = now;
       }
