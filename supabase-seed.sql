@@ -52,6 +52,25 @@ CREATE TABLE IF NOT EXISTS daily_reports (
   created_at         timestamptz NOT NULL DEFAULT now()
 );
 
+CREATE TABLE IF NOT EXISTS events (
+  id                uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name              text NOT NULL,
+  venue             text NOT NULL,
+  city_id           text NOT NULL REFERENCES cities(id),
+  latitude          double precision NOT NULL,
+  longitude         double precision NOT NULL,
+  start_at          timestamptz NOT NULL,
+  end_at            timestamptz NOT NULL,
+  capacity          int NOT NULL DEFAULT 0,
+  demand_impact     int NOT NULL DEFAULT 1,
+  boost_multiplier  numeric NOT NULL DEFAULT 1.0,
+  boost_radius_km   numeric NOT NULL DEFAULT 1.0,
+  boost_zone_types  text[] NOT NULL DEFAULT '{}',
+  category          text NOT NULL DEFAULT 'event',
+  is_holiday        boolean NOT NULL DEFAULT false,
+  created_at        timestamptz NOT NULL DEFAULT now()
+);
+
 -- ── Villes ──────────────────────────────────────────────────
 INSERT INTO cities (id, name) VALUES
   ('mtl', 'Montréal'),
