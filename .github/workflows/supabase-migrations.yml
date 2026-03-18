@@ -37,36 +37,27 @@ jobs:
           clean="$(echo "$raw" | tr -d '[:space:]' | sed -E "s/^['\"]//; s/['\"]$//")"
           ref=""
 
-          # 1) Direct project ref (Supabase ref: 20 lowercase letters)
-          if [[ "$clean" =~ ^[a-z]{20}$ ]]; then
+          # 1) Direct project ref (Supabase ref: 20 lowercase alphanumeric chars)
+          if [[ "$clean" =~ ^[a-z0-9]{20}$ ]]; then
             ref="$clean"
           fi
 
           # 2) API URL: https://<ref>.supabase.co
-          if [[ -z "$ref" && "$clean" =~ ^https?://([a-z]{20})\.supabase\.co(/.*)?$ ]]; then
+          if [[ -z "$ref" && "$clean" =~ ^https?://([a-z0-9]{20})\.supabase\.co(/.*)?$ ]]; then
             ref="${BASH_REMATCH[1]}"
           fi
 
           # 3) Dashboard URL: https://app.supabase.com/project/<ref>
-          if [[ -z "$ref" && "$clean" =~ /project/([a-z]{20})($|[/?#]) ]]; then
+          if [[ -z "$ref" && "$clean" =~ /project/([a-z0-9]{20})($|[/?#]) ]]; then
             ref="${BASH_REMATCH[1]}"
           fi
 
-          # 4) Last resort: first 20-char lowercase token inside the string
+          # 4) Last resort: first 20-char lowercase alphanumeric token inside the string
           if [[ -z "$ref" ]]; then
-            ref="$(echo "$clean" | grep -Eo '[a-z]{20}' | head -n 1 || true)"
+            ref="$(echo "$clean" | grep -Eo '[a-z0-9]{20}' | head -n 1 || true)"
           fi
 
-          # 5) Fallback from Supabase account projects list.
-          if [[ -z "$ref" ]]; then
-            listed_ref="$(supabase projects list 2>/dev/null | grep -Eo '[a-z]{20}' | head -n 1 || true)"
-            if [[ -n "$listed_ref" ]]; then
-              ref="$listed_ref"
-              echo "Using project ref from 'supabase projects list'."
-            fi
-          fi
-
-          if [[ ! "$ref" =~ ^[a-z]{20}$ ]]; then
+          if [[ ! "$ref" =~ ^[a-z0-9]{20}$ ]]; then
             echo "Invalid SUPABASE_PROJECT_ID format."
             echo "Expected one of:"
             echo "- project ref: abcdefghijklmnopqrst"
