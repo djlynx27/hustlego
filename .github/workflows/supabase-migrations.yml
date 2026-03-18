@@ -33,13 +33,36 @@ jobs:
             exit 1
           fi
 
-          # Accept either a direct project ref (abcdefghijklmnopqrst)
-          # or a URL like https://abcdefghijklmnopqrst.supabase.co
-          ref="$(echo "$raw" | sed -E 's#^https?://##; s#/.*$##; s#\.supabase\.co$##')"
+          # Trim quotes/whitespace from secret value.
+          clean="$(echo "$raw" | tr -d '[:space:]' | sed -E "s/^['\"]//; s/['\"]$//")"
+          ref=""
+
+          # 1) Direct project ref
+          if [[ "$clean" =~ ^[a-z0-9]{20}$ ]]; then
+            ref="$clean"
+          fi
+
+          # 2) API URL: https://<ref>.supabase.co
+          if [[ -z "$ref" && "$clean" =~ ^https?://([a-z0-9]{20})\.supabase\.co(/.*)?$ ]]; then
+            ref="${BASH_REMATCH[1]}"
+          fi
+
+          # 3) Dashboard URL: https://app.supabase.com/project/<ref>
+          if [[ -z "$ref" && "$clean" =~ /project/([a-z0-9]{20})($|[/?#]) ]]; then
+            ref="${BASH_REMATCH[1]}"
+          fi
+
+          # 4) Last resort: first 20-char lowercase/number token inside the string
+          if [[ -z "$ref" ]]; then
+            ref="$(echo "$clean" | grep -Eo '[a-z0-9]{20}' | head -n 1 || true)"
+          fi
 
           if [[ ! "$ref" =~ ^[a-z0-9]{20}$ ]]; then
             echo "Invalid SUPABASE_PROJECT_ID format: '$raw'"
-            echo "Expected a 20-char project ref like 'abcdefghijklmnopqrst'"
+            echo "Expected one of:"
+            echo "- project ref: abcdefghijklmnopqrst"
+            echo "- API URL: https://abcdefghijklmnopqrst.supabase.co"
+            echo "- Dashboard URL: https://app.supabase.com/project/abcdefghijklmnopqrst"
             exit 1
           fi
 
