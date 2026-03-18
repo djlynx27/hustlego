@@ -76,6 +76,16 @@ function DriverDot() {
   );
 }
 
+const LS_POS_KEY = 'geohustle_last_pos';
+function getCachedPos(): { lat: number; lng: number } | null {
+  try {
+    const raw = localStorage.getItem(LS_POS_KEY);
+    return raw ? JSON.parse(raw) : null;
+  } catch {
+    return null;
+  }
+}
+
 export function MapboxHeatmap({
   center,
   zoom = 11,
@@ -89,24 +99,41 @@ export function MapboxHeatmap({
   const [driverPos, setDriverPos] = useState<{
     lat: number;
     lng: number;
-  } | null>(null);
+  } | null>(() => getCachedPos());
   const [locationError, setLocationError] = useState<string | null>(null);
+  const hasAutoFocused = useRef(false);
 
-  // Watch driver GPS
+  const applyPos = useCallback((lat: number, lng: number) => {
+    const pos = { lat, lng };
+    setDriverPos(pos);
+    try {
+      localStorage.setItem(LS_POS_KEY, JSON.stringify(pos));
+    } catch {}
+    // Auto-fly to user position only on first fix
+    if (!hasAutoFocused.current && mapRef.current) {
+      hasAutoFocused.current = true;
+      mapRef.current.flyTo({ center: [lng, lat], zoom: 14, duration: 800 });
+    }
+  }, []);
+
+  // GPS: immediate fix via getCurrentPosition + continuous via watchPosition
   useEffect(() => {
     if (!navigator.geolocation) return;
+    navigator.geolocation.getCurrentPosition(
+      (pos) => applyPos(pos.coords.latitude, pos.coords.longitude),
+      () => {},
+      { enableHighAccuracy: false, timeout: 6000, maximumAge: 30000 }
+    );
     const watchId = navigator.geolocation.watchPosition(
-      (pos) =>
-        setDriverPos({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+      (pos) => applyPos(pos.coords.latitude, pos.coords.longitude),
       (error) => {
-        const message = error.message || 'Unable to watch location';
-        console.warn('Geolocation watch error:', message);
-        setLocationError(message);
+        console.warn('Geolocation watch error:', error.message);
+        setLocationError(error.message);
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 10000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
-  }, []);
+  }, [applyPos]);
 
   // Fly to center on change
   const onLoad = useCallback(() => {
@@ -232,15 +259,24 @@ export function MapboxHeatmap({
         </button>
         <div className="rounded-md border border-white/15 bg-black/40 px-1.5 py-1 text-[10px] text-white/80 backdrop-blur flex flex-col gap-0.5">
           <div className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#22c55e' }} />
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: '#22c55e' }}
+            />
             <span>Pass.</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#facc15' }} />
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: '#facc15' }}
+            />
             <span>Livr.</span>
           </div>
           <div className="flex items-center gap-1">
-            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#60a5fa' }} />
+            <span
+              className="w-2 h-2 rounded-full flex-shrink-0"
+              style={{ backgroundColor: '#60a5fa' }}
+            />
             <span>Transp.</span>
           </div>
         </div>

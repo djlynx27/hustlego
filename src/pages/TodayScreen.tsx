@@ -8,8 +8,8 @@ import { Button } from '@/components/ui/button';
 import { WeatherWidget } from '@/components/WeatherWidget';
 import { WeeklyGoalDisplay } from '@/components/WeeklyGoal';
 import { useI18n } from '@/contexts/I18nContext';
-import { useCityId } from '@/hooks/useCityId';
 import { useAutoCity } from '@/hooks/useAutoCity';
+import { useCityId } from '@/hooks/useCityId';
 import { useDemandScores } from '@/hooks/useDemandScores';
 import { useHabsGame } from '@/hooks/useHabsGame';
 import { useHoliday } from '@/hooks/useHoliday';
@@ -18,7 +18,9 @@ import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { useCities } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
-import { getCurrentSlotTime, getDemandClass } from '@/lib/demandUtils';
+import { useWeather } from '@/hooks/useWeather';
+import { formatTime24h, getCurrentSlotTime, getDemandClass } from '@/lib/demandUtils';
+import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
 import { getActiveTimeBoosts } from '@/lib/timeBoosts';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
 import {
@@ -28,9 +30,10 @@ import {
   Navigation,
   PartyPopper,
   Ticket,
+  Timer,
   WifiOff,
 } from 'lucide-react';
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 const MapboxHeatmap = lazy(() => import('@/components/MapboxHeatmap'));
 
@@ -98,6 +101,126 @@ export default function TodayScreen() {
   const [driverMode, setDriverMode] = useState<
     'rideshare' | 'delivery' | 'all'
   >('all');
+
+  // ── "Je suis libre" mode ───────────────────────────────────────────
+  const [libreMode, setLibreMode] = useState(false);
+  const [waitTimer, setWaitTimer] = useState<{
+    zoneId: string;
+    zoneName: string;
+    startedAt: number;
+  } | null>(null);
+  const [timerExpired, setTimerExpired] = useState(false);
+  const [nowTick, setNowTick] = useState(Date.now());
+
+  // Second-precision tick when timer is active
+  useEffect(() => {
+    if (!waitTimer) return;
+    const id = setInterval(() => setNowTick(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [!!waitTimer]);
+
+  const WAIT_DURATION_MS = 15 * 60 * 1000;
+  const waitRemainingMs = waitTimer
+    ? Math.max(0, WAIT_DURATION_MS - (nowTick - waitTimer.startedAt))
+    : 0;
+  const waitMin = Math.floor(waitRemainingMs / 60000);
+  const waitSec = Math.floor((waitRemainingMs % 60000) / 1000);
+  const waitDisplay = `${waitMin}:${String(waitSec).padStart(2, '0')}`;
+
+  // 15-min timer completion
+  type SmartZone = {
+    id: string; name: string; distKm: number; travelMin: number;
+    arrivalScore: number; arrivalTime: string; latitude: number; longitude: number;
+  };
+  const smartZonesRef = useRef<SmartZone[]>([]);
+  useEffect(() => {
+    if (!waitTimer) return;
+    const remaining = WAIT_DURATION_MS - (Date.now() - waitTimer.startedAt);
+    if (remaining <= 0) {
+      setTimerExpired(true);
+      setWaitTimer(null);
+      return;
+    }
+    const t = setTimeout(() => {
+      setTimerExpired(true);
+      setWaitTimer(null);
+      const next = smartZonesRef.current[0];
+      if (Notification.permission === 'granted') {
+        navigator.serviceWorker?.ready
+          .then((reg) =>
+            reg.showNotification('⏱ Temps de bouger !', {
+              body: `Dirige-toi vers ${next?.name ?? 'la prochaine zone'}.`,
+              icon: '/pwa-icon-192.png',
+              tag: 'wait-timer',
+              renotify: true,
+            } as NotificationOptions)
+          )
+          .catch(() => {
+            try {
+              new Notification('⏱ Temps de bouger !', {
+                body: 'Déplace-toi vers la prochaine zone.',
+                icon: '/pwa-icon-192.png',
+              });
+            } catch {}
+          });
+      }
+    }, remaining);
+    return () => clearTimeout(t);
+  }, [waitTimer]);
+
+  const { data: weather } = useWeather(cityId);
+  const AVG_SPEED_KMH = 30;
+
+  // Smart zones: scored at ARRIVAL time considering travel
+  const smartZones = useMemo(() => {
+    if (!userLocation) return [];
+    const weatherCond: WeatherCondition | null = weather
+      ? {
+          weatherId: weather.weatherId,
+          temp: weather.temp,
+          demandBoostPoints: weather.demandBoostPoints,
+        }
+      : null;
+    return modeZones
+      .map((z) => {
+        const distKm = haversineKm(
+          userLocation.latitude,
+          userLocation.longitude,
+          z.latitude,
+          z.longitude
+        );
+        const travelMin = Math.round((distKm / AVG_SPEED_KMH) * 60);
+        const arrivalDate = new Date(now.getTime() + travelMin * 60_000);
+        const { score: arrivalScore } = computeDemandScore(
+          z,
+          arrivalDate,
+          weatherCond
+        );
+        return {
+          ...z,
+          distKm,
+          travelMin,
+          arrivalScore,
+          arrivalTime: formatTime24h(arrivalDate),
+        };
+      })
+      .filter((z) => z.distKm <= 20 && z.arrivalScore >= 45)
+      .sort((a, b) => b.arrivalScore - a.arrivalScore)
+      .slice(0, 5);
+  }, [userLocation, modeZones, now, weather]);
+
+  // Keep ref in sync for the timer callback
+  useEffect(() => {
+    smartZonesRef.current = smartZones;
+  }, [smartZones]);
+
+  const startWaitAt = useCallback(
+    (zone: (typeof smartZones)[0]) => {
+      setWaitTimer({ zoneId: zone.id, zoneName: zone.name, startedAt: Date.now() });
+      setTimerExpired(false);
+    },
+    []
+  );
 
   // Ranked zones by score descending
   const rankedZones = useMemo(() => {
@@ -192,8 +315,60 @@ export default function TodayScreen() {
         </div>
       </div>
 
+      {/* Je suis libre toggle */}
+      <div className="px-3 mt-2">
+        <button
+          onClick={() => {
+            setLibreMode((l) => !l);
+            setWaitTimer(null);
+            setTimerExpired(false);
+          }}
+          className={`w-full h-11 rounded-xl text-[14px] font-display font-bold border transition-colors flex items-center justify-center gap-2 ${
+            libreMode
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'bg-card border-border text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <Timer className="w-4 h-4" />
+          {libreMode ? '🟢 Mode libre – Où aller ?' : '🕐 Je suis libre (sans client)'}
+        </button>
+      </div>
+
       {/* Alerts */}
       <div className="px-3 space-y-1.5 mt-2">
+        {/* 15-min parking countdown */}
+        {waitTimer && (
+          <div className="flex items-center justify-between gap-2 bg-primary/15 border border-primary/40 rounded-lg px-3 py-2">
+            <div>
+              <span className="text-[15px] font-display font-bold text-primary tabular-nums">
+                ⏱ {waitDisplay}
+              </span>
+              <span className="text-[12px] text-muted-foreground font-body block">
+                En attente · {waitTimer.zoneName}
+              </span>
+            </div>
+            <button
+              onClick={() => setWaitTimer(null)}
+              className="text-muted-foreground hover:text-foreground text-xl leading-none px-1"
+              aria-label="Annuler le timer"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        {timerExpired && (
+          <div className="flex items-center justify-between gap-2 bg-destructive/20 border border-destructive/40 rounded-lg px-3 py-2">
+            <span className="text-[14px] font-display font-bold text-destructive">
+              ⏱ Temps de bouger ! Prochaine zone recommandée ↓
+            </span>
+            <button
+              onClick={() => setTimerExpired(false)}
+              className="text-muted-foreground hover:text-foreground text-xl leading-none px-1"
+            >
+              ×
+            </button>
+          </div>
+        )}
         {!isOnline && (
           <div className="flex items-center gap-2 bg-destructive/20 border border-destructive/40 rounded-lg px-3 py-2">
             <WifiOff className="w-5 h-5 text-destructive flex-shrink-0" />
@@ -407,7 +582,83 @@ export default function TodayScreen() {
         <MultiAppStatus cityId={cityId} mode={driverMode} />
       </div>
 
-      {/* 4. PROCHAINS CRÉNEAUX */}
+      {/* 4. PROCHAINS CRÉNEAUX / OÙ ALLER MAINTENANT */}
+      {libreMode ? (
+        <div className="px-3 mt-3 pb-4 space-y-2">
+          <h3 className="text-[16px] font-display font-bold text-muted-foreground uppercase tracking-wide">
+            🧭 Où aller maintenant ?
+          </h3>
+          {!userLocation ? (
+            <p className="text-[14px] text-muted-foreground font-body px-1">
+              Activez votre GPS pour les suggestions en temps réel.
+            </p>
+          ) : smartZones.length === 0 ? (
+            <p className="text-[14px] text-muted-foreground font-body px-1">
+              Chargement des zones…
+            </p>
+          ) : (
+            smartZones.map((zone, i) => {
+              const dc = getDemandClass(zone.arrivalScore);
+              const isWaiting = waitTimer?.zoneId === zone.id;
+              return (
+                <div
+                  key={zone.id}
+                  className={`bg-card rounded-xl border-l-4 ${dc.border} border border-border p-3 gap-3 transition-all ${
+                    isWaiting ? 'ring-2 ring-primary' : ''
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex-1 min-w-0">
+                      <span className="text-[17px] font-display font-semibold block leading-tight break-words">
+                        {i === 0 && '⭐ '}{zone.name}
+                      </span>
+                      <span className="text-[12px] text-muted-foreground font-body">
+                        {zone.distKm.toFixed(1)} km · ~{zone.travelMin} min de route · arrivée {zone.arrivalTime}
+                      </span>
+                    </div>
+                    <DemandBadge score={zone.arrivalScore} size="lg" />
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <a
+                      href={getGoogleMapsNavUrl(zone.name, zone.latitude, zone.longitude)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => startWaitAt(zone)}
+                      className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground font-display font-bold text-[14px] rounded-lg h-10 hover:bg-primary/90 transition-colors"
+                    >
+                      <Navigation className="w-4 h-4" /> GO · Maps
+                    </a>
+                    <a
+                      href={getWazeNavUrl(zone.name, zone.latitude, zone.longitude)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => startWaitAt(zone)}
+                      className="flex-1 flex items-center justify-center gap-1 bg-secondary text-secondary-foreground font-display font-bold text-[14px] rounded-lg h-10 hover:bg-secondary/80 transition-colors"
+                    >
+                      🧭 Waze
+                    </a>
+                    {isWaiting ? (
+                      <button
+                        onClick={() => setWaitTimer(null)}
+                        className="px-3 h-10 rounded-lg border border-border text-[13px] text-muted-foreground hover:text-foreground font-body"
+                      >
+                        Annuler
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => startWaitAt(zone)}
+                        className="px-3 h-10 rounded-lg border border-primary/50 text-[13px] text-primary font-body"
+                      >
+                        J'arrive
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+      ) : (
       <div className="px-3 mt-3 pb-4 space-y-2">
         <h3 className="text-[16px] font-display font-bold text-muted-foreground uppercase tracking-wide">
           {t('nextSlots')}
@@ -451,6 +702,7 @@ export default function TodayScreen() {
           );
         })}
       </div>
+      )}
 
       <NavigationSheet
         open={!!navZone}

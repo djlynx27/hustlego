@@ -1,6 +1,6 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export type City = Tables<'cities'>;
 export type Zone = Tables<'zones'>;
@@ -12,7 +12,10 @@ export function useCities() {
   return useQuery({
     queryKey: ['cities'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('cities').select('*').order('name');
+      const { data, error } = await supabase
+        .from('cities')
+        .select('*')
+        .order('name');
       if (error) throw error;
       return data as City[];
     },
@@ -35,14 +38,18 @@ export function useZones(cityId: string) {
   return useQuery({
     queryKey: ['zones', cityId],
     queryFn: async () => {
-      const { data, error } = await supabase.from('zones').select('*').eq('city_id', cityId).order('name');
+      const { data, error } = await supabase
+        .from('zones')
+        .select('*')
+        .eq('city_id', cityId)
+        .order('name');
       if (error) throw error;
       return data as Zone[];
     },
     enabled: !!cityId,
-    staleTime: 5 * 60 * 1000,        // consider fresh for 5 min
-    refetchInterval: 5 * 60 * 1000,   // auto-refresh every 5 min
-    refetchOnWindowFocus: true,        // re-fetch when user returns to tab
+    staleTime: 5 * 60 * 1000, // consider fresh for 5 min
+    refetchInterval: 5 * 60 * 1000, // auto-refresh every 5 min
+    refetchOnWindowFocus: true, // re-fetch when user returns to tab
   });
 }
 
@@ -60,8 +67,20 @@ export function useAddZone() {
 export function useUpdateZone() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...updates }: { id: string; name?: string; type?: string; latitude?: number; longitude?: number }) => {
-      const { error } = await supabase.from('zones').update(updates as any).eq('id', id);
+    mutationFn: async ({
+      id,
+      ...updates
+    }: {
+      id: string;
+      name?: string;
+      type?: string;
+      latitude?: number;
+      longitude?: number;
+    }) => {
+      const { error } = await supabase
+        .from('zones')
+        .update(updates as any)
+        .eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['zones'] }),
@@ -117,7 +136,11 @@ export function useBulkInsertTimeSlots() {
     mutationFn: async (slots: TablesInsert<'time_slots'>[]) => {
       // Delete existing slots for that city+date first
       if (slots.length > 0) {
-        await supabase.from('time_slots').delete().eq('city_id', slots[0].city_id).eq('date', slots[0].date);
+        await supabase
+          .from('time_slots')
+          .delete()
+          .eq('city_id', slots[0].city_id)
+          .eq('date', slots[0].date);
       }
       // Insert in batches of 500
       for (let i = 0; i < slots.length; i += 500) {

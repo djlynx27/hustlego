@@ -7,8 +7,8 @@
  *   Laval     45.608, -73.747
  *   Longueuil 45.531, -73.518
  */
-import { useEffect, useRef } from 'react';
 import { haversineKm } from '@/hooks/useUserLocation';
+import { useEffect, useRef } from 'react';
 
 const CITY_CENTROIDS: { id: string; lat: number; lng: number }[] = [
   { id: 'mtl', lat: 45.508, lng: -73.587 },
@@ -36,7 +36,7 @@ export function nearestCityId(lat: number, lng: number): string {
 export function useAutoCity(
   setCityId: (id: string) => void,
   userLat: number | null | undefined,
-  userLng: number | null | undefined,
+  userLng: number | null | undefined
 ) {
   const hasFiredRef = useRef(false);
   useEffect(() => {
