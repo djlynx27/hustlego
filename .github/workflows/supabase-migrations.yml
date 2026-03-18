@@ -68,7 +68,31 @@ jobs:
 
           echo "Resolved Supabase project ref length: ${#ref}"
 
-          supabase link --project-ref "$ref"
+          # Try linking with the parsed ref first. If Supabase rejects format,
+          # retry with common OCR/typing fixes from copied URLs.
+          linked_ref=""
+          candidates=("$ref")
+          normalized_ref="$(echo "$ref" | tr '10' 'lo')"
+          if [[ "$normalized_ref" != "$ref" ]]; then
+            candidates+=("$normalized_ref")
+          fi
+
+          for candidate in "${candidates[@]}"; do
+            echo "Trying project ref candidate (len=${#candidate})"
+            if supabase link --project-ref "$candidate" >/tmp/supabase_link.log 2>&1; then
+              linked_ref="$candidate"
+              break
+            fi
+          done
+
+          if [[ -z "$linked_ref" ]]; then
+            echo "Failed to link project. Supabase output:"
+            cat /tmp/supabase_link.log || true
+            echo "Hint: verify SUPABASE_PROJECT_ID matches project URL subdomain exactly."
+            exit 1
+          fi
+
+          echo "Linked Supabase project ref length: ${#linked_ref}"
           supabase db push
           supabase db execute --file supabase-seed.sql
 
