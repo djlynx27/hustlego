@@ -221,36 +221,27 @@ export function MapboxHeatmap({
 
   return (
     <div className={`relative w-full h-full ${className}`}>
-      <div className="absolute z-20 left-3 top-3 flex flex-col gap-2">
+      <div className="absolute z-20 left-2 top-2 flex flex-col gap-1.5">
         <button
           onClick={goToMyLocation}
           disabled={!driverPos}
-          className="rounded-md border border-white/30 bg-white/10 px-2 py-1 text-xs text-white backdrop-blur transition hover:bg-white/20 disabled:cursor-not-allowed disabled:opacity-50"
+          title="Me localiser"
+          className="rounded-full border border-white/30 bg-black/50 w-8 h-8 flex items-center justify-center text-sm backdrop-blur transition hover:bg-black/70 disabled:cursor-not-allowed disabled:opacity-40"
         >
-          📍 Me localiser
+          📍
         </button>
-        <div className="rounded-md border border-white/20 bg-black/40 p-2 text-xs text-white">
-          <div className="font-semibold mb-1">Légende</div>
-          <div className="flex items-center gap-2">
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: '#22c55e' }}
-            />
-            Passagers
+        <div className="rounded-md border border-white/15 bg-black/40 px-1.5 py-1 text-[10px] text-white/80 backdrop-blur flex flex-col gap-0.5">
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#22c55e' }} />
+            <span>Pass.</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: '#facc15' }}
-            />
-            Commercial / Livraison
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#facc15' }} />
+            <span>Livr.</span>
           </div>
-          <div className="flex items-center gap-2">
-            <span
-              className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: '#60a5fa' }}
-            />
-            Transport / Autre
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: '#60a5fa' }} />
+            <span>Transp.</span>
           </div>
         </div>
       </div>
