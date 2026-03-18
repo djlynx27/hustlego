@@ -3,6 +3,7 @@ import { BrowserRouter, Route, Routes, useLocation } from "react-router-dom";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { I18nProvider } from "@/contexts/I18nContext";
+import { ThemeProvider } from "next-themes";
 import { BottomNav } from "@/components/BottomNav";
 import { NearestHotspot } from "@/components/NearestHotspot";
 import { LangToggle } from "@/components/LangToggle";
@@ -80,14 +81,16 @@ function AppContent() {
 const App = () => (
   <QueryClientProvider client={queryClient}>
     <I18nProvider>
-      <TooltipProvider>
-        <Sonner />
-        <BrowserRouter>
-          <AppErrorBoundary>
-            <AppContent />
-          </AppErrorBoundary>
-        </BrowserRouter>
-      </TooltipProvider>
+      <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+        <TooltipProvider>
+          <Sonner />
+          <BrowserRouter>
+            <AppErrorBoundary>
+              <AppContent />
+            </AppErrorBoundary>
+          </BrowserRouter>
+        </TooltipProvider>
+      </ThemeProvider>
     </I18nProvider>
   </QueryClientProvider>
 );
