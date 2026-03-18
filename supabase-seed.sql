@@ -1,6 +1,7 @@
 -- ============================================================
 -- Migration: Données réelles HustleGo (générée automatiquement)
 -- Source: zones bubble.csv + QuickBooks_Mileage.csv
+-- Trigger CI: workflow verification (2026-03-18)
 -- ============================================================
 
 -- ── Création des tables (si elles n'existent pas encore) ────
