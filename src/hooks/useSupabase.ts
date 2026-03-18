@@ -48,8 +48,8 @@ export function useAddCity() {
 	return addCity;
 }
 
-// Hook pour récupérer la liste des zones
-export function useZones() {
+// Hook pour récupérer la liste des zones d'une ville
+export function useZones(cityId: string) {
 	const [data, setData] = useState<any[]>([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<any>(null);
@@ -60,6 +60,7 @@ export function useZones() {
 		supabase
 			.from('zones')
 			.select('*')
+			.eq('city_id', cityId)
 			.then(({ data, error }) => {
 				if (mounted) {
 					if (error) setError(error);
@@ -70,7 +71,7 @@ export function useZones() {
 		return () => {
 			mounted = false;
 		};
-	}, []);
+	}, [cityId]);
 
 	return { data, loading, error };
 }
