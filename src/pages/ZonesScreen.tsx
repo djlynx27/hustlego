@@ -35,8 +35,8 @@ const ZONE_TYPES = Constants.public.Enums.zone_type;
 
 const CITY_CENTERS: Record<string, [number, number]> = {
   mtl: [45.5017, -73.5673],
-  qc: [46.8139, -71.208],
-  ott: [45.4215, -75.6972],
+  lvl: [45.5503, -73.7006],
+  lng: [45.5252, -73.5205],
 };
 
 export default function ZonesScreen() {
