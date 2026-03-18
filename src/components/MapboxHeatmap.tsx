@@ -231,3 +231,5 @@ export function MapboxHeatmap({ center, zoom = 11, markers, onZoneClick, classNa
     </div>
   );
 }
+
+export default MapboxHeatmap;
