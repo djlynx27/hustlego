@@ -261,3 +261,306 @@ INSERT INTO public.events (
 
 ON CONFLICT (id) DO NOTHING;
 
+-- ── Fondations learning / sessions / recherche vectorielle ─────────
+CREATE EXTENSION IF NOT EXISTS vector;
+
+CREATE TABLE IF NOT EXISTS public.sessions (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  started_at timestamptz NOT NULL,
+  ended_at timestamptz,
+  total_earnings numeric(8,2),
+  total_rides integer DEFAULT 0,
+  total_hours numeric(6,2),
+  weather_snapshot jsonb,
+  notes text,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.session_zones (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  session_id bigint NOT NULL REFERENCES public.sessions(id) ON DELETE CASCADE,
+  zone_id text NOT NULL REFERENCES public.zones(id) ON DELETE CASCADE,
+  entered_at timestamptz NOT NULL,
+  exited_at timestamptz,
+  rides_count integer NOT NULL DEFAULT 0,
+  earnings numeric(8,2) NOT NULL DEFAULT 0,
+  predicted_score numeric(5,2),
+  factors_snapshot jsonb,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.ema_patterns (
+  zone_id text NOT NULL REFERENCES public.zones(id) ON DELETE CASCADE,
+  day_of_week smallint NOT NULL,
+  hour_block smallint NOT NULL,
+  ema_earnings_per_hour numeric(8,2) NOT NULL DEFAULT 0,
+  ema_ride_count numeric(6,2) NOT NULL DEFAULT 0,
+  observation_count integer NOT NULL DEFAULT 0,
+  last_updated timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (zone_id, day_of_week, hour_block)
+);
+
+CREATE TABLE IF NOT EXISTS public.zone_beliefs (
+  zone_id text NOT NULL REFERENCES public.zones(id) ON DELETE CASCADE,
+  day_of_week smallint NOT NULL,
+  hour_block smallint NOT NULL,
+  prior_mean numeric(8,2) NOT NULL DEFAULT 25,
+  prior_variance numeric(8,4) NOT NULL DEFAULT 100,
+  observation_count integer NOT NULL DEFAULT 0,
+  last_updated timestamptz NOT NULL DEFAULT now(),
+  PRIMARY KEY (zone_id, day_of_week, hour_block)
+);
+
+CREATE TABLE IF NOT EXISTS public.predictions (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  zone_id text NOT NULL REFERENCES public.zones(id) ON DELETE CASCADE,
+  predicted_at timestamptz NOT NULL,
+  predicted_score numeric(5,2) NOT NULL,
+  factors_snapshot jsonb,
+  actual_earnings_per_hour numeric(8,2),
+  prediction_error numeric(8,4),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.weight_history (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  weights jsonb NOT NULL,
+  prediction_mae numeric(8,4),
+  triggered_by text NOT NULL DEFAULT 'post_shift',
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS public.demand_patterns (
+  id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
+  zone_id text NOT NULL REFERENCES public.zones(id) ON DELETE CASCADE,
+  context_vector vector(16) NOT NULL,
+  actual_earnings_per_hour numeric(8,2),
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE INDEX IF NOT EXISTS demand_patterns_context_vector_idx
+  ON public.demand_patterns USING hnsw (context_vector vector_cosine_ops);
+
+CREATE OR REPLACE FUNCTION public.match_similar_contexts(
+  query_vector vector(16),
+  query_zone_id text,
+  match_count integer DEFAULT 10
+)
+RETURNS TABLE (
+  id bigint,
+  zone_id text,
+  actual_earnings_per_hour numeric,
+  similarity double precision,
+  created_at timestamptz
+)
+LANGUAGE sql
+STABLE
+AS $$
+  SELECT
+    demand_patterns.id,
+    demand_patterns.zone_id,
+    demand_patterns.actual_earnings_per_hour,
+    1 - (demand_patterns.context_vector <=> query_vector) AS similarity,
+    demand_patterns.created_at
+  FROM public.demand_patterns
+  WHERE demand_patterns.zone_id = query_zone_id
+  ORDER BY demand_patterns.context_vector <=> query_vector
+  LIMIT greatest(match_count, 1);
+$$;
+
+ALTER TABLE public.sessions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.session_zones ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.ema_patterns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.zone_beliefs ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.predictions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.weight_history ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.demand_patterns ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "authenticated read sessions" ON public.sessions;
+CREATE POLICY "authenticated read sessions"
+  ON public.sessions FOR ALL
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "authenticated read session_zones" ON public.session_zones;
+CREATE POLICY "authenticated read session_zones"
+  ON public.session_zones FOR ALL
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "authenticated read ema_patterns" ON public.ema_patterns;
+CREATE POLICY "authenticated read ema_patterns"
+  ON public.ema_patterns FOR ALL
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "authenticated read zone_beliefs" ON public.zone_beliefs;
+CREATE POLICY "authenticated read zone_beliefs"
+  ON public.zone_beliefs FOR ALL
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "authenticated read predictions" ON public.predictions;
+CREATE POLICY "authenticated read predictions"
+  ON public.predictions FOR ALL
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "authenticated read weight_history" ON public.weight_history;
+CREATE POLICY "authenticated read weight_history"
+  ON public.weight_history FOR ALL
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+DROP POLICY IF EXISTS "authenticated read demand_patterns" ON public.demand_patterns;
+CREATE POLICY "authenticated read demand_patterns"
+  ON public.demand_patterns FOR ALL
+  USING (auth.uid() IS NOT NULL)
+  WITH CHECK (auth.uid() IS NOT NULL);
+
+DO $$
+DECLARE
+  seeded_session_id bigint;
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM public.weight_history WHERE triggered_by = 'seed_demo'
+  ) THEN
+    INSERT INTO public.sessions (
+      started_at,
+      ended_at,
+      total_earnings,
+      total_rides,
+      total_hours,
+      weather_snapshot,
+      notes
+    ) VALUES (
+      '2026-03-16 21:00:00+00',
+      '2026-03-17 01:30:00+00',
+      182.50,
+      5,
+      4.5,
+      jsonb_build_object('accuracy_percent', 87, 'mean_absolute_error', 13),
+      'Session seed de démonstration pour la boucle learning.'
+    )
+    RETURNING id INTO seeded_session_id;
+
+    INSERT INTO public.session_zones (
+      session_id,
+      zone_id,
+      entered_at,
+      exited_at,
+      rides_count,
+      earnings,
+      predicted_score,
+      factors_snapshot
+    ) VALUES
+      (
+        seeded_session_id,
+        'mtl-cb',
+        '2026-03-16 21:05:00+00',
+        '2026-03-16 23:10:00+00',
+        3,
+        118.50,
+        74,
+        jsonb_build_object('source', 'seed', 'zone_type', 'événements')
+      ),
+      (
+        seeded_session_id,
+        'mtl-bq',
+        '2026-03-16 23:20:00+00',
+        '2026-03-17 01:20:00+00',
+        2,
+        64.00,
+        56,
+        jsonb_build_object('source', 'seed', 'zone_type', 'métro')
+      );
+
+    INSERT INTO public.predictions (
+      zone_id,
+      predicted_at,
+      predicted_score,
+      factors_snapshot,
+      actual_earnings_per_hour,
+      prediction_error
+    ) VALUES
+      (
+        'mtl-cb',
+        '2026-03-16 21:05:00+00',
+        74,
+        jsonb_build_object('source', 'seed', 'platform', 'uber'),
+        52.60,
+        14.0000
+      ),
+      (
+        'mtl-bq',
+        '2026-03-16 23:20:00+00',
+        56,
+        jsonb_build_object('source', 'seed', 'platform', 'lyft'),
+        31.90,
+        -3.0000
+      );
+
+    INSERT INTO public.weight_history (
+      weights,
+      prediction_mae,
+      triggered_by
+    ) VALUES (
+      jsonb_build_object(
+        'timeOfDay', 0.24,
+        'dayOfWeek', 0.14,
+        'weather', 0.15,
+        'events', 0.18,
+        'historicalEarnings', 0.11,
+        'transitDisruption', 0.08,
+        'trafficCongestion', 0.06,
+        'winterConditions', 0.04
+      ),
+      8.5,
+      'seed_demo'
+    );
+
+    INSERT INTO public.ema_patterns (
+      zone_id,
+      day_of_week,
+      hour_block,
+      ema_earnings_per_hour,
+      ema_ride_count,
+      observation_count,
+      last_updated
+    ) VALUES
+      ('mtl-cb', 1, 84, 52.60, 2.40, 5, now()),
+      ('mtl-bq', 1, 93, 31.90, 1.60, 4, now())
+    ON CONFLICT (zone_id, day_of_week, hour_block) DO UPDATE SET
+      ema_earnings_per_hour = EXCLUDED.ema_earnings_per_hour,
+      ema_ride_count = EXCLUDED.ema_ride_count,
+      observation_count = EXCLUDED.observation_count,
+      last_updated = EXCLUDED.last_updated;
+
+    INSERT INTO public.zone_beliefs (
+      zone_id,
+      day_of_week,
+      hour_block,
+      prior_mean,
+      prior_variance,
+      observation_count,
+      last_updated
+    ) VALUES
+      ('mtl-cb', 1, 84, 49.25, 24.5000, 5, now()),
+      ('mtl-bq', 1, 93, 32.75, 28.0000, 4, now())
+    ON CONFLICT (zone_id, day_of_week, hour_block) DO UPDATE SET
+      prior_mean = EXCLUDED.prior_mean,
+      prior_variance = EXCLUDED.prior_variance,
+      observation_count = EXCLUDED.observation_count,
+      last_updated = EXCLUDED.last_updated;
+
+    INSERT INTO public.demand_patterns (
+      zone_id,
+      context_vector,
+      actual_earnings_per_hour
+    ) VALUES
+      ('mtl-cb', '[0.5,0.866025,0.781831,0.62349,0.876,0.425,0.3,0.2,1,0,0,0,0.25,1,1,0.88]', 52.60),
+      ('mtl-cb', '[0.258819,0.965926,0.781831,0.62349,0.812,0.39,0.28,0.16,0,1,0,0,0.25,1,1,0.84]', 48.10),
+      ('mtl-bq', '[-0.258819,-0.965926,0.781831,0.62349,0.532,0.24,0.25,0.08,1,0,0,0,0.25,1,0,0.53]', 31.90);
+  END IF;
+END $$;
+

@@ -32,6 +32,29 @@ Pour connecter Supabase, ajoute les variables d'environnement dans Vercel :
 
 - `VITE_SUPABASE_URL`
 - `VITE_SUPABASE_ANON_KEY`
+- `VITE_TOMTOM_KEY` pour enrichir le scoring avec le trafic TomTom
+
+### Activer le module learning
+
+Le moteur d'apprentissage, la synchronisation des shifts et la recherche de
+contextes similaires reposent sur la migration
+`supabase/migrations/20260318_learning_foundation.sql`.
+
+Si la CLI Supabase n'est pas disponible localement, exécute simplement ce
+fichier dans le SQL Editor du projet Supabase.
+
+Ensuite :
+
+1. Charge éventuellement les données de base de `supabase-seed.sql`.
+2. Lance l'app puis ouvre l'écran Admin.
+3. Utilise `Sync Supabase` dans la boucle d'apprentissage ou termine un shift
+   pour peupler `ema_patterns`, `zone_beliefs`, `predictions` et
+   `demand_patterns`.
+4. Le bloc `Contextes similaires` devient utile dès que des patterns ont été
+   synchronisés et que le RPC `match_similar_contexts` existe côté Supabase.
+5. En fallback (quand les scores DB ne sont pas disponibles), le scoring live
+   des zones applique aussi un bonus learning à partir des contextes similaires
+   récupérés via `match_similar_contexts`.
 
 ## Déploiement Vercel
 

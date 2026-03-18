@@ -19,7 +19,11 @@ import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { useCities } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { useWeather } from '@/hooks/useWeather';
-import { formatTime24h, getCurrentSlotTime, getDemandClass } from '@/lib/demandUtils';
+import {
+  formatTime24h,
+  getCurrentSlotTime,
+  getDemandClass,
+} from '@/lib/demandUtils';
 import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
 import { getActiveTimeBoosts } from '@/lib/timeBoosts';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
@@ -33,7 +37,15 @@ import {
   Timer,
   WifiOff,
 } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useNavigate } from 'react-router-dom';
 const MapboxHeatmap = lazy(() => import('@/components/MapboxHeatmap'));
 
@@ -68,6 +80,14 @@ const DELIVERY_BOOST: Record<string, number> = {
   événements: 0.7,
   aéroport: 0.65,
 };
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat('fr-CA', {
+    style: 'currency',
+    currency: 'CAD',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
 
 export default function TodayScreen() {
   const navigate = useNavigate();
@@ -129,8 +149,14 @@ export default function TodayScreen() {
 
   // 15-min timer completion
   type SmartZone = {
-    id: string; name: string; distKm: number; travelMin: number;
-    arrivalScore: number; arrivalTime: string; latitude: number; longitude: number;
+    id: string;
+    name: string;
+    distKm: number;
+    travelMin: number;
+    arrivalScore: number;
+    arrivalTime: string;
+    latitude: number;
+    longitude: number;
   };
   const smartZonesRef = useRef<SmartZone[]>([]);
   useEffect(() => {
@@ -170,6 +196,26 @@ export default function TodayScreen() {
 
   const { data: weather } = useWeather(cityId);
   const AVG_SPEED_KMH = 30;
+
+  // Ranked zones by score descending
+  const rankedZones = useMemo(() => {
+    return zones
+      .map((z) => ({ ...z, score: scores.get(z.id) ?? 0 }))
+      .sort((a, b) => b.score - a.score);
+  }, [zones, scores]);
+
+  // Reweight scores based on driver objective (personnes / livraison / les deux)
+  const modeZones = useMemo(() => {
+    if (driverMode === 'all') return rankedZones;
+    const boostMap =
+      driverMode === 'rideshare' ? RIDESHARE_BOOST : DELIVERY_BOOST;
+    return [...rankedZones]
+      .map((z) => ({
+        ...z,
+        score: Math.min(Math.round(z.score * (boostMap[z.type] ?? 1.0)), 100),
+      }))
+      .sort((a, b) => b.score - a.score);
+  }, [rankedZones, driverMode]);
 
   // Smart zones: scored at ARRIVAL time considering travel
   const smartZones = useMemo(() => {
@@ -214,35 +260,17 @@ export default function TodayScreen() {
     smartZonesRef.current = smartZones;
   }, [smartZones]);
 
-  const startWaitAt = useCallback(
-    (zone: (typeof smartZones)[0]) => {
-      setWaitTimer({ zoneId: zone.id, zoneName: zone.name, startedAt: Date.now() });
-      setTimerExpired(false);
-    },
-    []
-  );
-
-  // Ranked zones by score descending
-  const rankedZones = useMemo(() => {
-    return zones
-      .map((z) => ({ ...z, score: scores.get(z.id) ?? 0 }))
-      .sort((a, b) => b.score - a.score);
-  }, [zones, scores]);
-
-  // Reweight scores based on driver objective (personnes / livraison / les deux)
-  const modeZones = useMemo(() => {
-    if (driverMode === 'all') return rankedZones;
-    const boostMap =
-      driverMode === 'rideshare' ? RIDESHARE_BOOST : DELIVERY_BOOST;
-    return [...rankedZones]
-      .map((z) => ({
-        ...z,
-        score: Math.min(Math.round(z.score * (boostMap[z.type] ?? 1.0)), 100),
-      }))
-      .sort((a, b) => b.score - a.score);
-  }, [rankedZones, driverMode]);
+  const startWaitAt = useCallback((zone: (typeof smartZones)[0]) => {
+    setWaitTimer({
+      zoneId: zone.id,
+      zoneName: zone.name,
+      startedAt: Date.now(),
+    });
+    setTimerExpired(false);
+  }, []);
 
   const heroZone = modeZones[0] ?? null;
+  const heroFactors = heroZone ? factors.get(heroZone.id) : undefined;
   const nextZones = modeZones.slice(1, 4);
 
   const getDistance = (zone: any) => {
@@ -269,8 +297,9 @@ export default function TodayScreen() {
       latitude: z.latitude,
       longitude: z.longitude,
       demandScore: z.score,
+      learningBoostPoints: factors.get(z.id)?.learningBoostPoints ?? 0,
     }));
-  }, [modeZones]);
+  }, [modeZones, factors]);
 
   return (
     <div className="flex flex-col h-full pb-20">
@@ -330,7 +359,9 @@ export default function TodayScreen() {
           }`}
         >
           <Timer className="w-4 h-4" />
-          {libreMode ? '🟢 Mode libre – Où aller ?' : '🕐 Je suis libre (sans client)'}
+          {libreMode
+            ? '🟢 Mode libre – Où aller ?'
+            : '🕐 Je suis libre (sans client)'}
         </button>
       </div>
 
@@ -501,6 +532,17 @@ export default function TodayScreen() {
                   {heroZone.type}
                   <ScoreFactorIcons factors={factors.get(heroZone.id)} />
                 </span>
+                {Number(heroFactors?.learningBoostPoints ?? 0) > 0 && (
+                  <span className="text-[13px] text-primary/90 font-body block mt-1">
+                    IA contextuelle +{heroFactors?.learningBoostPoints} pts ·{' '}
+                    similarité{' '}
+                    {Math.round((heroFactors?.learningSimilarity ?? 0) * 100)}%
+                    {' · '}
+                    historique{' '}
+                    {formatMoney(heroFactors?.learningAvgEarningsPerHour ?? 0)}
+                    /h
+                  </span>
+                )}
                 {heroDistance !== null && (
                   <span className="text-[20px] font-display font-semibold text-muted-foreground mt-1 block">
                     📍 {heroDistance.toFixed(1)} km
@@ -600,6 +642,7 @@ export default function TodayScreen() {
             smartZones.map((zone, i) => {
               const dc = getDemandClass(zone.arrivalScore);
               const isWaiting = waitTimer?.zoneId === zone.id;
+              const zoneFactors = factors.get(zone.id);
               return (
                 <div
                   key={zone.id}
@@ -610,17 +653,32 @@ export default function TodayScreen() {
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
                       <span className="text-[17px] font-display font-semibold block leading-tight break-words">
-                        {i === 0 && '⭐ '}{zone.name}
+                        {i === 0 && '⭐ '}
+                        {zone.name}
                       </span>
                       <span className="text-[12px] text-muted-foreground font-body">
-                        {zone.distKm.toFixed(1)} km · ~{zone.travelMin} min de route · arrivée {zone.arrivalTime}
+                        {zone.distKm.toFixed(1)} km · ~{zone.travelMin} min de
+                        route · arrivée {zone.arrivalTime}
                       </span>
+                      {Number(zoneFactors?.learningBoostPoints ?? 0) > 0 && (
+                        <span className="text-[12px] text-primary/90 font-body block mt-0.5">
+                          Boost IA +{zoneFactors?.learningBoostPoints} (
+                          {Math.round(
+                            (zoneFactors?.learningSimilarity ?? 0) * 100
+                          )}
+                          %)
+                        </span>
+                      )}
                     </div>
                     <DemandBadge score={zone.arrivalScore} size="lg" />
                   </div>
                   <div className="flex gap-2 mt-2">
                     <a
-                      href={getGoogleMapsNavUrl(zone.name, zone.latitude, zone.longitude)}
+                      href={getGoogleMapsNavUrl(
+                        zone.name,
+                        zone.latitude,
+                        zone.longitude
+                      )}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => startWaitAt(zone)}
@@ -629,7 +687,11 @@ export default function TodayScreen() {
                       <Navigation className="w-4 h-4" /> GO · Maps
                     </a>
                     <a
-                      href={getWazeNavUrl(zone.name, zone.latitude, zone.longitude)}
+                      href={getWazeNavUrl(
+                        zone.name,
+                        zone.latitude,
+                        zone.longitude
+                      )}
                       target="_blank"
                       rel="noopener noreferrer"
                       onClick={() => startWaitAt(zone)}
@@ -659,49 +721,57 @@ export default function TodayScreen() {
           )}
         </div>
       ) : (
-      <div className="px-3 mt-3 pb-4 space-y-2">
-        <h3 className="text-[16px] font-display font-bold text-muted-foreground uppercase tracking-wide">
-          {t('nextSlots')}
-        </h3>
-        {nextZones.map((zone) => {
-          const dc = getDemandClass(zone.score);
-          const dist = getDistance(zone);
-          return (
-            <div
-              key={zone.id}
-              onClick={() =>
-                setNavZone({
-                  name: zone.name,
-                  lat: zone.latitude,
-                  lng: zone.longitude,
-                })
-              }
-              className={`flex items-center justify-between bg-card rounded-xl border-l-4 ${dc.border} border border-border p-4 gap-3 cursor-pointer active:scale-[0.98] transition-transform`}
-            >
-              <div className="flex-1 min-w-0">
-                <span className="text-[18px] font-display font-semibold block leading-tight break-words">
-                  {zone.name}
-                  {dist !== null && (
-                    <span className="text-muted-foreground text-[14px] font-body ml-2">
-                      · {dist.toFixed(1)} km
+        <div className="px-3 mt-3 pb-4 space-y-2">
+          <h3 className="text-[16px] font-display font-bold text-muted-foreground uppercase tracking-wide">
+            {t('nextSlots')}
+          </h3>
+          {nextZones.map((zone) => {
+            const dc = getDemandClass(zone.score);
+            const dist = getDistance(zone);
+            const zoneFactors = factors.get(zone.id);
+            return (
+              <div
+                key={zone.id}
+                onClick={() =>
+                  setNavZone({
+                    name: zone.name,
+                    lat: zone.latitude,
+                    lng: zone.longitude,
+                  })
+                }
+                className={`flex items-center justify-between bg-card rounded-xl border-l-4 ${dc.border} border border-border p-4 gap-3 cursor-pointer active:scale-[0.98] transition-transform`}
+              >
+                <div className="flex-1 min-w-0">
+                  <span className="text-[18px] font-display font-semibold block leading-tight break-words">
+                    {zone.name}
+                    {dist !== null && (
+                      <span className="text-muted-foreground text-[14px] font-body ml-2">
+                        · {dist.toFixed(1)} km
+                      </span>
+                    )}
+                  </span>
+                  <span className="text-[14px] text-muted-foreground font-body capitalize">
+                    {zone.type}
+                    <ScoreFactorIcons factors={factors.get(zone.id)} />
+                  </span>
+                  <span className="text-[12px] text-muted-foreground font-body">
+                    {start}–{end}
+                  </span>
+                  {Number(zoneFactors?.learningBoostPoints ?? 0) > 0 && (
+                    <span className="text-[12px] text-primary/90 font-body block mt-0.5">
+                      Boost IA +{zoneFactors?.learningBoostPoints} (
+                      {Math.round((zoneFactors?.learningSimilarity ?? 0) * 100)}
+                      %)
                     </span>
                   )}
-                </span>
-                <span className="text-[14px] text-muted-foreground font-body capitalize">
-                  {zone.type}
-                  <ScoreFactorIcons factors={factors.get(zone.id)} />
-                </span>
-                <span className="text-[12px] text-muted-foreground font-body">
-                  {start}–{end}
-                </span>
+                </div>
+                <div className="flex-shrink-0">
+                  <DemandBadge score={zone.score} size="lg" />
+                </div>
               </div>
-              <div className="flex-shrink-0">
-                <DemandBadge score={zone.score} size="lg" />
-              </div>
-            </div>
-          );
-        })}
-      </div>
+            );
+          })}
+        </div>
       )}
 
       <NavigationSheet

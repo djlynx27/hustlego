@@ -20,6 +20,7 @@ export interface HeatmapZone {
   latitude: number;
   longitude: number;
   demandScore?: number;
+  learningBoostPoints?: number;
 }
 
 interface MapboxHeatmapProps {
@@ -279,6 +280,10 @@ export function MapboxHeatmap({
             />
             <span>Transp.</span>
           </div>
+          <div className="flex items-center gap-1">
+            <span className="w-2 h-2 rounded-full flex-shrink-0 border border-fuchsia-300 bg-fuchsia-500/80" />
+            <span>IA+</span>
+          </div>
         </div>
       </div>
 
@@ -351,6 +356,11 @@ export function MapboxHeatmap({
 
           {/* Zone circle markers */}
           {markers.map((m) => {
+            const learningBoost = Math.max(
+              0,
+              Number(m.learningBoostPoints ?? 0)
+            );
+            const hasLearningBoost = learningBoost > 0;
             return (
               <Marker
                 key={m.id}
@@ -358,19 +368,34 @@ export function MapboxHeatmap({
                 latitude={m.latitude}
                 anchor="center"
               >
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onZoneClick?.(m);
-                  }}
-                  className="rounded-full border-2 shadow-md transition-transform hover:scale-125 focus:outline-none"
-                  style={{
-                    width: 18,
-                    height: 18,
-                    ...getTypeStyle(m.type),
-                  }}
-                  aria-label={m.name}
-                />
+                <div className="relative">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onZoneClick?.(m);
+                    }}
+                    className="rounded-full border-2 shadow-md transition-transform hover:scale-125 focus:outline-none"
+                    style={{
+                      width: 18,
+                      height: 18,
+                      boxShadow: hasLearningBoost
+                        ? '0 0 0 3px rgba(217, 70, 239, 0.45)'
+                        : undefined,
+                      ...getTypeStyle(m.type),
+                    }}
+                    aria-label={m.name}
+                    title={
+                      hasLearningBoost
+                        ? `${m.name} · IA +${learningBoost}`
+                        : m.name
+                    }
+                  />
+                  {hasLearningBoost && (
+                    <span className="absolute -top-2 -right-3 min-w-4 h-4 px-1 rounded-full border border-fuchsia-300 bg-fuchsia-500 text-white text-[9px] leading-4 text-center font-semibold shadow-sm">
+                      +{learningBoost}
+                    </span>
+                  )}
+                </div>
               </Marker>
             );
           })}

@@ -2,7 +2,10 @@ import { CitySelect } from '@/components/CitySelect';
 import { CsvImporter } from '@/components/CsvImporter';
 import { DailyReports } from '@/components/DailyReports';
 import { ExperimentalShiftComparison } from '@/components/ExperimentalShiftComparison';
+import { LearningInsightsPanel } from '@/components/LearningInsightsPanel';
 import { ModeTaxi } from '@/components/ModeTaxi';
+import { RevenueDashboard } from '@/components/RevenueDashboard';
+import { ShiftTracker } from '@/components/ShiftTracker';
 import { TripLogger } from '@/components/TripLogger';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -347,7 +350,13 @@ export default function AdminScreen() {
         {/* Weekly Goal Setting — inside ModeTaxi section */}
 
         {/* Trip Logger */}
+        <ShiftTracker />
+
         <TripLogger />
+
+        <RevenueDashboard />
+
+        <LearningInsightsPanel />
 
         {/* Daily Reports */}
         <DailyReports />

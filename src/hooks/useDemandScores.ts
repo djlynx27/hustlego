@@ -9,10 +9,15 @@ import {
   getRelevantTmEvents,
   useTicketmasterEvents,
 } from '@/hooks/useTicketmaster';
+import {
+  getAverageTrafficCongestion,
+  useTomTomTraffic,
+} from '@/hooks/useTomTomTraffic';
 import { useWeather } from '@/hooks/useWeather';
 import { useZoneScores } from '@/hooks/useZoneScores';
 import { supabase } from '@/integrations/supabase/client';
 import { type ZoneHistory } from '@/lib/aiAgents';
+import { findSimilarContextsForZoneContext } from '@/lib/learningSync';
 import {
   scoreAllZonesWithLearning,
   type ActiveEventBoost,
@@ -26,6 +31,9 @@ export interface ScoreFactors {
   hasEventBoost: boolean;
   weatherBoostPoints: number;
   eventBoostPoints: number;
+  learningBoostPoints?: number;
+  learningSimilarity?: number;
+  learningAvgEarningsPerHour?: number;
 }
 
 /**
@@ -39,6 +47,7 @@ export function useDemandScores(cityId: string) {
   const { data: events = [] } = useEvents(cityId);
   const { data: tmEvents = [] } = useTicketmasterEvents(cityId);
   const { data: dbScores = [] } = useZoneScores(cityId);
+  const { data: trafficSnapshots = [] } = useTomTomTraffic(cityId, zones);
   const { data: tripLogs = [] } = useQuery({
     queryKey: ['trip-history', cityId],
     queryFn: async () => {
@@ -135,6 +144,111 @@ export function useDemandScores(cityId: string) {
     return [...dbBoosts, ...tmBoosts];
   }, [activeEvents, relevantTmEvents]);
 
+  const trafficByZone = useMemo(() => {
+    return new Map(
+      trafficSnapshots.map((snapshot) => [snapshot.zoneId, snapshot.congestion])
+    );
+  }, [trafficSnapshots]);
+
+  const averageTrafficCongestion = useMemo(
+    () => getAverageTrafficCongestion(trafficSnapshots),
+    [trafficSnapshots]
+  );
+
+  const candidateZonesForSimilarity = useMemo(() => {
+    return [...zones]
+      .sort(
+        (left, right) =>
+          Number((right as any).current_score ?? 0) -
+          Number((left as any).current_score ?? 0)
+      )
+      .slice(0, 12);
+  }, [zones]);
+
+  const { data: similarContextSignals = [] } = useQuery({
+    queryKey: [
+      'similar-context-signals',
+      cityId,
+      now.getDay(),
+      now.getHours(),
+      now.getMinutes() < 30 ? 0 : 1,
+      candidateZonesForSimilarity.map((zone) => zone.id).join('|'),
+      weatherCondition?.demandBoostPoints ?? 0,
+    ],
+    queryFn: async () => {
+      if (candidateZonesForSimilarity.length === 0) return [];
+
+      const results = await Promise.all(
+        candidateZonesForSimilarity.map(async (zone) => {
+          const result = await findSimilarContextsForZoneContext(
+            {
+              zoneId: zone.id,
+              zoneType: zone.type,
+              currentScore: Number((zone as any).current_score ?? 50),
+              now,
+              trafficCongestion:
+                trafficByZone.get(zone.id) ?? averageTrafficCongestion,
+              weatherDemandBoostPoints: weatherCondition?.demandBoostPoints,
+            },
+            5
+          );
+
+          return {
+            zoneId: zone.id,
+            result,
+          };
+        })
+      );
+
+      return results;
+    },
+    enabled:
+      !!cityId &&
+      candidateZonesForSimilarity.length > 0 &&
+      dbScores.length === 0,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
+  const learningSignalByZone = useMemo(() => {
+    const byZone = new Map<
+      string,
+      {
+        boostPoints: number;
+        similarity: number;
+        avgEarningsPerHour: number;
+      }
+    >();
+
+    for (const signal of similarContextSignals) {
+      if (!signal.result.ok || signal.result.matches.length === 0) continue;
+
+      const normalizedEarnings = Math.max(
+        0,
+        Math.min(1, (signal.result.averageEarningsPerHour - 18) / 42)
+      );
+      const confidence = Math.max(
+        0,
+        Math.min(
+          1,
+          signal.result.averageSimilarity *
+            Math.min(1, signal.result.matches.length / 5)
+        )
+      );
+      const boostPoints = Math.round(normalizedEarnings * confidence * 8);
+
+      if (boostPoints > 0) {
+        byZone.set(signal.zoneId, {
+          boostPoints,
+          similarity: signal.result.averageSimilarity,
+          avgEarningsPerHour: signal.result.averageEarningsPerHour,
+        });
+      }
+    }
+
+    return byZone;
+  }, [similarContextSignals]);
+
   // Build score maps: prefer DB scores, fallback to client-side
   const { scores, factors } = useMemo(() => {
     // DB scores indexed by zone_id
@@ -171,14 +285,57 @@ export function useDemandScores(cityId: string) {
     }
 
     // Fallback: client-side calculated with learning agents from trip history
-    return scoreAllZonesWithLearning(
+    const fallback = scoreAllZonesWithLearning(
       zones,
       now,
       weatherCondition,
       eventBoosts,
-      tripHistory
+      tripHistory,
+      (zone) => ({
+        trafficCongestion:
+          trafficByZone.get(zone.id) ?? averageTrafficCongestion,
+      })
     );
-  }, [zones, dbScores, now, weatherCondition, eventBoosts]);
+
+    if (learningSignalByZone.size === 0) {
+      return fallback;
+    }
+
+    const boostedScores = new Map(fallback.scores);
+    const boostedFactors = new Map(fallback.factors);
+
+    for (const [zoneId, signal] of learningSignalByZone) {
+      const currentScore = boostedScores.get(zoneId);
+      if (currentScore == null) continue;
+
+      boostedScores.set(
+        zoneId,
+        Math.min(100, currentScore + signal.boostPoints)
+      );
+
+      const currentFactors = boostedFactors.get(zoneId);
+      if (currentFactors) {
+        boostedFactors.set(zoneId, {
+          ...currentFactors,
+          learningBoostPoints: signal.boostPoints,
+          learningSimilarity: signal.similarity,
+          learningAvgEarningsPerHour: signal.avgEarningsPerHour,
+        });
+      }
+    }
+
+    return { scores: boostedScores, factors: boostedFactors };
+  }, [
+    zones,
+    dbScores,
+    now,
+    weatherCondition,
+    eventBoosts,
+    tripHistory,
+    trafficByZone,
+    averageTrafficCongestion,
+    learningSignalByZone,
+  ]);
 
   return {
     scores,
@@ -190,5 +347,8 @@ export function useDemandScores(cityId: string) {
     endingSoon,
     startingSoon,
     relevantTmEvents,
+    trafficSnapshots,
+    averageTrafficCongestion,
+    similarContextSignals,
   };
 }

@@ -16,19 +16,60 @@ export interface ActiveEventBoost {
   boost_zone_types: string[]; // empty = all zones
 }
 
+export interface DemandFactors {
+  timeOfDay: number;
+  dayOfWeek: number;
+  weather: number;
+  events: number;
+  historicalEarnings: number;
+  transitDisruption: number;
+  trafficCongestion: number;
+  winterConditions: number;
+}
+
+export interface WeightConfig {
+  timeOfDay: number;
+  dayOfWeek: number;
+  weather: number;
+  events: number;
+  historicalEarnings: number;
+  transitDisruption: number;
+  trafficCongestion: number;
+  winterConditions: number;
+}
+
+export interface ScoringContext {
+  history?: ZoneHistory[];
+  weights?: Partial<WeightConfig>;
+  transitDisruption?: number;
+  trafficCongestion?: number;
+  winterConditions?: number;
+}
+
+export const DEFAULT_WEIGHTS: WeightConfig = {
+  timeOfDay: 0.25,
+  dayOfWeek: 0.15,
+  weather: 0.15,
+  events: 0.15,
+  historicalEarnings: 0.1,
+  transitDisruption: 0.08,
+  trafficCongestion: 0.07,
+  winterConditions: 0.05,
+};
+
 // ── Base scores by zone type (conservative baseline, boosted by time rules) ──
 const BASE_SCORES: Record<string, number> = {
-  'aéroport': 50,
-  'métro': 35,
-  'nightlife': 40,
-  'transport': 40,
-  'événements': 45,
-  'commercial': 40,
-  'université': 35,
-  'médical': 40,
-  'tourisme': 45,
-  'résidentiel': 35,
-  'achalandage': 40,
+  aéroport: 50,
+  métro: 35,
+  nightlife: 40,
+  transport: 40,
+  événements: 45,
+  commercial: 40,
+  université: 35,
+  médical: 40,
+  tourisme: 45,
+  résidentiel: 35,
+  achalandage: 40,
 };
 
 // ── Time-of-day rules with realistic multipliers ─────────────────────
@@ -52,41 +93,124 @@ interface TimeRule {
 
 const TIME_RULES: TimeRule[] = [
   // 00:00–05:00: nightlife stays high, metro dead, airport early flights
-  { days: [], startHour: 0, startMin: 0, endHour: 5, endMin: 0,
-    multipliers: { 'métro': 1.0, 'nightlife': 1.7, 'aéroport': 1.1, 'résidentiel': 0.9, 'commercial': 0.8 } },
+  {
+    days: [],
+    startHour: 0,
+    startMin: 0,
+    endHour: 5,
+    endMin: 0,
+    multipliers: {
+      métro: 1.0,
+      nightlife: 1.7,
+      aéroport: 1.1,
+      résidentiel: 0.9,
+      commercial: 0.8,
+    },
+  },
   // 06:00–08:00: morning commute peak
-  { days: [1,2,3,4,5], startHour: 6, startMin: 0, endHour: 8, endMin: 0,
-    multipliers: { 'métro': 1.7, 'transport': 1.85, 'aéroport': 1.2 } },
+  {
+    days: [1, 2, 3, 4, 5],
+    startHour: 6,
+    startMin: 0,
+    endHour: 8,
+    endMin: 0,
+    multipliers: { métro: 1.7, transport: 1.85, aéroport: 1.2 },
+  },
   // 08:00–11:00: post-rush, moderate metro, commercial opening
-  { days: [1,2,3,4,5], startHour: 8, startMin: 0, endHour: 11, endMin: 0,
-    multipliers: { 'métro': 1.6, 'commercial': 1.5, 'université': 1.4 } },
+  {
+    days: [1, 2, 3, 4, 5],
+    startHour: 8,
+    startMin: 0,
+    endHour: 11,
+    endMin: 0,
+    multipliers: { métro: 1.6, commercial: 1.5, université: 1.4 },
+  },
   // 11:00–14:00: lunch hour, commercial peak, residential pickup
-  { days: [1,2,3,4,5], startHour: 11, startMin: 0, endHour: 14, endMin: 0,
-    multipliers: { 'commercial': 1.7, 'résidentiel': 1.55, 'tourisme': 1.3 } },
+  {
+    days: [1, 2, 3, 4, 5],
+    startHour: 11,
+    startMin: 0,
+    endHour: 14,
+    endMin: 0,
+    multipliers: { commercial: 1.7, résidentiel: 1.55, tourisme: 1.3 },
+  },
   // 14:00–17:00: afternoon mixed demand
-  { days: [1,2,3,4,5], startHour: 14, startMin: 0, endHour: 17, endMin: 0,
-    multipliers: { 'métro': 1.5, 'commercial': 1.5, 'université': 1.4, 'tourisme': 1.3 } },
+  {
+    days: [1, 2, 3, 4, 5],
+    startHour: 14,
+    startMin: 0,
+    endHour: 17,
+    endMin: 0,
+    multipliers: {
+      métro: 1.5,
+      commercial: 1.5,
+      université: 1.4,
+      tourisme: 1.3,
+    },
+  },
   // 17:00–19:00: evening commute peak (strongest metro demand)
-  { days: [1,2,3,4,5], startHour: 17, startMin: 0, endHour: 19, endMin: 0,
-    multipliers: { 'métro': 2.1, 'transport': 2.0, 'aéroport': 1.2 } },
+  {
+    days: [1, 2, 3, 4, 5],
+    startHour: 17,
+    startMin: 0,
+    endHour: 19,
+    endMin: 0,
+    multipliers: { métro: 2.1, transport: 2.0, aéroport: 1.2 },
+  },
   // 19:00–23:00: nightlife + events prime time
-  { days: [], startHour: 19, startMin: 0, endHour: 23, endMin: 0,
-    multipliers: { 'nightlife': 2.0, 'événements': 1.9, 'tourisme': 1.2 } },
+  {
+    days: [],
+    startHour: 19,
+    startMin: 0,
+    endHour: 23,
+    endMin: 0,
+    multipliers: { nightlife: 2.0, événements: 1.9, tourisme: 1.2 },
+  },
   // 23:00–00:00: late night transition
-  { days: [], startHour: 23, startMin: 0, endHour: 0, endMin: 0,
-    multipliers: { 'nightlife': 1.9, 'aéroport': 1.1 } },
+  {
+    days: [],
+    startHour: 23,
+    startMin: 0,
+    endHour: 0,
+    endMin: 0,
+    multipliers: { nightlife: 1.9, aéroport: 1.1 },
+  },
   // Fri/Sat late night extra boost
-  { days: [5,6], startHour: 22, startMin: 0, endHour: 3, endMin: 0,
-    multipliers: { 'nightlife': 2.2, 'aéroport': 1.2 } },
+  {
+    days: [5, 6],
+    startHour: 22,
+    startMin: 0,
+    endHour: 3,
+    endMin: 0,
+    multipliers: { nightlife: 2.2, aéroport: 1.2 },
+  },
   // Bar closing surge 02:00–03:30
-  { days: [], startHour: 2, startMin: 0, endHour: 3, endMin: 30,
-    multipliers: { 'nightlife': 2.0 } },
+  {
+    days: [],
+    startHour: 2,
+    startMin: 0,
+    endHour: 3,
+    endMin: 30,
+    multipliers: { nightlife: 2.0 },
+  },
   // Sundays 10:00–14:00 brunch/shopping
-  { days: [0], startHour: 10, startMin: 0, endHour: 14, endMin: 0,
-    multipliers: { 'commercial': 1.5, 'tourisme': 1.3 } },
+  {
+    days: [0],
+    startHour: 10,
+    startMin: 0,
+    endHour: 14,
+    endMin: 0,
+    multipliers: { commercial: 1.5, tourisme: 1.3 },
+  },
   // Weekend daytime: lower metro, higher tourism/commercial
-  { days: [0,6], startHour: 10, startMin: 0, endHour: 18, endMin: 0,
-    multipliers: { 'métro': 1.2, 'tourisme': 1.4, 'commercial': 1.4 } },
+  {
+    days: [0, 6],
+    startHour: 10,
+    startMin: 0,
+    endHour: 18,
+    endMin: 0,
+    multipliers: { métro: 1.2, tourisme: 1.4, commercial: 1.4 },
+  },
 ];
 
 // Medical shift changes - special handling
@@ -142,7 +266,7 @@ const ZONE_PROFILES: Record<string, ZoneProfile> = {
       return 4;
     },
   },
-  'CHUM': {
+  CHUM: {
     pattern: (h) => {
       if (MEDICAL_SHIFT_HOURS.includes(h)) return 7;
       return 3;
@@ -156,7 +280,8 @@ const ZONE_PROFILES: Record<string, ZoneProfile> = {
   },
   'Station Berri-UQAM': {
     pattern: (h, d) => {
-      if (d >= 1 && d <= 5 && ((h >= 7 && h <= 9) || (h >= 17 && h <= 19))) return 8;
+      if (d >= 1 && d <= 5 && ((h >= 7 && h <= 9) || (h >= 17 && h <= 19)))
+        return 8;
       if (d >= 1 && d <= 5 && h >= 10 && h <= 16) return 5;
       return 3;
     },
@@ -177,7 +302,8 @@ const ZONE_PROFILES: Record<string, ZoneProfile> = {
   },
   'Station Montmorency': {
     pattern: (h, d) => {
-      if (d >= 1 && d <= 5 && ((h >= 7 && h <= 9) || (h >= 17 && h <= 19))) return 7;
+      if (d >= 1 && d <= 5 && ((h >= 7 && h <= 9) || (h >= 17 && h <= 19)))
+        return 7;
       return 3;
     },
   },
@@ -187,7 +313,7 @@ const ZONE_PROFILES: Record<string, ZoneProfile> = {
       return 3;
     },
   },
-  'Centropolis': {
+  Centropolis: {
     pattern: (h, d) => {
       if ((d === 5 || d === 6) && h >= 20 && (h <= 23 || h < 1)) return 7;
       return 3;
@@ -201,14 +327,16 @@ const ZONE_PROFILES: Record<string, ZoneProfile> = {
   },
   'Gare Sainte-Rose': {
     pattern: (h, d) => {
-      if (d >= 1 && d <= 5 && ((h >= 6 && h <= 8) || (h >= 16 && h <= 18))) return 7;
+      if (d >= 1 && d <= 5 && ((h >= 6 && h <= 8) || (h >= 16 && h <= 18)))
+        return 7;
       return 2;
     },
   },
   // LONGUEUIL
   'Longueuil–Université-de-Sherbrooke': {
     pattern: (h, d) => {
-      if (d >= 1 && d <= 5 && ((h >= 7 && h <= 9) || (h >= 17 && h <= 19))) return 7;
+      if (d >= 1 && d <= 5 && ((h >= 7 && h <= 9) || (h >= 17 && h <= 19)))
+        return 7;
       return 3;
     },
   },
@@ -241,10 +369,262 @@ export interface ScoreFactors {
   eventBoostPoints: number;
 }
 
+function clamp01(value: number): number {
+  return Math.max(0, Math.min(1, value));
+}
+
+function normalizeWeights(partial?: Partial<WeightConfig>): WeightConfig {
+  const merged: WeightConfig = {
+    ...DEFAULT_WEIGHTS,
+    ...partial,
+  };
+  const entries = Object.entries(merged) as Array<[keyof WeightConfig, number]>;
+  const sum = entries.reduce((total, [, value]) => total + Math.abs(value), 0);
+
+  if (sum <= 0) {
+    return DEFAULT_WEIGHTS;
+  }
+
+  return entries.reduce((acc, [key, value]) => {
+    acc[key] = Math.abs(value) / sum;
+    return acc;
+  }, {} as WeightConfig);
+}
+
+function getMaxMultiplierForType(zoneType: string): number {
+  const multipliers = TIME_RULES.flatMap((rule) =>
+    rule.multipliers[zoneType] ? [rule.multipliers[zoneType]] : []
+  );
+  return multipliers.length > 0 ? Math.max(...multipliers) : 1;
+}
+
+function computeTimePatternBase(
+  zone: { name: string; type: string },
+  now: Date
+): number {
+  const hour = now.getHours();
+  const min = now.getMinutes();
+  const dayOfWeek = now.getDay();
+
+  let baseScore = BASE_SCORES[zone.type] ?? 40;
+  let bestMultiplier = 1.0;
+
+  for (const rule of TIME_RULES) {
+    if (dayMatches(dayOfWeek, rule) && timeInRange(hour, min, rule)) {
+      const multiplier = rule.multipliers[zone.type];
+      if (multiplier && multiplier > bestMultiplier)
+        bestMultiplier = multiplier;
+    }
+  }
+
+  baseScore *= bestMultiplier;
+
+  if (zone.type === 'médical') {
+    for (const shiftHour of MEDICAL_SHIFT_HOURS) {
+      const diff = Math.abs(hour - shiftHour);
+      if (
+        diff === 0 ||
+        (diff === 1 && (shiftHour > hour ? min >= 30 : min <= 30))
+      ) {
+        baseScore *= 1.3;
+        break;
+      }
+    }
+  }
+
+  const profile = ZONE_PROFILES[zone.name];
+  if (profile) {
+    const curveValue = profile.pattern(hour, dayOfWeek);
+    baseScore = baseScore * 0.6 + (curveValue / 10) * 100 * 0.4;
+  }
+
+  return Math.min(100, baseScore);
+}
+
+function computeEventBoostPoints(
+  zone: { type: string; latitude?: number; longitude?: number },
+  eventBoosts?: ActiveEventBoost[]
+): number {
+  if (
+    !eventBoosts ||
+    eventBoosts.length === 0 ||
+    zone.latitude == null ||
+    zone.longitude == null
+  ) {
+    return 0;
+  }
+
+  let eventBoostPoints = 0;
+  for (const eventBoost of eventBoosts) {
+    const dist = haversineKm(
+      zone.latitude,
+      zone.longitude,
+      eventBoost.latitude,
+      eventBoost.longitude
+    );
+    if (dist > eventBoost.boost_radius_km) continue;
+
+    const typeMatch =
+      eventBoost.boost_zone_types.length === 0 ||
+      eventBoost.boost_zone_types.includes(zone.type);
+    if (!typeMatch) continue;
+
+    const proximity = 1 - dist / Math.max(eventBoost.boost_radius_km, 0.25);
+    const scaled = Math.round(
+      Math.max(0, (eventBoost.boost_multiplier - 1) * 18 * proximity)
+    );
+    if (scaled > eventBoostPoints) {
+      eventBoostPoints = Math.min(30, scaled);
+    }
+  }
+
+  return eventBoostPoints;
+}
+
+function getDayOfWeekFactor(zoneType: string, now: Date): number {
+  const day = now.getDay();
+  const hour = now.getHours();
+  const weekend = day === 0 || day === 6;
+  const fridayOrSaturday = day === 5 || day === 6;
+
+  if (zoneType === 'nightlife' || zoneType === 'événements') {
+    if (fridayOrSaturday && (hour >= 20 || hour < 3)) return 0.95;
+    if (weekend) return 0.75;
+  }
+
+  if (zoneType === 'métro' || zoneType === 'transport') {
+    if (!weekend && ((hour >= 6 && hour <= 9) || (hour >= 16 && hour <= 19))) {
+      return 0.9;
+    }
+    if (weekend) return 0.45;
+  }
+
+  if (zoneType === 'commercial' || zoneType === 'tourisme') {
+    if (weekend && hour >= 10 && hour <= 19) return 0.8;
+  }
+
+  if (zoneType === 'université') {
+    if (day >= 1 && day <= 5 && hour >= 8 && hour <= 18) return 0.72;
+    return 0.35;
+  }
+
+  return weekend ? 0.6 : 0.55;
+}
+
+function getHistoricalFactor(
+  zone: { id?: string | null; current_score?: number | null },
+  history: ZoneHistory[] = []
+): number {
+  const zoneId = zone.id;
+  if (!zoneId) {
+    return clamp01((zone.current_score ?? 50) / 100);
+  }
+
+  const matching = history
+    .filter((entry) => entry.zoneId === zoneId)
+    .sort(
+      (left, right) =>
+        new Date(right.timestamp).getTime() - new Date(left.timestamp).getTime()
+    )
+    .slice(0, 12);
+
+  if (matching.length === 0) {
+    return clamp01((zone.current_score ?? 50) / 100);
+  }
+
+  const weightedAverage =
+    matching.reduce((sum, entry, index) => {
+      const weight = Math.max(1, matching.length - index);
+      return sum + entry.observedScore * weight;
+    }, 0) /
+    matching.reduce(
+      (sum, _, index) => sum + Math.max(1, matching.length - index),
+      0
+    );
+
+  return clamp01(weightedAverage / 100);
+}
+
+function getWeatherFactor(weather: WeatherCondition | null): number {
+  if (!weather) return 0.25;
+  const multiplierBoost = clamp01((getWeatherMultiplier(weather) - 1) / 0.4);
+  const pointsBoost = clamp01((weather.demandBoostPoints ?? 0) / 30);
+  return clamp01(0.2 + Math.max(multiplierBoost, pointsBoost) * 0.8);
+}
+
+function getWinterFactor(weather: WeatherCondition | null): number {
+  if (!weather) return 0;
+  const isSnow = weather.weatherId >= 600 && weather.weatherId <= 622;
+  const isThunder = weather.weatherId >= 200 && weather.weatherId <= 232;
+  const deepCold = weather.temp <= -15;
+  if (isSnow) return 0.9;
+  if (isThunder) return 0.55;
+  if (deepCold) return 0.45;
+  return 0;
+}
+
+export function calculateDemandFactors(
+  zone: {
+    id?: string | null;
+    name: string;
+    type: string;
+    latitude?: number;
+    longitude?: number;
+    current_score?: number | null;
+  },
+  now: Date,
+  weather: WeatherCondition | null,
+  eventBoosts?: ActiveEventBoost[],
+  context?: ScoringContext
+): {
+  demandFactors: DemandFactors;
+  weatherBoostPoints: number;
+  eventBoostPoints: number;
+} {
+  const timePatternBase = computeTimePatternBase(zone, now);
+  const weatherBoostPoints = weather?.demandBoostPoints ?? 0;
+  const eventBoostPoints = computeEventBoostPoints(zone, eventBoosts);
+  const maxMultiplier = getMaxMultiplierForType(zone.type);
+
+  const demandFactors: DemandFactors = {
+    timeOfDay: clamp01(
+      timePatternBase /
+        ((BASE_SCORES[zone.type] ?? 40) * Math.max(maxMultiplier, 1))
+    ),
+    dayOfWeek: getDayOfWeekFactor(zone.type, now),
+    weather: getWeatherFactor(weather),
+    events: clamp01(eventBoostPoints / 30),
+    historicalEarnings: getHistoricalFactor(zone, context?.history),
+    transitDisruption: clamp01(context?.transitDisruption ?? 0),
+    trafficCongestion: clamp01(context?.trafficCongestion ?? 0),
+    winterConditions: clamp01(
+      context?.winterConditions ?? getWinterFactor(weather)
+    ),
+  };
+
+  return { demandFactors, weatherBoostPoints, eventBoostPoints };
+}
+
+export function calculateWeightedDemandScore(
+  demandFactors: DemandFactors,
+  weights?: Partial<WeightConfig>
+): number {
+  const normalizedWeights = normalizeWeights(weights);
+  return clamp01(
+    (
+      Object.entries(demandFactors) as Array<[keyof DemandFactors, number]>
+    ).reduce((score, [key, value]) => score + value * normalizedWeights[key], 0)
+  );
+}
+
 export function getWeatherMultiplier(weather: WeatherCondition | null): number {
   if (!weather) return 1.0;
   const { weatherId, temp } = weather;
-  if ((weatherId >= 502 && weatherId <= 531) || (weatherId >= 600 && weatherId <= 622) || (weatherId >= 200 && weatherId <= 232)) {
+  if (
+    (weatherId >= 502 && weatherId <= 531) ||
+    (weatherId >= 600 && weatherId <= 622) ||
+    (weatherId >= 200 && weatherId <= 232)
+  ) {
     return 1.4;
   }
   if (weatherId >= 300 && weatherId <= 501) {
@@ -256,78 +636,37 @@ export function getWeatherMultiplier(weather: WeatherCondition | null): number {
 
 // ── Main scoring function ─────────────────────────────────────────────
 export function computeDemandScore(
-  zone: { name: string; type: string; latitude?: number; longitude?: number },
+  zone: {
+    id?: string | null;
+    name: string;
+    type: string;
+    latitude?: number;
+    longitude?: number;
+    current_score?: number | null;
+  },
   now: Date,
   weather: WeatherCondition | null,
   eventBoosts?: ActiveEventBoost[],
+  context?: ScoringContext
 ): { score: number; factors: ScoreFactors } {
-  const hour = now.getHours();
-  const min = now.getMinutes();
-  const dayOfWeek = now.getDay();
+  const legacyBaseScore = computeTimePatternBase(zone, now);
+  const { demandFactors, weatherBoostPoints, eventBoostPoints } =
+    calculateDemandFactors(zone, now, weather, eventBoosts, context);
+  const weightedScore = calculateWeightedDemandScore(
+    demandFactors,
+    context?.weights
+  );
 
-  // 1. Base score
-  let baseScore = BASE_SCORES[zone.type] ?? 40;
-
-  // 2. Time multipliers (take the highest applicable)
-  let bestMultiplier = 1.0;
-  for (const rule of TIME_RULES) {
-    if (dayMatches(dayOfWeek, rule) && timeInRange(hour, min, rule)) {
-      const m = rule.multipliers[zone.type];
-      if (m && m > bestMultiplier) bestMultiplier = m;
-    }
-  }
-  baseScore *= bestMultiplier;
-
-  // 3. Medical shift change bonus
-  if (zone.type === 'médical') {
-    for (const sh of MEDICAL_SHIFT_HOURS) {
-      const diff = Math.abs(hour - sh);
-      if (diff === 0 || (diff === 1 && (sh > hour ? min >= 30 : min <= 30))) {
-        baseScore *= 1.3;
-        break;
-      }
-    }
-  }
-
-  // 4. City-specific zone profile overlay (40% weight)
-  const profile = ZONE_PROFILES[zone.name];
-  if (profile) {
-    const curveValue = profile.pattern(hour, dayOfWeek);
-    baseScore = baseScore * 0.6 + (curveValue / 10) * 100 * 0.4;
-  }
-
-  // Cap base at 100
-  baseScore = Math.min(100, baseScore);
-
-  // 5. Weather boost
-  const weatherBoostPoints = weather?.demandBoostPoints ?? 0;
-  const weatherMultiplier = getWeatherMultiplier(weather);
-  const weatherAdjustedBase = baseScore * weatherMultiplier;
-
-  // 6. Event boost (proximity-based)
-  let eventBoostPoints = 0;
-  if (eventBoosts && eventBoosts.length > 0 && zone.latitude != null && zone.longitude != null) {
-    for (const eb of eventBoosts) {
-      const dist = haversineKm(zone.latitude, zone.longitude, eb.latitude, eb.longitude);
-      if (dist <= eb.boost_radius_km) {
-        const typeMatch = eb.boost_zone_types.length === 0 || eb.boost_zone_types.includes(zone.type);
-        if (typeMatch) {
-          const pts = Math.min(30, Math.round((eb.boost_multiplier - 1) * baseScore));
-          if (pts > eventBoostPoints) eventBoostPoints = pts;
-        }
-      }
-    }
-  }
-
-  // 7. Final weighted score: 50% base + 25% weather + 25% events
+  const legacyNormalized = clamp01(
+    (legacyBaseScore + weatherBoostPoints * 0.6 + eventBoostPoints * 0.6) / 100
+  );
   const finalScore = Math.round(
-    weatherAdjustedBase * 0.50 +
-    (baseScore + weatherBoostPoints) * 0.25 +
-    (baseScore + eventBoostPoints) * 0.25
+    clamp01(legacyNormalized * 0.35 + weightedScore * 0.65) * 100
   );
 
   const factors: ScoreFactors = {
-    hasWeatherBoost: weatherBoostPoints > 0 || weatherMultiplier > 1.0,
+    hasWeatherBoost:
+      weatherBoostPoints > 0 || getWeatherMultiplier(weather) > 1.0,
     hasEventBoost: eventBoostPoints > 0,
     weatherBoostPoints,
     eventBoostPoints,
@@ -345,11 +684,20 @@ export function scoreAllZones(
   now: Date,
   weather: WeatherCondition | null,
   eventBoosts?: ActiveEventBoost[],
+  context?: ScoringContext | ((zone: Zone) => ScoringContext | undefined)
 ): { scores: Map<string, number>; factors: Map<string, ScoreFactors> } {
   const scores = new Map<string, number>();
   const factors = new Map<string, ScoreFactors>();
   for (const zone of zones) {
-    const result = computeDemandScore(zone, now, weather, eventBoosts);
+    const resolvedContext =
+      typeof context === 'function' ? context(zone) : context;
+    const result = computeDemandScore(
+      zone,
+      now,
+      weather,
+      eventBoosts,
+      resolvedContext
+    );
     scores.set(zone.id, result.score);
     factors.set(zone.id, result.factors);
   }
@@ -362,8 +710,20 @@ export function scoreAllZonesWithLearning(
   weather: WeatherCondition | null,
   eventBoosts?: ActiveEventBoost[],
   history: ZoneHistory[] = [],
+  context?: ScoringContext | ((zone: Zone) => ScoringContext | undefined)
 ): { scores: Map<string, number>; factors: Map<string, ScoreFactors> } {
-  const base = scoreAllZones(zones, now, weather, eventBoosts);
+  const mergedContext =
+    typeof context === 'function'
+      ? (zone: Zone) => ({
+          ...(context(zone) ?? {}),
+          history,
+        })
+      : {
+          ...(context ?? {}),
+          history,
+        };
+
+  const base = scoreAllZones(zones, now, weather, eventBoosts, mergedContext);
   const adjustedScores = applyLearningAgents(zones, base.scores, history);
   return { scores: adjustedScores, factors: base.factors };
 }

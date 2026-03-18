@@ -1,0 +1,268 @@
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import { useTrips } from '@/hooks/useTrips';
+import {
+  derivePostShiftSummary,
+  type PostShiftSummary,
+} from '@/lib/learningEngine';
+import { syncShiftLearning } from '@/lib/learningSync';
+import { DEFAULT_WEIGHTS } from '@/lib/scoringEngine';
+import { buildShiftSnapshot } from '@/lib/tripAnalytics';
+import { cn } from '@/lib/utils';
+import { Clock3, Flag, Play, Route, Smartphone, Wallet } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+
+const ACTIVE_SHIFT_KEY = 'hustlego_active_shift';
+
+type ActiveShift = {
+  startedAt: string;
+};
+
+function loadActiveShift() {
+  if (typeof window === 'undefined') return null;
+  try {
+    const raw = window.localStorage.getItem(ACTIVE_SHIFT_KEY);
+    return raw ? (JSON.parse(raw) as ActiveShift) : null;
+  } catch {
+    return null;
+  }
+}
+
+function saveActiveShift(shift: ActiveShift | null) {
+  if (typeof window === 'undefined') return;
+  if (!shift) {
+    window.localStorage.removeItem(ACTIVE_SHIFT_KEY);
+    return;
+  }
+  window.localStorage.setItem(ACTIVE_SHIFT_KEY, JSON.stringify(shift));
+}
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat('fr-CA', {
+    style: 'currency',
+    currency: 'CAD',
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
+export function ShiftTracker() {
+  const { data: trips = [] } = useTrips(500);
+  const [activeShift, setActiveShift] = useState<ActiveShift | null>(() =>
+    loadActiveShift()
+  );
+  const [now, setNow] = useState(() => new Date());
+  const [lastShiftSummary, setLastShiftSummary] =
+    useState<PostShiftSummary | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  useEffect(() => {
+    if (!activeShift) return;
+    const intervalId = window.setInterval(() => setNow(new Date()), 30_000);
+    return () => window.clearInterval(intervalId);
+  }, [activeShift]);
+
+  const snapshot = useMemo(() => {
+    if (!activeShift) return null;
+    return buildShiftSnapshot(trips, activeShift.startedAt, now);
+  }, [activeShift, now, trips]);
+
+  const startShift = () => {
+    const nextShift = { startedAt: new Date().toISOString() };
+    setActiveShift(nextShift);
+    saveActiveShift(nextShift);
+    setNow(new Date());
+    toast.success('Shift démarré');
+  };
+
+  const endShift = async () => {
+    if (!snapshot) return;
+    const endedAt = new Date().toISOString();
+    const summary = derivePostShiftSummary(
+      trips,
+      snapshot.startedAt,
+      endedAt,
+      DEFAULT_WEIGHTS
+    );
+    setLastShiftSummary(summary);
+    setActiveShift(null);
+    saveActiveShift(null);
+    setIsSyncing(true);
+    const syncResult = await syncShiftLearning(
+      trips,
+      snapshot.startedAt,
+      endedAt,
+      DEFAULT_WEIGHTS
+    );
+    setIsSyncing(false);
+    toast.success(
+      `Shift terminé: ${formatMoney(snapshot.metrics.revenue)} sur ${snapshot.metrics.rides} course${snapshot.metrics.rides > 1 ? 's' : ''}`
+    );
+    if (syncResult.ok) {
+      toast.info(syncResult.message);
+    } else {
+      toast.error(syncResult.message);
+    }
+  };
+
+  const startedLabel = snapshot
+    ? new Date(snapshot.startedAt).toLocaleString('fr-CA', {
+        hour: '2-digit',
+        minute: '2-digit',
+        month: 'short',
+        day: 'numeric',
+      })
+    : null;
+
+  const stats = snapshot
+    ? [
+        {
+          label: 'Revenu',
+          value: formatMoney(snapshot.metrics.revenue),
+          icon: Wallet,
+        },
+        {
+          label: '$/h',
+          value: formatMoney(snapshot.metrics.revenuePerHour),
+          icon: Clock3,
+        },
+        {
+          label: 'Courses',
+          value: String(snapshot.metrics.rides),
+          icon: Smartphone,
+        },
+        {
+          label: 'Distance',
+          value: `${snapshot.metrics.distanceKm.toFixed(1)} km`,
+          icon: Route,
+        },
+      ]
+    : [];
+
+  return (
+    <Card className="bg-card border-border">
+      <CardHeader className="pb-2">
+        <CardTitle className="text-base font-display flex items-center gap-2">
+          <Flag className="w-4 h-4 text-primary" /> Shift tracker
+        </CardTitle>
+        <CardDescription className="text-xs">
+          Suivi live du shift en cours à partir des courses enregistrées ou
+          importées.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-3">
+        {snapshot ? (
+          <>
+            <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-xs text-muted-foreground">
+                    Démarré à {startedLabel}
+                  </p>
+                  <p className="text-lg font-display font-semibold">
+                    {snapshot.elapsedHours.toFixed(1)} h en cours
+                  </p>
+                </div>
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={endShift}
+                  disabled={isSyncing}
+                >
+                  {isSyncing ? 'Sync...' : 'Terminer'}
+                </Button>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              {stats.map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-xl border border-border bg-background p-3"
+                >
+                  <div className="flex items-center gap-2 text-muted-foreground text-xs">
+                    <stat.icon className="h-3.5 w-3.5" />
+                    {stat.label}
+                  </div>
+                  <p className="mt-1 text-lg font-semibold font-display">
+                    {stat.value}
+                  </p>
+                </div>
+              ))}
+            </div>
+
+            <div className="grid gap-2 rounded-xl border border-border bg-background p-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">
+                  Zone la plus rentable
+                </span>
+                <span className="font-medium">
+                  {snapshot.topZone ?? 'Pas encore de données'}
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-muted-foreground">
+                  Plateforme dominante
+                </span>
+                <span className="font-medium">
+                  {snapshot.topPlatform ?? 'Pas encore de données'}
+                </span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div className="rounded-xl border border-dashed border-border bg-background/50 p-4">
+            <p className="text-sm text-muted-foreground">
+              Lance un shift avant de rouler pour suivre automatiquement le
+              revenu, le rythme et la meilleure zone pendant la session.
+            </p>
+            <Button className="mt-3 w-full gap-2" onClick={startShift}>
+              <Play className="w-4 h-4" /> Démarrer un shift
+            </Button>
+          </div>
+        )}
+
+        <p className={cn('text-[11px] leading-relaxed text-muted-foreground')}>
+          Le suivi est calculé depuis les courses présentes dans la table
+          `trips`. Si tu ajoutes les courses plus tard, le résumé du shift se
+          mettra à jour.
+        </p>
+
+        {lastShiftSummary && (
+          <div className="rounded-xl border border-primary/20 bg-primary/5 p-3">
+            <p className="text-xs text-muted-foreground">Résumé post-shift</p>
+            <div className="mt-2 grid gap-2 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span>Précision estimée</span>
+                <span className="font-semibold">
+                  {lastShiftSummary.accuracyPercent}%
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Rythme réel</span>
+                <span className="font-semibold">
+                  {formatMoney(lastShiftSummary.revenuePerHour)}/h
+                </span>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <span>Meilleure zone</span>
+                <span className="font-semibold">
+                  {lastShiftSummary.bestZone ?? 'Pas assez de données'}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground pt-1">
+                {lastShiftSummary.suggestedFocus}
+              </p>
+            </div>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
