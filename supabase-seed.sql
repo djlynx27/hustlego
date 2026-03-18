@@ -3,6 +3,55 @@
 -- Source: zones bubble.csv + QuickBooks_Mileage.csv
 -- ============================================================
 
+-- ── Création des tables (si elles n'existent pas encore) ────
+
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'zone_type') THEN
+    CREATE TYPE zone_type AS ENUM (
+      'métro', 'commercial', 'résidentiel', 'nightlife',
+      'aéroport', 'transport', 'médical', 'université',
+      'événements', 'tourisme'
+    );
+  END IF;
+END $$;
+
+CREATE TABLE IF NOT EXISTS cities (
+  id         text PRIMARY KEY,
+  name       text NOT NULL,
+  created_at timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS zones (
+  id            text PRIMARY KEY,
+  city_id       text NOT NULL REFERENCES cities(id),
+  name          text NOT NULL,
+  type          zone_type NOT NULL DEFAULT 'commercial',
+  latitude      double precision NOT NULL,
+  longitude     double precision NOT NULL,
+  base_score    int,
+  current_score int,
+  address       text,
+  category      text,
+  territory     text,
+  created_at    timestamptz NOT NULL DEFAULT now(),
+  updated_at    timestamptz NOT NULL DEFAULT now()
+);
+
+CREATE TABLE IF NOT EXISTS daily_reports (
+  id                 uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  report_date        date NOT NULL UNIQUE,
+  total_trips        int,
+  total_distance_km  numeric,
+  hours_worked       numeric,
+  total_earnings     numeric,
+  dead_time_pct      int,
+  best_zone_name     text,
+  worst_zone_name    text,
+  best_time_slot     text,
+  ai_recommendation  text,
+  created_at         timestamptz NOT NULL DEFAULT now()
+);
+
 -- ── Villes ──────────────────────────────────────────────────
 INSERT INTO cities (id, name) VALUES
   ('mtl', 'Montréal'),
