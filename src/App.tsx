@@ -3,7 +3,7 @@ import Home from './pages/Home';
 import AdminScreen from './pages/AdminScreen';
 import DriveScreen from './pages/DriveScreen';
 import EventsScreen from './pages/EventsScreen';
-import TodayScreen from './pages/TodayScreen';
+import TodayScreen2 from './pages/TodayScreen2';
 import PlanningScreen from './pages/PlanningScreen';
 import ZonesScreen from './pages/ZonesScreen';
 import NotFound from './pages/NotFound';
@@ -19,7 +19,7 @@ function App() {
             <Route path="/admin" element={<AdminScreen />} />
             <Route path="/drive" element={<DriveScreen />} />
             <Route path="/events" element={<EventsScreen />} />
-            <Route path="/today" element={<TodayScreen />} />
+            <Route path="/today" element={<TodayScreen2 />} />
             <Route path="/planning" element={<PlanningScreen />} />
             <Route path="/zones" element={<ZonesScreen />} />
             <Route path="/404" element={<NotFound />} />
