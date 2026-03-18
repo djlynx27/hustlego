@@ -22,8 +22,7 @@ jobs:
       - name: Set up Supabase CLI
         uses: supabase/setup-cli@v1
 
-      - name: Resolve Supabase project ref
-        id: resolve_project_ref
+      - name: Resolve, link, and deploy migrations
         shell: bash
         run: |
           set -euo pipefail
@@ -59,7 +58,7 @@ jobs:
           fi
 
           if [[ ! "$ref" =~ ^[a-z0-9]{20}$ ]]; then
-            echo "Invalid SUPABASE_PROJECT_ID format: '$raw'"
+            echo "Invalid SUPABASE_PROJECT_ID format."
             echo "Expected one of:"
             echo "- project ref: abcdefghijklmnopqrst"
             echo "- API URL: https://abcdefghijklmnopqrst.supabase.co"
@@ -67,17 +66,10 @@ jobs:
             exit 1
           fi
 
-          echo "project_ref=$ref" >> "$GITHUB_OUTPUT"
           echo "Resolved Supabase project ref length: ${#ref}"
 
-      - name: Link to Supabase project
-        run: supabase link --project-ref "${{ steps.resolve_project_ref.outputs.project_ref }}"
-
-      - name: Push migrations to Supabase
-        run: supabase db push
-
-      - name: Run seed SQL (optional demo data)
-        run: |
+          supabase link --project-ref "$ref"
+          supabase db push
           supabase db execute --file supabase-seed.sql
 
       - name: Log migration status
