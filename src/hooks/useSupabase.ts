@@ -1,3 +1,4 @@
+// Touch: force Vercel to resync case-sensitive files
 
 import type { Database } from '@/integrations/supabase/types';
 export type Zone = Database['public']['Tables']['zones']['Row'];
