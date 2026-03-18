@@ -1,12 +1,14 @@
-import { useState, useMemo } from 'react';
+import { Button } from '@/components/ui/button';
 import { useI18n } from '@/contexts/I18nContext';
 import { useEvents, type AppEvent } from '@/hooks/useEvents';
-import { Button } from '@/components/ui/button';
-import { Navigation, Star, Calendar, Clock, Users } from 'lucide-react';
+import { Calendar, Clock, Navigation, Star, Users } from 'lucide-react';
+import { useMemo } from 'react';
 
 function formatDate(dateStr: string, locale: string): string {
   return new Date(dateStr).toLocaleDateString(locale, {
-    weekday: 'short', month: 'short', day: 'numeric',
+    weekday: 'short',
+    month: 'short',
+    day: 'numeric',
   });
 }
 
@@ -49,16 +51,21 @@ function EventCard({ event, isToday }: { event: AppEvent; isToday: boolean }) {
   const googleUrl = `https://www.google.com/maps/dir/?api=1&destination=${event.latitude},${event.longitude}&travelmode=driving`;
   const now = new Date();
   const endAt = new Date(event.end_at);
-  const minutesUntilEnd = Math.round((endAt.getTime() - now.getTime()) / 60_000);
+  const minutesUntilEnd = Math.round(
+    (endAt.getTime() - now.getTime()) / 60_000
+  );
   const isEndingSoon = isToday && minutesUntilEnd > 0 && minutesUntilEnd <= 60;
   const isActive = isToday && now >= new Date(event.start_at) && now <= endAt;
 
   return (
-    <div className={`bg-card rounded-xl border border-border p-4 space-y-3 ${isActive ? 'ring-1 ring-primary/50' : ''}`}>
+    <div
+      className={`bg-card rounded-xl border border-border p-4 space-y-3 ${isActive ? 'ring-1 ring-primary/50' : ''}`}
+    >
       {isEndingSoon && (
         <div className="flex items-center gap-2 bg-destructive/20 border border-destructive/40 rounded-lg px-3 py-2">
           <span className="text-[14px] font-body font-bold text-destructive">
-            🔴 {event.name} {t('eventEndsIn')} {minutesUntilEnd}{t('minutes')} – {t('maxDemandExpected')}
+            🔴 {event.name} {t('eventEndsIn')} {minutesUntilEnd}
+            {t('minutes')} – {t('maxDemandExpected')}
           </span>
         </div>
       )}
@@ -73,8 +80,12 @@ function EventCard({ event, isToday }: { event: AppEvent; isToday: boolean }) {
               </span>
             )}
           </div>
-          <h3 className="text-[20px] font-display font-bold leading-tight break-words">{event.name}</h3>
-          <p className="text-[14px] text-muted-foreground mt-0.5">{event.venue}</p>
+          <h3 className="text-[20px] font-display font-bold leading-tight break-words">
+            {event.name}
+          </h3>
+          <p className="text-[14px] text-muted-foreground mt-0.5">
+            {event.venue}
+          </p>
         </div>
         <DemandStars impact={event.demand_impact} />
       </div>
@@ -97,13 +108,20 @@ function EventCard({ event, isToday }: { event: AppEvent; isToday: boolean }) {
       </div>
 
       <div className="flex items-center gap-2 text-[13px] text-muted-foreground">
-        <span>{t('boost')}: ×{event.boost_multiplier}</span>
+        <span>
+          {t('boost')}: ×{event.boost_multiplier}
+        </span>
         <span>·</span>
-        <span>{t('radius')}: {event.boost_radius_km} km</span>
+        <span>
+          {t('radius')}: {event.boost_radius_km} km
+        </span>
       </div>
 
       {!event.is_holiday && (
-        <Button asChild className="w-full h-14 text-[16px] font-display font-bold gap-2 bg-primary text-primary-foreground hover:bg-primary/90">
+        <Button
+          asChild
+          className="w-full h-14 text-[16px] font-display font-bold gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+        >
           <a href={googleUrl} target="_blank" rel="noopener noreferrer">
             <Navigation className="w-4 h-4" />
             {t('navigateTo')} {event.venue}
@@ -115,7 +133,7 @@ function EventCard({ event, isToday }: { event: AppEvent; isToday: boolean }) {
 }
 
 export default function EventsScreen() {
-  const { locale } = useI18n();
+  const { t, locale } = useI18n();
   const { data: events = [] } = useEvents('mtl');
 
   // Build stable date boundaries for today (local timezone)
@@ -132,30 +150,30 @@ export default function EventsScreen() {
 
   // Today: any event that overlaps with today (started before tomorrow AND ends after midnight today)
   // This includes events starting later tonight that haven't begun yet
-  const todayEvents = useMemo(() =>
-    events.filter(e => {
-      const startMs = new Date(e.start_at).getTime();
-      const endMs = new Date(e.end_at).getTime();
-      return startMs < todayEndMs && endMs >= todayMs;
-    }),
-    [events, todayMs, todayEndMs],
+  const todayEvents = useMemo(
+    () =>
+      events.filter((e) => {
+        const startMs = new Date(e.start_at).getTime();
+        const endMs = new Date(e.end_at).getTime();
+        return startMs < todayEndMs && endMs >= todayMs;
+      }),
+    [events, todayMs, todayEndMs]
   );
 
   // Next 7 days: events starting from tomorrow through next week
-  const upcomingEvents = useMemo(() =>
-    events.filter(e => {
-      const startMs = new Date(e.start_at).getTime();
-      return startMs >= todayEndMs && startMs < weekEndMs;
-    }),
-    [events, todayEndMs, weekEndMs],
+  const upcomingEvents = useMemo(
+    () =>
+      events.filter((e) => {
+        const startMs = new Date(e.start_at).getTime();
+        return startMs >= todayEndMs && startMs < weekEndMs;
+      }),
+    [events, todayEndMs, weekEndMs]
   );
 
   return (
     <div className="flex flex-col h-full pb-36 overflow-y-auto">
       <div className="px-3 pt-3 pb-2">
-        <h1 className="text-[22px] font-display font-bold">
-          {t('events')}
-        </h1>
+        <h1 className="text-[22px] font-display font-bold">{t('events')}</h1>
       </div>
 
       <div className="px-3 space-y-3">
@@ -173,7 +191,9 @@ export default function EventsScreen() {
             {t('noEventsToday')}
           </p>
         )}
-        {todayEvents.map(e => <EventCard key={e.id} event={e} isToday />)}
+        {todayEvents.map((e) => (
+          <EventCard key={e.id} event={e} isToday />
+        ))}
 
         {/* Next 7 days */}
         <h2 className="text-[16px] font-display font-bold text-muted-foreground uppercase tracking-wide mt-4">
@@ -184,7 +204,9 @@ export default function EventsScreen() {
             {t('noUpcomingEvents')}
           </p>
         )}
-        {upcomingEvents.map(e => <EventCard key={e.id} event={e} isToday={false} />)}
+        {upcomingEvents.map((e) => (
+          <EventCard key={e.id} event={e} isToday={false} />
+        ))}
       </div>
     </div>
   );
