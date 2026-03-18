@@ -1,5 +1,5 @@
 -- HustleGo Learning Foundation Migration
--- Tested via GitHub Actions on 2026-03-18
+-- Tested via GitHub Actions on 2026-03-18 (retry #2)
 create extension if not exists vector;
 
 create table if not exists public.sessions (
