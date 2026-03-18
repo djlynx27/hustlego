@@ -1,1 +1,3 @@
-// ...existing code from geo-hustle-main/src/pages/AdminScreen.tsx...
+export default function AdminScreen() {
+	return <div>AdminScreen (à compléter)</div>;
+}

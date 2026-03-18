@@ -1,1 +1,3 @@
-// ...existing code from geo-hustle-main/src/pages/ZonesScreen.tsx...
+export default function ZonesScreen() {
+	return <div>ZonesScreen (à compléter)</div>;
+}

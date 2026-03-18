@@ -1,1 +1,3 @@
-// ...existing code from geo-hustle-main/src/pages/DriveScreen.tsx...
+export default function DriveScreen() {
+	return <div>DriveScreen (à compléter)</div>;
+}

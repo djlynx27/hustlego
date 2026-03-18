@@ -1,1 +1,3 @@
-// ...existing code from geo-hustle-main/src/pages/TodayScreen.tsx...
+export default function TodayScreen() {
+	return <div>TodayScreen (à compléter)</div>;
+}

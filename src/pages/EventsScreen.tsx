@@ -1,1 +1,3 @@
-// ...existing code from geo-hustle-main/src/pages/EventsScreen.tsx...
+export default function EventsScreen() {
+	return <div>EventsScreen (à compléter)</div>;
+}

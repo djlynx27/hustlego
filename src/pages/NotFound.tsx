@@ -1,1 +1,3 @@
-// ...existing code from geo-hustle-main/src/pages/NotFound.tsx...
+export default function NotFound() {
+	return <div>404 - Page non trouvée</div>;
+}

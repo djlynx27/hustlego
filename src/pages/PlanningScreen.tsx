@@ -1,1 +1,3 @@
-// ...existing code from geo-hustle-main/src/pages/PlanningScreen.tsx...
+export default function PlanningScreen() {
+	return <div>PlanningScreen (à compléter)</div>;
+}
