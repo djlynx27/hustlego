@@ -23,6 +23,7 @@ jobs:
         uses: supabase/setup-cli@v1
 
       - name: Resolve Supabase project ref
+        id: resolve_project_ref
         shell: bash
         run: |
           set -euo pipefail
@@ -66,11 +67,11 @@ jobs:
             exit 1
           fi
 
-          echo "SUPABASE_PROJECT_REF=$ref" >> "$GITHUB_ENV"
-          echo "Resolved Supabase project ref: $ref"
+          echo "project_ref=$ref" >> "$GITHUB_OUTPUT"
+          echo "Resolved Supabase project ref length: ${#ref}"
 
       - name: Link to Supabase project
-        run: supabase link --project-ref "$SUPABASE_PROJECT_REF"
+        run: supabase link --project-ref "${{ steps.resolve_project_ref.outputs.project_ref }}"
 
       - name: Push migrations to Supabase
         run: supabase db push

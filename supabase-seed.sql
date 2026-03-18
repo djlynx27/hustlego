@@ -7,6 +7,7 @@
 -- Trigger CI: workflow verification (2026-03-18 retry 4)
 -- Trigger CI: workflow verification (2026-03-18 retry 5)
 -- Trigger CI: workflow verification (2026-03-18 retry 6)
+-- Trigger CI: workflow verification (2026-03-18 retry 7)
 -- ============================================================
 
 -- ── Création des tables (si elles n'existent pas encore) ────
