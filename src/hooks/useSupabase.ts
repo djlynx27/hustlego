@@ -1,3 +1,6 @@
+
+import type { Database } from '@/integrations/supabase/types';
+export type Zone = Database['public']['Tables']['zones']['Row'];
 import { createClient } from '@supabase/supabase-js';
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
