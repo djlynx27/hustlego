@@ -1,28 +1,47 @@
-# HustleGo Vercel Deployment Guide
+# HustleGo — Guide de déploiement Vercel
 
-## 1. Prerequisites
-- Vercel account (https://vercel.com)
-- GitHub repository connected to Vercel
-- Supabase project (get your URL and anon key)
-- Foursquare API key (optional, for place search)
+## 1. Prérequis
+- Compte Vercel (vercel.com) connecté au dépôt GitHub
+- Projet Supabase avec URL + anon key
+- Clé Mapbox (maps.mapbox.com)
 
-## 2. Environment Variables
-Set these in your Vercel project settings:
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
-- `VITE_FOURSQUARE_API_KEY` (optional)
+## 2. Variables d'environnement Vercel
 
-## 3. Deploy Steps
-1. Push your code to GitHub (main branch)
-2. Import the repo in Vercel dashboard
-3. Set environment variables
-4. Deploy!
+Dans **Vercel → Settings → Environment Variables**, ajouter :
+
+| Variable | Obligatoire | Source |
+|---|---|---|
+| `VITE_SUPABASE_URL` | ✅ | Supabase → Settings → API |
+| `VITE_SUPABASE_ANON_KEY` | ✅ | Supabase → Settings → API |
+| `VITE_MAPBOX_TOKEN` | ✅ | maps.mapbox.com → Tokens |
+| `VITE_TOMTOM_KEY` | ✅ | developer.tomtom.com → My Apps |
+| `VITE_STM_KEY` | ✅ (MTL) | portail.developpeurs.stm.info — **GRATUIT** |
+| `VITE_AVIATIONSTACK_KEY` | ⚡ optionnel | aviationstack.com — plan Free (100 req/mois) |
+| `VITE_TICKETMASTER_KEY` | ⚡ optionnel | developer.ticketmaster.com — **GRATUIT** |
+| `VITE_FOURSQUARE_API_KEY` | ⚡ optionnel | foursquare.com/developer |
+
+### Obtenir la clé STM (5 min, gratuit)
+1. Aller sur **portail.developpeurs.stm.info**
+2. Créer un compte → **Créer une application**
+3. Activer le produit **GTFS-RT** (serviceAlerts, vehiclePositions, tripUpdates)
+4. Copier la clé API → `VITE_STM_KEY` dans Vercel
+
+### Obtenir la clé AviationStack (optionnel)
+1. **aviationstack.com** → Sign Up Free
+2. 100 requêtes/mois (mises en cache 4h dans l'app = largement suffisant)
+3. Sans cette clé : l'app utilise les vagues YUL préprogrammées (6h-10h, 11h-14h, 17h-21h)
+
+## 3. Déploiement
+1. `git push origin main` depuis le projet
+2. GitHub Actions applique automatiquement les migrations Supabase
+3. Vercel détecte le push et builds/déploie automatiquement
 
 ## 4. Notes
-- The app is a Vite PWA. Static export is handled by Vercel.
-- All routes are client-side (SPA). The `vercel.json` rewrites everything to `index.html`.
-- For Supabase, ensure CORS is set to allow your Vercel domain.
+- PWA Vite — export statique géré par Vercel
+- Toutes les routes sont SPA (rewrite dans `vercel.json`)
+- Migrations Supabase : voir `.github/workflows/supabase-migrations.yml`
 
-## 5. Troubleshooting
-- If you see blank pages, check environment variables and Supabase CORS.
-- For API errors, check your keys and Supabase project status.
+## 5. Dépannage
+- Page blanche → vérifier les vars d'env et CORS Supabase (autoriser le domaine Vercel)
+- STM badge absent → `VITE_STM_KEY` manquante ou clé invalide (l'app continue de fonctionner normalement)
+- YUL badge — fonctionne sans clé AviationStack (schedule statique intégré)
