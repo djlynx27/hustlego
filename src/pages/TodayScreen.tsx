@@ -3,8 +3,10 @@ import { DeadTimeTimer } from '@/components/DeadTimeTimer';
 import { DemandBadge } from '@/components/DemandBadge';
 import { MultiAppStatus } from '@/components/MultiAppStatus';
 import { NavigationSheet } from '@/components/NavigationSheet';
+import { PreShiftBriefing } from '@/components/PreShiftBriefing';
 import { ScoreFactorIcons } from '@/components/ScoreFactorIcons';
 import { Button } from '@/components/ui/button';
+import { VoiceAssistant } from '@/components/VoiceAssistant';
 import { WeatherWidget } from '@/components/WeatherWidget';
 import { WeeklyGoalDisplay } from '@/components/WeeklyGoal';
 import { useI18n } from '@/contexts/I18nContext';
@@ -19,6 +21,7 @@ import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { useCities } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { useWeather } from '@/hooks/useWeather';
+import { useYulFlights } from '@/hooks/useYulFlights';
 import {
   formatTime24h,
   getCurrentSlotTime,
@@ -112,11 +115,19 @@ export default function TodayScreen() {
 
   const { start, end } = getCurrentSlotTime(now);
   const { data: cities = [] } = useCities();
-  const { scores, factors, zones, endingSoon, relevantTmEvents } =
-    useDemandScores(cityId);
+  const {
+    scores,
+    factors,
+    zones,
+    endingSoon,
+    activeEvents,
+    relevantTmEvents,
+    stmStatus,
+  } = useDemandScores(cityId);
   const { data: holiday } = useHoliday(getCurrentSlotTime(now).date);
   const { data: habsGame } = useHabsGame(getCurrentSlotTime(now).date);
   const timeBoosts = useMemo(() => getActiveTimeBoosts(now), [now]);
+  const { data: yulStatus } = useYulFlights();
 
   const [driverMode, setDriverMode] = useState<
     'rideshare' | 'delivery' | 'all'
@@ -317,6 +328,20 @@ export default function TodayScreen() {
       <div className="px-3 mt-2 space-y-2">
         <DeadTimeTimer nearestZoneName={heroZone?.name} />
         <WeeklyGoalDisplay />
+        <PreShiftBriefing
+          topZones={modeZones.slice(0, 5).map((z) => ({
+            id: z.id,
+            name: z.name,
+            type: z.type,
+            score: z.score,
+          }))}
+          weather={weather ?? null}
+          upcomingEvents={activeEvents ?? []}
+          tmEvents={relevantTmEvents}
+          stmStatus={stmStatus ?? null}
+          yulStatus={yulStatus ?? null}
+          cityId={cityId}
+        />
       </div>
 
       {/* Mode filter tabs */}
@@ -459,6 +484,28 @@ export default function TodayScreen() {
             <span className="text-lg flex-shrink-0">🏒</span>
             <span className="text-[14px] font-body font-medium">
               {t('canadiensGame')}
+            </span>
+          </div>
+        )}
+        {/* Badge YUL — vague d'arrivées aéroport */}
+        {cityId === 'mtl' &&
+          yulStatus?.isActivePeriod &&
+          yulStatus.currentWave && (
+            <div className="flex items-center gap-2 bg-blue-500/15 border border-blue-500/40 rounded-lg px-3 py-2">
+              <span className="text-lg flex-shrink-0">✈️</span>
+              <span className="text-[13px] font-body font-medium text-blue-400">
+                {yulStatus.currentWave.rideshareImpact}
+              </span>
+            </div>
+          )}
+        {/* Badge STM — perturbation transit */}
+        {stmStatus?.hasDisruption && (
+          <div className="flex items-center gap-2 bg-orange-500/15 border border-orange-500/40 rounded-lg px-3 py-2">
+            <span className="text-lg flex-shrink-0">🚇</span>
+            <span className="text-[13px] font-body font-medium text-orange-400">
+              Perturbation STM active — demande rideshare en hausse (
+              {stmStatus.alertCount} alerte
+              {stmStatus.alertCount > 1 ? 's' : ''})
             </span>
           </div>
         )}
@@ -780,6 +827,28 @@ export default function TodayScreen() {
         zoneName={navZone?.name ?? ''}
         latitude={navZone?.lat ?? 0}
         longitude={navZone?.lng ?? 0}
+      />
+
+      {/* Assistant vocal mains-libres */}
+      <VoiceAssistant
+        heroZone={
+          heroZone
+            ? {
+                name: heroZone.name,
+                score: heroZone.score,
+                type: heroZone.type,
+              }
+            : null
+        }
+        smartZones={smartZones}
+        nextEvent={
+          relevantTmEvents[0]
+            ? {
+                name: relevantTmEvents[0].name,
+                venueName: relevantTmEvents[0].venueName,
+              }
+            : null
+        }
       />
     </div>
   );

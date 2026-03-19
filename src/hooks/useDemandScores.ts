@@ -4,6 +4,7 @@ import {
   getStartingSoonEvents,
   useEvents,
 } from '@/hooks/useEvents';
+import { useStmTransit } from '@/hooks/useStmTransit';
 import { useZones } from '@/hooks/useSupabase';
 import {
   getRelevantTmEvents,
@@ -48,6 +49,7 @@ export function useDemandScores(cityId: string) {
   const { data: tmEvents = [] } = useTicketmasterEvents(cityId);
   const { data: dbScores = [] } = useZoneScores(cityId);
   const { data: trafficSnapshots = [] } = useTomTomTraffic(cityId, zones);
+  const { data: stmStatus } = useStmTransit();
   const { data: tripLogs = [] } = useQuery({
     queryKey: ['trip-history', cityId],
     queryFn: async () => {
@@ -294,6 +296,7 @@ export function useDemandScores(cityId: string) {
       (zone) => ({
         trafficCongestion:
           trafficByZone.get(zone.id) ?? averageTrafficCongestion,
+        transitDisruption: stmStatus?.disruptionScore ?? 0,
       })
     );
 
@@ -335,6 +338,7 @@ export function useDemandScores(cityId: string) {
     trafficByZone,
     averageTrafficCongestion,
     learningSignalByZone,
+    stmStatus,
   ]);
 
   return {
@@ -350,5 +354,6 @@ export function useDemandScores(cityId: string) {
     trafficSnapshots,
     averageTrafficCongestion,
     similarContextSignals,
+    stmStatus,
   };
 }
