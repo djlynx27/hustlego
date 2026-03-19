@@ -149,13 +149,16 @@ export default function TodayScreen() {
   >(() => {
     try {
       const saved = localStorage.getItem(DRIVER_MODE_KEY);
-      if (saved === 'rideshare' || saved === 'delivery' || saved === 'all') return saved;
+      if (saved === 'rideshare' || saved === 'delivery' || saved === 'all')
+        return saved;
     } catch {}
     return 'all';
   });
   const setDriverMode = (mode: 'rideshare' | 'delivery' | 'all') => {
     setDriverModeState(mode);
-    try { localStorage.setItem(DRIVER_MODE_KEY, mode); } catch {}
+    try {
+      localStorage.setItem(DRIVER_MODE_KEY, mode);
+    } catch {}
   };
 
   // ── "Je suis libre" mode ───────────────────────────────────────────

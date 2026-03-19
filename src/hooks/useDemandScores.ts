@@ -298,7 +298,8 @@ export function useDemandScores(cityId: string) {
       for (const zone of zones) {
         const dbRow = dbScoreMap.get(zone.id);
         if (dbRow) {
-          const finalScore = dbRow.final_score ?? (zone as any).current_score ?? 50;
+          const finalScore =
+            dbRow.final_score ?? (zone as any).current_score ?? 50;
           const weatherBoost = dbRow.weather_boost ?? 0;
           const eventBoost = dbRow.event_boost ?? 0;
           scores.set(zone.id, finalScore);

@@ -1,6 +1,6 @@
+import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
 
 export interface ZoneScore {
   id: string;
@@ -55,7 +55,7 @@ export function useZoneScores(cityId: string) {
 
       // Deduplicate: keep only the latest score per zone
       const latest = new Map<string, ZoneScore>();
-      for (const row of (data ?? [])) {
+      for (const row of data ?? []) {
         if (!latest.has(row.zone_id)) {
           latest.set(row.zone_id, row as unknown as ZoneScore);
         }
@@ -66,4 +66,3 @@ export function useZoneScores(cityId: string) {
     refetchInterval: 30 * 60 * 1000, // poll every 30 min as safety net
   });
 }
-
