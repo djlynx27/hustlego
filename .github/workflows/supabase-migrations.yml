@@ -96,14 +96,6 @@ jobs:
 
           echo "Linked Supabase project ref length: ${#linked_ref}"
 
-          # Repair any migration tracking inconsistencies before pushing.
-          # Marks remote-tracked-but-stuck migrations as reverted so db push
-          # can cleanly re-apply local files. Idempotent: no-op if already clean.
-          supabase migration repair --status reverted \
-            20260318_events_2026 \
-            20260318_learning_foundation \
-            2>/dev/null || true
-
           supabase db push --password "$SUPABASE_DB_PASSWORD"
           supabase db execute --file supabase-seed.sql
 
