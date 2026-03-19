@@ -103,6 +103,9 @@ jobs:
         shell: bash
         run: |
           supabase functions deploy score-calculator --no-verify-jwt
+          supabase functions deploy ai-score-analysis --no-verify-jwt
+          supabase functions deploy analyze-screenshot --no-verify-jwt
+          supabase functions deploy generate-daily-report --no-verify-jwt
 
       - name: Log migration status
         run: echo "✅ Supabase migrations applied successfully"
