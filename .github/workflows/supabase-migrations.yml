@@ -97,7 +97,6 @@ jobs:
           echo "Linked Supabase project ref length: ${#linked_ref}"
 
           supabase db push --password "$SUPABASE_DB_PASSWORD"
-          supabase db execute --file supabase-seed.sql
 
       - name: Log migration status
         run: echo "✅ Supabase migrations applied successfully"
