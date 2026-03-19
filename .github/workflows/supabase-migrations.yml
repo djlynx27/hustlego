@@ -1,12 +1,14 @@
 name: Apply Supabase Migrations
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - main
     paths:
       - 'supabase/migrations/**'
       - 'supabase-seed.sql'
+      - '.github/workflows/supabase-migrations.yml'
 
 jobs:
   migrate:
