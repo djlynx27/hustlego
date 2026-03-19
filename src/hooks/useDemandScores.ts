@@ -24,8 +24,8 @@ import {
   type ActiveEventBoost,
   type WeatherCondition,
 } from '@/lib/scoringEngine';
-import { useQuery } from '@tanstack/react-query';
-import { useEffect, useMemo, useState } from 'react';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect, useMemo, useRef, useState } from 'react';
 
 export interface ScoreFactors {
   hasWeatherBoost: boolean;
@@ -43,6 +43,7 @@ export interface ScoreFactors {
  * Fallback: client-side calculation using weather + events.
  */
 export function useDemandScores(cityId: string) {
+  const queryClient = useQueryClient();
   const { data: zones = [] } = useZones(cityId);
   const { data: weather } = useWeather(cityId);
   const { data: events = [] } = useEvents(cityId);
@@ -69,6 +70,39 @@ export function useDemandScores(cityId: string) {
     const interval = setInterval(() => setNow(new Date()), 60_000);
     return () => clearInterval(interval);
   }, []);
+
+  // Trigger Edge Function when DB scores are absent or older than 35 minutes.
+  // The SQL cron refreshes every 30 min; the Edge Function adds weather + AI.
+  const refreshedRef = useRef(false);
+  useEffect(() => {
+    if (refreshedRef.current) return;
+    if (!cityId) return;
+
+    const scoresAreStale =
+      dbScores.length === 0 ||
+      dbScores.some((s) => {
+        const ageMs = Date.now() - new Date(s.calculated_at).getTime();
+        return ageMs > 35 * 60 * 1000;
+      });
+
+    if (!scoresAreStale) return;
+
+    refreshedRef.current = true;
+    supabase.functions
+      .invoke('score-calculator')
+      .then(({ error }) => {
+        if (error) {
+          console.warn('score-calculator edge function error:', error);
+          return;
+        }
+        // Invalidate zone-scores cache so the map re-renders with fresh data
+        queryClient.invalidateQueries({ queryKey: ['zone-scores', cityId] });
+        queryClient.invalidateQueries({ queryKey: ['zones', cityId] });
+      })
+      .catch((err) => {
+        console.warn('score-calculator invocation failed:', err);
+      });
+  }, [cityId, dbScores, queryClient]);
 
   const weatherCondition: WeatherCondition | null = useMemo(() => {
     if (!weather) return null;

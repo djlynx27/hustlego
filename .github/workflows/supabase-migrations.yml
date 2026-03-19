@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - 'supabase/migrations/**'
+      - 'supabase/functions/**'
       - 'supabase-seed.sql'
       - '.github/workflows/supabase-migrations.yml'
 
@@ -97,6 +98,11 @@ jobs:
           echo "Linked Supabase project ref length: ${#linked_ref}"
 
           supabase db push --password "$SUPABASE_DB_PASSWORD"
+
+      - name: Deploy Edge Functions
+        shell: bash
+        run: |
+          supabase functions deploy score-calculator --no-verify-jwt
 
       - name: Log migration status
         run: echo "✅ Supabase migrations applied successfully"
