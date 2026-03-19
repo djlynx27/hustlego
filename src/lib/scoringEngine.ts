@@ -367,6 +367,12 @@ export interface ScoreFactors {
   hasEventBoost: boolean;
   weatherBoostPoints: number;
   eventBoostPoints: number;
+  /** Points ajoutés par l'IA d'apprentissage contextuel */
+  learningBoostPoints?: number;
+  /** 0..1 — score de similarité avec des contextes passés similaires */
+  learningSimilarity?: number;
+  /** Revenu moyen/h historique sur des contextes similaires */
+  learningAvgEarningsPerHour?: number;
 }
 
 function clamp01(value: number): number {
