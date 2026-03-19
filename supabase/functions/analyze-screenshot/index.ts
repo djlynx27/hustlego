@@ -17,7 +17,7 @@ interface ZoneDetected {
 interface AnalysisResult {
   zones_detected?: ZoneDetected[];
   overall_demand?: string;
-  time_context?: string;
+  time_context?: string | null;
   notes?: string;
   recommended_target?:
     | 'demand'
@@ -27,13 +27,15 @@ interface AnalysisResult {
     | 'profit'
     | 'unknown';
   extracted_data?: {
-    earnings?: number;
-    tips?: number;
-    distance_km?: number;
-    hours_worked?: number;
-    trips_count?: number;
-    date?: string;
+    earnings?: number | null;
+    tips?: number | null;
+    distance_km?: number | null;
+    hours_worked?: number | null;
+    trips_count?: number | null;
+    date?: string | null;
   };
+  matched_zone_id?: string;
+  matched_zone_name?: string;
 }
 
 interface RequestBody {
@@ -59,11 +61,7 @@ serve(async (req) => {
 
     // ─── File / text path ────────────────────────────────────────────
     if (body.file_content) {
-      const analysis = analyzeFileContent(
-        body.file_content,
-        body.file_name,
-        body.zone_name
-      );
+      const analysis = analyzeFileContent(body.file_content, body.file_name);
       return jsonResponse({ analysis });
     }
 
@@ -92,7 +90,7 @@ serve(async (req) => {
 
     const base64Image = btoa(String.fromCharCode(...imageBytes));
 
-    const prompt = buildPrompt(body.zone_name, body.zone_id);
+    const prompt = buildPrompt(body.zone_name);
 
     const geminiRes = await fetch(
       `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${geminiKey}`,
@@ -156,8 +154,8 @@ serve(async (req) => {
         .single();
       if (matchedZone) {
         // attach matched zone id to response so frontend can preselect it
-        (analysis as any).matched_zone_id = matchedZone.id;
-        (analysis as any).matched_zone_name = matchedZone.name;
+        analysis.matched_zone_id = matchedZone.id;
+        analysis.matched_zone_name = matchedZone.name;
       }
     }
 
@@ -173,7 +171,7 @@ serve(async (req) => {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-function buildPrompt(zoneName?: string, zoneId?: string): string {
+function buildPrompt(zoneName?: string): string {
   const zoneCtx = zoneName
     ? `The driver is currently positioned near "${zoneName}" in Montreal/Laval/Longueuil (Quebec).`
     : '';
@@ -208,8 +206,7 @@ Rules:
 
 function analyzeFileContent(
   content: string,
-  fileName?: string,
-  zoneName?: string
+  fileName?: string
 ): AnalysisResult {
   const lines = content.split('\n');
   const headers = lines[0]?.toLowerCase() || '';
