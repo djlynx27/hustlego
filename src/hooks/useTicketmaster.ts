@@ -1,6 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-const TM_API_KEY = 'FZGUwyiY8ANRUaOao4IwE5S4eNV0xBwm';
+const TM_API_KEY = import.meta.env.VITE_TICKETMASTER_KEY ?? '';
 
 const CITY_LATLONG: Record<string, string> = {
   mtl: '45.5017,-73.5673',
@@ -19,8 +19,8 @@ const VENUE_CAPACITIES: Record<string, number> = {
   'Olympic Stadium': 56000,
   'Bell Centre': 21000,
   'Théâtre St-Denis': 2500,
-  'MTELUS': 2300,
-  'L\'Olympia': 1200,
+  MTELUS: 2300,
+  "L'Olympia": 1200,
   'Club Soda': 500,
 };
 
@@ -48,6 +48,8 @@ export function useTicketmasterEvents(cityId: string) {
   return useQuery<TicketmasterEvent[]>({
     queryKey: ['ticketmaster', cityId],
     queryFn: async () => {
+      if (!TM_API_KEY) return [];
+
       const url = `https://app.ticketmaster.com/discovery/v2/events.json?apikey=${TM_API_KEY}&latlong=${latlong}&radius=30&unit=km&size=50&sort=date,asc`;
 
       const res = await fetch(url);
@@ -70,7 +72,8 @@ export function useTicketmasterEvents(cityId: string) {
           const lng = parseFloat(venue.location.longitude);
           if (isNaN(lat) || isNaN(lng)) return null;
 
-          const startDate = ev.dates?.start?.dateTime ?? ev.dates?.start?.localDate ?? '';
+          const startDate =
+            ev.dates?.start?.dateTime ?? ev.dates?.start?.localDate ?? '';
 
           // Determine capacity from known venues or fallback
           const knownCap = VENUE_CAPACITIES[venueName];
@@ -100,17 +103,20 @@ export function useTicketmasterEvents(cityId: string) {
 export function getRelevantTmEvents(
   events: TicketmasterEvent[],
   now: Date,
-  windowHours = 3,
+  windowHours = 3
 ): TicketmasterEvent[] {
   const nowMs = now.getTime();
   const windowMs = windowHours * 60 * 60 * 1000;
   const eventDuration = 3 * 60 * 60 * 1000; // assume ~3h events
 
-  return events.filter(ev => {
+  return events.filter((ev) => {
     const start = new Date(ev.startDate).getTime();
     if (isNaN(start)) return false;
     const end = start + eventDuration;
     // Starting within window OR currently happening
-    return (start - nowMs <= windowMs && start - nowMs >= 0) || (nowMs >= start && nowMs <= end);
+    return (
+      (start - nowMs <= windowMs && start - nowMs >= 0) ||
+      (nowMs >= start && nowMs <= end)
+    );
   });
 }
