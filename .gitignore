@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Android signing — NE JAMAIS commiter le keystore
+*.keystore
+*.jks

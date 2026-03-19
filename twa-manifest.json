@@ -1,0 +1,63 @@
+{
+  "$schema": "https://raw.githubusercontent.com/GoogleChromeLabs/bubblewrap/main/packages/core/schema/twa-manifest.schema.json",
+
+  "packageId": "app.hustlego.driver",
+  "host": "hustlego.vercel.app",
+  "name": "HustleGo — Chauffeur",
+  "launcherName": "HustleGo",
+  "display": "standalone",
+  "orientation": "portrait",
+  "themeColor": "#0a0a1a",
+  "navigationColor": "#0a0a1a",
+  "navigationColorDark": "#0a0a1a",
+  "navigationDividerColor": "#0a0a1a",
+  "navigationDividerColorDark": "#0a0a1a",
+  "backgroundColor": "#0a0a1a",
+  "enableNotifications": true,
+  "startUrl": "/",
+  "iconUrl": "https://hustlego.vercel.app/pwa-icon-512.png",
+  "maskableIconUrl": "https://hustlego.vercel.app/pwa-icon-512.png",
+  "monochromeIconUrl": "https://hustlego.vercel.app/pwa-icon-512.png",
+  "shortcuts": [
+    {
+      "name": "Aujourd'hui",
+      "shortName": "Aujourd'hui",
+      "url": "/",
+      "icons": [
+        {
+          "src": "https://hustlego.vercel.app/pwa-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    },
+    {
+      "name": "Mes revenus",
+      "shortName": "Revenus",
+      "url": "/revenue",
+      "icons": [
+        {
+          "src": "https://hustlego.vercel.app/pwa-icon-192.png",
+          "sizes": "192x192"
+        }
+      ]
+    }
+  ],
+  "appVersion": "1.0.0",
+  "appVersionCode": 1,
+  "signingKey": {
+    "path": "./android.keystore",
+    "alias": "hustlego"
+  },
+  "splashScreenFadeOutDuration": 300,
+  "fallbackType": "chromeos",
+  "features": {},
+  "alphaDependencies": {
+    "enabled": false
+  },
+  "enableSiteSettingsShortcut": true,
+  "isChromeOSOnly": false,
+  "isMetaQuest": false,
+  "fullyImmersive": false,
+  "minSdkVersion": 21,
+  "targetSdkVersion": 34
+}
