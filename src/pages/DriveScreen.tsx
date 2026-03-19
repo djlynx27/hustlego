@@ -1,18 +1,21 @@
 import { CitySelect } from '@/components/CitySelect';
 import { DeadTimeTimer } from '@/components/DeadTimeTimer';
 import { DemandBadge } from '@/components/DemandBadge';
+import { DrivingHUD } from '@/components/DrivingHUD';
 import { NavigationSheet } from '@/components/NavigationSheet';
 import { ScoreFactorIcons } from '@/components/ScoreFactorIcons';
 import { Button } from '@/components/ui/button';
 import { WeeklyGoalDisplay } from '@/components/WeeklyGoal';
 import { useI18n } from '@/contexts/I18nContext';
+import { useActivityDetection } from '@/hooks/useActivityDetection';
 import { useCityId } from '@/hooks/useCityId';
 import { useDemandScores } from '@/hooks/useDemandScores';
+import { useHaptics } from '@/hooks/useHaptics';
 import { useCities } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { getDemandClass } from '@/lib/demandUtils';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
-import { Crosshair, Maximize2, Minimize2, Navigation } from 'lucide-react';
+import { Car, Crosshair, Maximize2, Minimize2, Navigation } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 export default function DriveScreen() {
@@ -27,6 +30,19 @@ export default function DriveScreen() {
     lat: number;
     lng: number;
   } | null>(null);
+
+  // Speed-based activity detection → auto-HUD
+  const { isInVehicle, speedKmh } = useActivityDetection();
+  const [hudActive, setHudActive] = useState(false);
+  const { vibrate } = useHaptics();
+
+  // Auto-enable HUD when vehicle motion is confidently detected
+  useEffect(() => {
+    if (isInVehicle && !hudActive) {
+      setHudActive(true);
+      vibrate('newOrder'); // alert driver that HUD is now active
+    }
+  }, [isInVehicle]);
 
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
@@ -107,6 +123,36 @@ export default function DriveScreen() {
 
   return (
     <div className="flex flex-col h-full pb-36 bg-background text-foreground overflow-y-auto">
+      {/* ── NHTSA Driving HUD overlay ── */}
+      {hudActive && (
+        <DrivingHUD
+          heroZone={
+            heroZone
+              ? {
+                  id: heroZone.id,
+                  name: heroZone.name,
+                  score: heroZone.score,
+                  latitude: heroZone.latitude,
+                  longitude: heroZone.longitude,
+                  distKm: heroDistance ?? undefined,
+                }
+              : null
+          }
+          nextZone={
+            nextZones[0]
+              ? {
+                  id: nextZones[0].id,
+                  name: nextZones[0].name,
+                  score: nextZones[0].score,
+                  latitude: nextZones[0].latitude,
+                  longitude: nextZones[0].longitude,
+                }
+              : null
+          }
+          speedKmh={speedKmh}
+          onExit={() => setHudActive(false)}
+        />
+      )}
       {/* Header */}
       {!fullScreen && (
         <div className="px-4 pt-3 pb-2 flex items-center gap-3">
@@ -229,6 +275,21 @@ export default function DriveScreen() {
             <Maximize2 className="w-5 h-5" />
           )}
           {fullScreen ? '↙ Réduire' : '🚀 Mode Plein Écran'}
+        </Button>
+
+        {/* Manual HUD toggle + speed readout */}
+        <Button
+          variant={hudActive ? 'default' : 'outline'}
+          className="w-full h-12 gap-2 font-display font-bold"
+          onClick={() => {
+            setHudActive((v) => !v);
+            vibrate('accepted');
+          }}
+        >
+          <Car className="w-5 h-5" />
+          {hudActive
+            ? '✅ HUD actif — Appuyer 2× sur ✕ pour quitter'
+            : `🚗 Mode HUD conduite${speedKmh !== null ? ` · ${Math.round(speedKmh ?? 0)} km/h` : ''}`}
         </Button>
 
         <div className="flex items-center gap-3 bg-card rounded-xl border border-border px-4 py-3">

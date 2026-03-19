@@ -99,6 +99,64 @@
   }
 }
 
+/* ── Semantic mode color tokens ─────────────────────────────────────────── */
+@layer base {
+  :root {
+    /* Rideshare mode (blue) */
+    --mode-rideshare: 210 100% 56%; /* #1a7fff */
+    --mode-rideshare-bg: 210 100% 56% / 0.12;
+    /* Delivery mode (amber-orange) */
+    --mode-delivery: 33 100% 50%; /* #ff8800 */
+    --mode-delivery-bg: 33 100% 50% / 0.12;
+    /* Alert semantic (amber for warnings, distinct from delivery) */
+    --alert-amber: 45 100% 51%; /* #ffcc00 */
+    /* Spring easing */
+    --spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --spring-fast: cubic-bezier(0.22, 1, 0.36, 1);
+  }
+}
+
+/* ── Glassmorphism card (non-critical UI only) ─────────────────────────── */
+@layer components {
+  .glass-card {
+    background: hsl(var(--card) / 0.7);
+    backdrop-filter: blur(16px) saturate(1.4);
+    -webkit-backdrop-filter: blur(16px) saturate(1.4);
+    border: 1px solid hsl(var(--border) / 0.6);
+    border-radius: var(--radius);
+  }
+
+  /* Mode-aware accent strip */
+  [data-mode='rideshare'] .mode-accent {
+    background: hsl(var(--mode-rideshare));
+    box-shadow: 0 0 12px hsl(var(--mode-rideshare) / 0.4);
+  }
+  [data-mode='delivery'] .mode-accent {
+    background: hsl(var(--mode-delivery));
+    box-shadow: 0 0 12px hsl(var(--mode-delivery) / 0.4);
+  }
+
+  /* Driving-mode font scale — larger for glanceability */
+  .drive-mode-text-primary {
+    font-size: clamp(1.5rem, 5vw, 3rem);
+    font-weight: 900;
+    line-height: 1.1;
+  }
+  .drive-mode-text-secondary {
+    font-size: clamp(1.125rem, 3.5vw, 1.75rem);
+    font-weight: 600;
+  }
+
+  /* Minimum 56 dp tap targets in driving context */
+  .tap-target-drive {
+    min-width: 56px;
+    min-height: 56px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
 @layer utilities {
   .demand-high {
     @apply bg-[hsl(var(--demand-high))];
@@ -135,5 +193,30 @@
   }
   .text-score-low {
     color: hsl(var(--demand-low));
+  }
+
+  /* Mode-specific text colours */
+  .text-mode-rideshare {
+    color: hsl(var(--mode-rideshare));
+  }
+  .text-mode-delivery {
+    color: hsl(var(--mode-delivery));
+  }
+  .text-alert-amber {
+    color: hsl(var(--alert-amber));
+  }
+
+  /* Spring transition helpers */
+  .transition-spring {
+    transition-timing-function: var(--spring);
+  }
+  .transition-spring-fast {
+    transition-timing-function: var(--spring-fast);
+  }
+
+  /* Prevent text selection & callout on driving UI */
+  .no-callout {
+    -webkit-touch-callout: none;
+    user-select: none;
   }
 }

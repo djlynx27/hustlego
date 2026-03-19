@@ -1,0 +1,17 @@
+{
+  "folders": [
+	{
+		"path": "."
+	},
+	{
+		"path": "../GeoHustle"
+	},
+	{
+		"path": "../Cursor code"
+	},
+	{
+		"path": "../Base de données pour mon appli HustleGo"
+	}
+],
+  "settings": {}
+}

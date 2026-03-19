@@ -3,17 +3,22 @@ import { DeadTimeTimer } from '@/components/DeadTimeTimer';
 import { DemandBadge } from '@/components/DemandBadge';
 import { MultiAppStatus } from '@/components/MultiAppStatus';
 import { NavigationSheet } from '@/components/NavigationSheet';
+import { NetProfitWidget } from '@/components/NetProfitWidget';
 import { PreShiftBriefing } from '@/components/PreShiftBriefing';
 import { ScoreFactorIcons } from '@/components/ScoreFactorIcons';
+import { SwipeToAccept } from '@/components/SwipeToAccept';
 import { Button } from '@/components/ui/button';
 import { VoiceAssistant } from '@/components/VoiceAssistant';
 import { WeatherWidget } from '@/components/WeatherWidget';
 import { WeeklyGoalDisplay } from '@/components/WeeklyGoal';
 import { useI18n } from '@/contexts/I18nContext';
+import { useActivityDetection } from '@/hooks/useActivityDetection';
+import { useAntiDeadhead } from '@/hooks/useAntiDeadhead';
 import { useAutoCity } from '@/hooks/useAutoCity';
 import { useCityId } from '@/hooks/useCityId';
 import { useDemandScores } from '@/hooks/useDemandScores';
 import { useHabsGame } from '@/hooks/useHabsGame';
+import { useHaptics } from '@/hooks/useHaptics';
 import { useHoliday } from '@/hooks/useHoliday';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
@@ -31,7 +36,9 @@ import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
 import { getActiveTimeBoosts } from '@/lib/timeBoosts';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
 import {
+  ArrowRight,
   Bell,
+  Car,
   Clock,
   Download,
   Navigation,
@@ -128,6 +135,13 @@ export default function TodayScreen() {
   const { data: habsGame } = useHabsGame(getCurrentSlotTime(now).date);
   const timeBoosts = useMemo(() => getActiveTimeBoosts(now), [now]);
   const { data: yulStatus } = useYulFlights();
+
+  // ── Compass UX additions ───────────────────────────────────────────
+  const { isInVehicle, speedKmh } = useActivityDetection();
+  const { vibrate } = useHaptics();
+
+  // Haptic feedback when the top zone changes (new demand opportunity)
+  const prevHeroIdRef = useRef<string | null>(null);
 
   const [driverMode, setDriverMode] = useState<
     'rideshare' | 'delivery' | 'all'
@@ -296,6 +310,43 @@ export default function TodayScreen() {
 
   const heroDistance = getDistance(heroZone);
 
+  // Haptic alert when the top zone changes (new best opportunity)
+  useEffect(() => {
+    if (heroZone && heroZone.id !== prevHeroIdRef.current) {
+      if (prevHeroIdRef.current !== null) vibrate('newOrder');
+      prevHeroIdRef.current = heroZone.id;
+    }
+  }, [heroZone?.id]);
+
+  // Anti-deadhead: suggest repositioning when in a low-demand zone
+  const currentZoneId = useMemo(() => {
+    if (!userLocation) return null;
+    let closest: string | null = null;
+    let minDist = Infinity;
+    for (const z of zones) {
+      const d = haversineKm(
+        userLocation.latitude,
+        userLocation.longitude,
+        z.latitude,
+        z.longitude
+      );
+      if (d < minDist) {
+        minDist = d;
+        closest = z.id;
+      }
+    }
+    return minDist < 1.5 ? closest : null; // only claim zone if within 1.5 km
+  }, [userLocation, zones]);
+
+  const deadheadSuggestion = useAntiDeadhead({
+    currentLat: userLocation?.latitude ?? null,
+    currentLng: userLocation?.longitude ?? null,
+    currentZoneId,
+    zones: modeZones,
+    scores,
+    driverMode,
+  });
+
   const mapCenter = heroZone
     ? ([heroZone.latitude, heroZone.longitude] as [number, number])
     : (CITY_CENTERS[cityId] ?? CITY_CENTERS.mtl);
@@ -313,7 +364,25 @@ export default function TodayScreen() {
   }, [modeZones, factors]);
 
   return (
-    <div className="flex flex-col h-full pb-20">
+    <div className="flex flex-col h-full pb-20" data-mode={driverMode}>
+      {/* ── Driving-mode banner (NHTSA: direct to Drive screen) ── */}
+      {isInVehicle && (
+        <div className="mx-3 mt-2 flex items-center gap-3 rounded-xl bg-[hsl(var(--mode-rideshare)/0.15)] border border-[hsl(var(--mode-rideshare)/0.4)] px-3 py-2 animate-slide-up">
+          <Car className="w-5 h-5 text-[hsl(var(--mode-rideshare))] flex-shrink-0" />
+          <span className="flex-1 text-[13px] font-body text-[hsl(var(--mode-rideshare))]">
+            En déplacement ·{' '}
+            {speedKmh !== null ? `${Math.round(speedKmh)} km/h · ` : ''}
+            Mode HUD disponible dans l'onglet conduite
+          </span>
+          <button
+            onClick={() => window.location.assign('/drive')}
+            className="flex items-center gap-1 text-[12px] font-bold text-[hsl(var(--mode-rideshare))] bg-[hsl(var(--mode-rideshare)/0.2)] rounded-lg px-2.5 py-1 active:scale-95 transition-transform"
+          >
+            HUD <ArrowRight className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
       {/* 1. Compact header */}
       <div className="flex items-center gap-2 px-3 pt-2 pb-1 h-12">
         <div className="w-[130px] flex-shrink-0">
@@ -344,22 +413,37 @@ export default function TodayScreen() {
         />
       </div>
 
-      {/* Mode filter tabs */}
+      {/* Mode filter tabs — colour-coded per compass doc (blue=rideshare, amber=delivery) */}
       <div className="px-3 mt-2">
         <div className="flex rounded-xl border border-border bg-muted/30 p-1 gap-1">
           {(
             [
-              { key: 'all', label: '🌐 Les deux' },
-              { key: 'rideshare', label: '🚗 Personnes' },
-              { key: 'delivery', label: '📦 Livraison' },
+              {
+                key: 'all',
+                label: '🌐 Les deux',
+                activeClass: 'bg-primary text-primary-foreground',
+              },
+              {
+                key: 'rideshare',
+                label: '🚗 Personnes',
+                activeClass: 'bg-rideshare text-white',
+              },
+              {
+                key: 'delivery',
+                label: '📦 Livraison',
+                activeClass: 'bg-delivery text-white',
+              },
             ] as const
-          ).map(({ key, label }) => (
+          ).map(({ key, label, activeClass }) => (
             <button
               key={key}
-              onClick={() => setDriverMode(key)}
+              onClick={() => {
+                setDriverMode(key);
+                vibrate('navigation');
+              }}
               className={`flex-1 text-[13px] font-display font-semibold py-2 rounded-lg transition-colors ${
                 driverMode === key
-                  ? 'bg-primary text-primary-foreground shadow-sm'
+                  ? `${activeClass} shadow-sm`
                   : 'text-muted-foreground hover:text-foreground'
               }`}
             >
@@ -640,9 +724,72 @@ export default function TodayScreen() {
                   🧭 Waze
                 </a>
               </Button>
+
+              {/* Swipe-to-accept — safer in-vehicle hero zone confirmation */}
+              {isInVehicle && (
+                <SwipeToAccept
+                  label="Glisser → confirmer direction"
+                  onAccept={() => {
+                    window.open(
+                      getGoogleMapsNavUrl(
+                        heroZone.name,
+                        heroZone.latitude,
+                        heroZone.longitude
+                      ),
+                      '_blank'
+                    );
+                  }}
+                />
+              )}
             </div>
           )}
         </div>
+      </div>
+
+      {/* Anti-deadhead suggestion */}
+      {deadheadSuggestion && (
+        <div
+          className={`mx-3 mt-2 rounded-xl border px-3 py-2.5 flex items-center gap-3 animate-slide-up ${
+            deadheadSuggestion.urgency === 'high'
+              ? 'border-destructive/40 bg-destructive/10'
+              : deadheadSuggestion.urgency === 'medium'
+                ? 'border-alert-amber/40 bg-[hsl(var(--alert-amber)/0.08)]'
+                : 'border-border bg-card'
+          }`}
+        >
+          <Car
+            className={`w-5 h-5 flex-shrink-0 ${
+              deadheadSuggestion.urgency === 'high'
+                ? 'text-destructive'
+                : 'text-alert-amber'
+            }`}
+          />
+          <div className="flex-1 min-w-0">
+            <p className="text-[13px] font-semibold text-foreground">
+              Zone creuse — repositionne-toi
+            </p>
+            <p className="text-[12px] text-muted-foreground leading-snug">
+              {deadheadSuggestion.reason}
+            </p>
+          </div>
+          <button
+            onClick={() =>
+              setNavZone({
+                name: deadheadSuggestion.zone.name,
+                lat: deadheadSuggestion.zone.latitude,
+                lng: deadheadSuggestion.zone.longitude,
+              })
+            }
+            className="text-[12px] font-bold text-primary bg-primary/10 rounded-lg px-2.5 py-1.5 flex-shrink-0 active:scale-95 transition-transform"
+          >
+            GO
+          </button>
+        </div>
+      )}
+
+      {/* Net profit widget — shows after hero zone */}
+      <div className="px-3 mt-2">
+        <NetProfitWidget grossEarnings={0} totalKm={0} hoursWorked={0} />
       </div>
 
       {/* 3. Heatmap */}

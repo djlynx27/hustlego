@@ -9,7 +9,18 @@
       "Bash(grep:*)",
       "Bash(npx tsc:*)",
       "Bash(find D:/Documents/HustleGo/src -name *.js -o -name *.jsx)",
-      "Bash(npm run:*)"
+      "Bash(npm run:*)",
+      "Bash(claude install:*)",
+      "Bash(code:*)",
+      "Bash(code.cmd --version)",
+      "Bash(\"/c/Users/djwal/AppData/Local/Programs/Microsoft VS Code/bin/code\" --version)",
+      "Bash(\"/c/Users/djwal/AppData/Local/Programs/Microsoft VS Code/bin/code.cmd\" --version 2>&1)",
+      "Bash(\"/c/Users/djwal/AppData/Local/Programs/Microsoft VS Code/bin/code.cmd\" --list-extensions --show-versions)",
+      "Bash(\"/c/Users/djwal/AppData/Local/Programs/Microsoft VS Code/bin/code.cmd\" --install-extension github.copilot-chat --force 2>&1)",
+      "mcp__supabase__list_projects",
+      "mcp__supabase__list_tables",
+      "mcp__supabase__execute_sql",
+      "Bash(claude mcp:*)"
     ]
   }
 }

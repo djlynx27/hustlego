@@ -1,0 +1,19 @@
+{
+  "permissions": {
+    "allow": [".*"],
+    "deny": []
+  },
+  "mcpServers": {
+    "supabase": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@supabase/mcp-server-supabase@latest",
+        "--supabase-url",
+        "https://hibzhsjgipybfihhzpxr.supabase.co",
+        "--supabase-key",
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpYnpoc2pnaXB5YmZpaGh6cHhyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3MzU2Mjg2MCwiZXhwIjoyMDg5MTM4ODYwfQ.uTHU1k5I6iph2JLMHm10T5bntPNqziHx6BinrFJTTsI"
+      ]
+    }
+  }
+}

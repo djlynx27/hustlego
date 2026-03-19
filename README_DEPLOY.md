@@ -57,15 +57,18 @@ Dans **Vercel → Settings → Environment Variables**, ajouter :
 ## 6. Google Play Store (TWA — Trusted Web Activity)
 
 ### Prérequis
+
 - JDK 11+ installé (`keytool` disponible)
 - Node.js 20+
 
 ### Étapes en 6 minutes
 
 **1. Générer le keystore de signature :**
+
 ```bash
 bash scripts/setup-android-signing.sh
 ```
+
 Le script génère `android.keystore`, affiche le SHA-256 et le base64 à copier.
 
 **2. Mettre à jour `public/.well-known/assetlinks.json` :**
@@ -78,13 +81,14 @@ Si tu as un domaine custom, changer `host` (ex: `hustlego.app` au lieu de `hustl
 **4. Ajouter les 3 GitHub Secrets :**
 → GitHub → Repo → Settings → Secrets and variables → Actions
 
-| Secret | Valeur |
-|---|---|
-| `ANDROID_KEYSTORE_BASE64` | sortie base64 du script |
-| `ANDROID_KEYSTORE_PASSWORD` | mot de passe choisi |
-| `ANDROID_KEY_ALIAS_PASSWORD` | idem (ou différent) |
+| Secret                       | Valeur                  |
+| ---------------------------- | ----------------------- |
+| `ANDROID_KEYSTORE_BASE64`    | sortie base64 du script |
+| `ANDROID_KEYSTORE_PASSWORD`  | mot de passe choisi     |
+| `ANDROID_KEY_ALIAS_PASSWORD` | idem (ou différent)     |
 
 **5. Pousser le tag pour déclencher le build :**
+
 ```bash
 git tag v1.0.0
 git push --tags
@@ -93,6 +97,7 @@ git push --tags
 Le workflow `.github/workflows/build-apk.yml` build l'APK et l'AAB, crée une GitHub Release.
 
 **6. Uploader sur Play Console :**
+
 - `app-release.aab` → Google Play Console → Production → Nouvelle version
 - Remplir la fiche (nom, description, captures d'écran)
 - Soumettre pour révision (~3 jours)
