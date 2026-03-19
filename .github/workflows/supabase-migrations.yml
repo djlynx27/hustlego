@@ -74,14 +74,8 @@ jobs:
 
           echo "Resolved Supabase project ref length: ${#ref}"
 
-          # Try linking with the parsed ref first. If Supabase rejects format,
-          # retry with common OCR/typing fixes from copied URLs.
           linked_ref=""
           candidates=("$ref")
-          normalized_ref="$(echo "$ref" | tr '10' 'lo')"
-          if [[ "$normalized_ref" != "$ref" ]]; then
-            candidates+=("$normalized_ref")
-          fi
 
           for candidate in "${candidates[@]}"; do
             echo "Trying project ref candidate (len=${#candidate})"
