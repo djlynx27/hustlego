@@ -58,8 +58,9 @@ function useAddTrip() {
       notes: string;
       platform: string | null;
       experiment?: boolean;
+      zone_score?: number | null;
     }) => {
-      const { error } = await supabase.from('trips').insert(trip as any);
+      const { error } = await supabase.from('trips').insert(trip);
       if (error) throw error;
       return trip.zone_id;
     },

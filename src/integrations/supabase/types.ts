@@ -544,9 +544,11 @@ export type Database = {
           experiment: boolean;
           id: string;
           notes: string | null;
+          platform: string | null;
           started_at: string;
           tips: number | null;
           zone_id: string | null;
+          zone_score: number | null;
         };
         Insert: {
           created_at?: string;
@@ -556,9 +558,11 @@ export type Database = {
           experiment?: boolean;
           id?: string;
           notes?: string | null;
+          platform?: string | null;
           started_at?: string;
           tips?: number | null;
           zone_id?: string | null;
+          zone_score?: number | null;
         };
         Update: {
           created_at?: string;
@@ -568,9 +572,11 @@ export type Database = {
           experiment?: boolean;
           id?: string;
           notes?: string | null;
+          platform?: string | null;
           started_at?: string;
           tips?: number | null;
           zone_id?: string | null;
+          zone_score?: number | null;
         };
         Relationships: [
           {

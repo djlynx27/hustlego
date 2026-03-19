@@ -298,12 +298,15 @@ export function useDemandScores(cityId: string) {
       for (const zone of zones) {
         const dbRow = dbScoreMap.get(zone.id);
         if (dbRow) {
-          scores.set(zone.id, dbRow.final_score);
+          const finalScore = dbRow.final_score ?? (zone as any).current_score ?? 50;
+          const weatherBoost = dbRow.weather_boost ?? 0;
+          const eventBoost = dbRow.event_boost ?? 0;
+          scores.set(zone.id, finalScore);
           factors.set(zone.id, {
-            hasWeatherBoost: dbRow.weather_boost > 0,
-            hasEventBoost: dbRow.event_boost > 0,
-            weatherBoostPoints: dbRow.weather_boost,
-            eventBoostPoints: dbRow.event_boost,
+            hasWeatherBoost: weatherBoost > 0,
+            hasEventBoost: eventBoost > 0,
+            weatherBoostPoints: weatherBoost,
+            eventBoostPoints: eventBoost,
           });
         } else {
           // Zone has no DB score yet, use current_score from zone

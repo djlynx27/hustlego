@@ -143,9 +143,20 @@ export default function TodayScreen() {
   // Haptic feedback when the top zone changes (new demand opportunity)
   const prevHeroIdRef = useRef<string | null>(null);
 
-  const [driverMode, setDriverMode] = useState<
+  const DRIVER_MODE_KEY = 'geohustle_driver_mode';
+  const [driverMode, setDriverModeState] = useState<
     'rideshare' | 'delivery' | 'all'
-  >('all');
+  >(() => {
+    try {
+      const saved = localStorage.getItem(DRIVER_MODE_KEY);
+      if (saved === 'rideshare' || saved === 'delivery' || saved === 'all') return saved;
+    } catch {}
+    return 'all';
+  });
+  const setDriverMode = (mode: 'rideshare' | 'delivery' | 'all') => {
+    setDriverModeState(mode);
+    try { localStorage.setItem(DRIVER_MODE_KEY, mode); } catch {}
+  };
 
   // ── "Je suis libre" mode ───────────────────────────────────────────
   const [libreMode, setLibreMode] = useState(false);

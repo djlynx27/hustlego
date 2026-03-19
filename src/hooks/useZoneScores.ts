@@ -1,25 +1,49 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface ZoneScore {
   id: string;
   zone_id: string;
-  score: number;
-  weather_boost: number;
-  event_boost: number;
-  final_score: number;
+  score: number | null;
+  weather_boost: number | null;
+  event_boost: number | null;
+  final_score: number | null;
   calculated_at: string;
 }
 
 /**
  * Fetch the latest calculated scores for all zones in a city.
- * Falls back to zone.current_score if no score rows exist yet.
+ * Subscribes to Realtime so the map updates live when the Edge Function
+ * pushes new scores (no manual refresh needed).
  */
 export function useZoneScores(cityId: string) {
+  const queryClient = useQueryClient();
+
+  // Realtime: invalidate cache whenever scores table changes.
+  // This gives live map updates when the cron / Edge Function recalculates.
+  useEffect(() => {
+    if (!cityId) return;
+
+    const channel = supabase
+      .channel(`scores-${cityId}`)
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'scores' },
+        () => {
+          queryClient.invalidateQueries({ queryKey: ['zone-scores', cityId] });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [cityId, queryClient]);
+
   return useQuery<ZoneScore[]>({
     queryKey: ['zone-scores', cityId],
     queryFn: async () => {
-      // Get the latest scores by joining with zones for city filter
       const { data, error } = await supabase
         .from('scores')
         .select('*, zones!inner(city_id)')
@@ -28,7 +52,7 @@ export function useZoneScores(cityId: string) {
         .limit(200);
 
       if (error) throw error;
-      
+
       // Deduplicate: keep only the latest score per zone
       const latest = new Map<string, ZoneScore>();
       for (const row of (data ?? [])) {
@@ -39,7 +63,7 @@ export function useZoneScores(cityId: string) {
       return Array.from(latest.values());
     },
     staleTime: 5 * 60 * 1000,
-    refetchInterval: 5 * 60 * 1000,
+    refetchInterval: 30 * 60 * 1000, // poll every 30 min as safety net
   });
 }
 
