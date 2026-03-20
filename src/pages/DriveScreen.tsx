@@ -26,6 +26,8 @@ interface WakeLockNavigator extends Navigator {
   };
 }
 
+type WakeLockStatus = 'active' | 'inactive' | 'unsupported';
+
 export default function DriveScreen() {
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
@@ -43,6 +45,10 @@ export default function DriveScreen() {
   const { isInVehicle, speedKmh } = useActivityDetection();
   const [hudActive, setHudActive] = useState(false);
   const { vibrate } = useHaptics();
+  const [wakeLockStatus, setWakeLockStatus] = useState<WakeLockStatus>(() => {
+    const nav = navigator as WakeLockNavigator;
+    return nav.wakeLock ? 'inactive' : 'unsupported';
+  });
 
   // Auto-enable HUD when vehicle motion is confidently detected
   useEffect(() => {
@@ -56,9 +62,21 @@ export default function DriveScreen() {
 
   useEffect(() => {
     let cancelled = false;
+
+    function releaseWakeLock() {
+      if (wakeLockRef.current) {
+        wakeLockRef.current.release();
+        wakeLockRef.current = null;
+      }
+      setWakeLockStatus('inactive');
+    }
+
     async function requestWakeLock() {
       const nav = navigator as WakeLockNavigator;
-      if (!nav.wakeLock) return;
+      if (!nav.wakeLock) {
+        setWakeLockStatus('unsupported');
+        return;
+      }
       try {
         const wl = await nav.wakeLock.request('screen');
         if (cancelled) {
@@ -66,31 +84,49 @@ export default function DriveScreen() {
           return;
         }
         wakeLockRef.current = wl;
+        setWakeLockStatus('active');
         wl.addEventListener('release', () => {
-          if (wakeLockRef.current === wl) wakeLockRef.current = null;
+          if (wakeLockRef.current === wl) {
+            wakeLockRef.current = null;
+            setWakeLockStatus('inactive');
+          }
         });
       } catch {
-        /* silently ignore */
+        setWakeLockStatus('inactive');
       }
     }
+
     if (document.visibilityState === 'visible') requestWakeLock();
+
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') requestWakeLock();
-      else if (wakeLockRef.current) {
-        wakeLockRef.current.release();
-        wakeLockRef.current = null;
-      }
+      else releaseWakeLock();
     };
+
     document.addEventListener('visibilitychange', handleVisibility);
+
     return () => {
       cancelled = true;
       document.removeEventListener('visibilitychange', handleVisibility);
-      if (wakeLockRef.current) {
-        wakeLockRef.current.release();
-        wakeLockRef.current = null;
-      }
+      releaseWakeLock();
     };
   }, []);
+
+  const wakeLockBadge =
+    wakeLockStatus === 'active'
+      ? {
+          className: 'bg-primary/20 text-primary',
+          label: t('screenActive'),
+        }
+      : wakeLockStatus === 'unsupported'
+        ? {
+            className: 'bg-muted text-muted-foreground',
+            label: t('screenUnsupported'),
+          }
+        : {
+            className: 'bg-amber-500/15 text-amber-300',
+            label: t('screenInactive'),
+          };
 
   const rankedZones = useMemo(() => {
     return zones
@@ -167,15 +203,11 @@ export default function DriveScreen() {
           <div className="flex-1 min-w-0">
             <h1 className="text-[20px] font-display font-bold flex items-center gap-2">
               🚗 {t('driveMode')}
-              {document.fullscreenElement || wakeLockRef.current ? (
-                <span className="text-[13px] bg-primary/20 text-primary rounded-full px-2 py-0.5 font-body">
-                  🔒 {t('screenActive')}
-                </span>
-              ) : (
-                <span className="text-[13px] bg-primary/20 text-primary rounded-full px-2 py-0.5 font-body">
-                  🔒 {t('screenActive')}
-                </span>
-              )}
+              <span
+                className={`text-[13px] rounded-full px-2 py-0.5 font-body ${wakeLockBadge.className}`}
+              >
+                🔒 {wakeLockBadge.label}
+              </span>
             </h1>
           </div>
           <div className="w-[130px] flex-shrink-0">

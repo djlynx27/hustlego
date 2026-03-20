@@ -76,7 +76,12 @@ const translations: Record<string, Record<Lang, string>> = {
   },
   readyToDrive: { en: 'Ready to drive', fr: 'Prêt à rouler' },
   driveMode: { en: 'Drive Mode', fr: 'Mode Conduite' },
-  screenActive: { en: 'Screen active', fr: 'Écran actif' },
+  screenActive: { en: 'Screen awake', fr: 'Écran réveillé' },
+  screenInactive: { en: 'May sleep', fr: 'Veille possible' },
+  screenUnsupported: {
+    en: 'Not supported',
+    fr: 'Non supporté',
+  },
   close: { en: 'Close', fr: 'Fermer' },
   goGoogleMaps: { en: 'GO — Google Maps', fr: 'GO — Google Maps' },
   waze: { en: 'Waze', fr: 'Waze' },
