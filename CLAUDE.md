@@ -26,8 +26,8 @@ Lyft, DoorDash, SkipTheDishes, Hypra Pro S
 
 ### Structure Supabase
 
-Tables: zones, scores, events, weather_cache, drivers, notifications
-Edge Functions: score-calculator (Gemini 2.5 Flash), push-notifications, demand-aggregator
+Tables: zones, scores, events, weather_cache, drivers, notifications, zone_context_vectors
+Edge Functions: score-calculator (Gemini 2.5 Flash), ai-score-analysis, analyze-screenshot, generate-daily-report, context-embeddings
 
 ---
 
@@ -94,6 +94,13 @@ Carte principale: Mapbox GL JS via react-map-gl.
 Fallback sans token: Leaflet + CartoDB dark tiles.
 Heatmap: couleur verte→orange→rouge selon score.
 Lire `.claude/skills/map-visualizer/SKILL.md`.
+
+### surge-engine
+
+Surge = currentScore / (baselineScore × DOW × seasonal) → multiplicateur 1.0–2.5×.
+Vecteur contexte 8D → zone_context_vectors (pgvector, ivfflat cosine).
+Classes: normal (<1.18), elevated (1.18–1.44), high (1.45–1.79), peak (≥1.80).
+Lire `.claude/skills/surge-engine/SKILL.md` pour le code complet.
 
 ### git-workflow
 
