@@ -103,17 +103,17 @@ Le rapport identifie **5 leviers de rendement $/h** pour un chauffeur multi-plat
 
 ---
 
-### PHASE 4 — Feedback Loop ML + Shift Optimizer (🔮 FUTUR)
+### PHASE 4 — Feedback Loop ML + Shift Optimizer (✅ DONE)
 
 **Objectif :** améliorer la précision du modèle avec les vrais résultats de conduite
 
 | #   | Livrable                                    | Agent responsable | Effort | Status |
 | --- | ------------------------------------------- | ----------------- | ------ | ------ |
-| 4.1 | Table `weight_history`                      | Architecte        | S      | P4     |
-| 4.2 | `weight-calibrator` Edge Function           | Data Scientist    | L      | P4     |
-| 4.3 | Post-trip comparison `prediction vs actual` | Data Scientist    | M      | P4     |
-| 4.4 | `ShiftOptimizer` — planning hebdomadaire IA | Frontend Dev      | L      | P4     |
-| 4.5 | Rapport revenus multi-plateforme            | Frontend Dev      | M      | P4     |
+| 4.1 | Table `weight_history`                      | Architecte        | S      | ✅     |
+| 4.2 | `weight-calibrator` Edge Function           | Data Scientist    | L      | ✅     |
+| 4.3 | Post-trip comparison `prediction vs actual` | Data Scientist    | M      | ✅     |
+| 4.4 | `ShiftOptimizer` — planning hebdomadaire IA | Frontend Dev      | L      | ✅     |
+| 4.5 | Rapport revenus multi-plateforme            | Frontend Dev      | M      | ✅     |
 
 ---
 

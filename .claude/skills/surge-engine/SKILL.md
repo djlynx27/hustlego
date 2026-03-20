@@ -24,10 +24,10 @@ find_similar_contexts() → "Dans des situations similaires : +$XX/h"
 
 ## Fichiers clés
 
-| Fichier | Rôle |
-|---------|------|
-| `src/lib/surgeEngine.ts` | Moteur surge + vecteur contexte 8D |
-| `supabase/functions/context-embeddings/index.ts` | Edge Function pgvector CRUD |
+| Fichier                                                   | Rôle                                  |
+| --------------------------------------------------------- | ------------------------------------- |
+| `src/lib/surgeEngine.ts`                                  | Moteur surge + vecteur contexte 8D    |
+| `supabase/functions/context-embeddings/index.ts`          | Edge Function pgvector CRUD           |
 | `supabase/migrations/20260320000001_pgvector_context.sql` | Table + IVFFlat index + SQL functions |
 
 ---
@@ -51,12 +51,12 @@ Similarité cosinus dans pgvector : `context_vector <=> p_vector`
 
 ## Classes de surge (seuils ratio actuel/baseline)
 
-| Classe | Seuil ratio | Multiplicateur | Boost $/h |
-|--------|------------|----------------|-----------|
-| normal | < 1.18 | 1.00 – 1.17 | 0% |
-| elevated | 1.18 – 1.44 | 1.17 – 1.49 | +15–30% |
-| high | 1.45 – 1.79 | 1.50 – 1.79 | +30–60% |
-| peak | ≥ 1.80 | 1.80 – 2.50 | +60–150% |
+| Classe   | Seuil ratio | Multiplicateur | Boost $/h |
+| -------- | ----------- | -------------- | --------- |
+| normal   | < 1.18      | 1.00 – 1.17    | 0%        |
+| elevated | 1.18 – 1.44 | 1.17 – 1.49    | +15–30%   |
+| high     | 1.45 – 1.79 | 1.50 – 1.79    | +30–60%   |
+| peak     | ≥ 1.80      | 1.80 – 2.50    | +60–150%  |
 
 ---
 
@@ -64,7 +64,7 @@ Similarité cosinus dans pgvector : `context_vector <=> p_vector`
 
 ```typescript
 // Jan  Fév  Mar  Avr  Mai  Jun  Jul  Aoû  Sep  Oct  Nov  Déc
-[1.15, 1.12, 1.05, 0.95, 0.90, 1.02, 1.10, 1.08, 1.00, 0.95, 0.98, 1.18]
+[1.15, 1.12, 1.05, 0.95, 0.9, 1.02, 1.1, 1.08, 1.0, 0.95, 0.98, 1.18];
 ```
 
 Juillet = Grand Prix + festivals. Décembre = fêtes. Hiver Jan–Fév = prime conducteur.
@@ -74,7 +74,11 @@ Juillet = Grand Prix + festivals. Décembre = fêtes. Hiver Jan–Fév = prime c
 ## Usage dans React
 
 ```typescript
-import { computeSurge, buildSurgeContext, getSurgeDisplay } from '@/lib/surgeEngine'
+import {
+  computeSurge,
+  buildSurgeContext,
+  getSurgeDisplay,
+} from '@/lib/surgeEngine';
 
 // Dans useDemandScores ou TodayScreen :
 const surgeCtx = buildSurgeContext({
@@ -85,9 +89,9 @@ const surgeCtx = buildSurgeContext({
   eventProximity: activeEvents.length > 0 ? 70 : 0,
   trafficIndex: trafficData?.index ?? 0,
   deadheadKm: getDistance(zone) ?? 5,
-})
-const surge = computeSurge(surgeCtx)
-const display = getSurgeDisplay(surge.surgeClass)
+});
+const surge = computeSurge(surgeCtx);
+const display = getSurgeDisplay(surge.surgeClass);
 ```
 
 ---
@@ -103,7 +107,7 @@ await supabase.functions.invoke('context-embeddings', {
     surge_multiplier: surge.surgeMultiplier,
     surge_class: surge.surgeClass,
   },
-})
+});
 ```
 
 ---
@@ -120,7 +124,7 @@ const { data } = await supabase.functions.invoke('context-embeddings', {
     limit: 10,
     min_trips: 1,
   },
-})
+});
 // data.predicted_earnings_per_hour → prédiction $/h basée sur le passé
 // data.similar[]  → liste avec .similarity (cosinus), .surge_class, etc.
 ```
@@ -134,11 +138,11 @@ const { data } = await supabase.functions.invoke('context-embeddings', {
 await supabase.functions.invoke('context-embeddings', {
   body: {
     action: 'update_outcome',
-    id: vectorId,          // retourné lors du stockage
+    id: vectorId, // retourné lors du stockage
     actual_earnings_per_hour: earnings / hours,
     trip_count: 1,
   },
-})
+});
 ```
 
 ---

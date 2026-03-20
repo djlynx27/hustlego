@@ -1,6 +1,7 @@
 import { CitySelect } from '@/components/CitySelect';
 import { DemandBadge } from '@/components/DemandBadge';
 import { NavigationSheet } from '@/components/NavigationSheet';
+import { ShiftOptimizer } from '@/components/ShiftOptimizer';
 import { Input } from '@/components/ui/input';
 import {
   Select,
@@ -240,6 +241,9 @@ export default function PlanningScreen() {
         ref={listRef}
         className="flex-1 overflow-y-auto px-3 space-y-1.5 pb-4"
       >
+        {/* Weekly shift optimizer — appears above the daily slots */}
+        <ShiftOptimizer cityId={cityId} className="mb-3 mt-1" />
+
         {slots.map((slot, index) => {
           const zone = slot.zones ?? zones.find((z) => z.id === slot.zone_id);
           const dc = getDemandClass(slot.demand_score);

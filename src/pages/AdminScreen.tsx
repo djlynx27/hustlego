@@ -358,6 +358,14 @@ export default function AdminScreen() {
 
         <LearningInsightsPanel />
 
+        {/* Multi-platform & zone earnings report + ML weight calibration */}
+        <div className="space-y-1">
+          <h2 className="text-[18px] font-display font-bold flex items-center gap-2 px-1">
+            <TrendingUp className="w-5 h-5 text-primary" /> Rapport de revenus
+          </h2>
+          <EarningsReport />
+        </div>
+
         {/* Daily Reports */}
         <DailyReports />
 

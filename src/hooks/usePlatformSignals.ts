@@ -77,10 +77,12 @@ export function usePlatformSignals(
     queryFn: async () => {
       if (!zoneId) return [];
       // Use type-safe REST call since generated types don't include this new RPC yet
-      const { data, error } = await (supabase.rpc as unknown as (
-        fn: string,
-        args: Record<string, unknown>,
-      ) => Promise<{ data: unknown; error: unknown }>)('get_best_platform_for_zone', {
+      const { data, error } = await (
+        supabase.rpc as unknown as (
+          fn: string,
+          args: Record<string, unknown>
+        ) => Promise<{ data: unknown; error: unknown }>
+      )('get_best_platform_for_zone', {
         p_zone_id: zoneId,
         p_lookback: `${lookbackMin} minutes`,
       });
