@@ -1,7 +1,6 @@
 import { useQuery } from '@tanstack/react-query';
 
-const STM_KEY = import.meta.env.VITE_STM_KEY ?? '';
-const ALERTS_URL = 'https://api.stm.info/pub/od/gtfs-rt/ic/v2/serviceAlerts';
+const ALERTS_URL = '/api/stm-alerts';
 
 export interface StmTransitStatus {
   /** true si au moins une alerte de service est active */
@@ -56,8 +55,29 @@ function countGtfsEntities(buffer: ArrayBuffer): number {
 }
 
 async function fetchStmAlerts(): Promise<StmTransitStatus> {
-  // Sans clé STM : retourner un état neutre (aucune perturbation)
-  if (!STM_KEY) {
+  try {
+    const response = await fetch(ALERTS_URL);
+
+    if (!response.ok) {
+      return {
+        hasDisruption: false,
+        disruptionScore: 0,
+        alertCount: 0,
+        fetchedAt: new Date().toISOString(),
+      };
+    }
+
+    const buffer = await response.arrayBuffer();
+    const alertCount = countGtfsEntities(buffer);
+
+    return {
+      hasDisruption: alertCount > 0,
+      // 5 alertes ou plus = perturbation maximale (score 1.0)
+      disruptionScore: Math.min(1, alertCount / 5),
+      alertCount,
+      fetchedAt: new Date().toISOString(),
+    };
+  } catch {
     return {
       hasDisruption: false,
       disruptionScore: 0,
@@ -65,31 +85,12 @@ async function fetchStmAlerts(): Promise<StmTransitStatus> {
       fetchedAt: new Date().toISOString(),
     };
   }
-
-  const response = await fetch(ALERTS_URL, {
-    headers: { apikey: STM_KEY },
-  });
-
-  if (!response.ok) {
-    throw new Error(`STM alerts fetch failed (HTTP ${response.status})`);
-  }
-
-  const buffer = await response.arrayBuffer();
-  const alertCount = countGtfsEntities(buffer);
-
-  return {
-    hasDisruption: alertCount > 0,
-    // 5 alertes ou plus = perturbation maximale (score 1.0)
-    disruptionScore: Math.min(1, alertCount / 5),
-    alertCount,
-    fetchedAt: new Date().toISOString(),
-  };
 }
 
 /**
  * Hook de surveillance des alertes STM en temps réel.
  * Rafraîchi toutes les 5 minutes.
- * Si VITE_STM_KEY n'est pas défini, retourne toujours hasDisruption=false.
+ * Le fetch passe par un endpoint same-origin pour éviter les erreurs CORS.
  *
  * Inscription gratuite : https://portail.developpeurs.stm.info/
  */
@@ -99,8 +100,6 @@ export function useStmTransit() {
     queryFn: fetchStmAlerts,
     staleTime: 5 * 60 * 1000,
     refetchInterval: 5 * 60 * 1000,
-    // On ne réessaie qu'une seule fois — les erreurs CORS sont fréquentes
-    // si la clé est absente ou invalide
     retry: 1,
     retryDelay: 15_000,
   });
