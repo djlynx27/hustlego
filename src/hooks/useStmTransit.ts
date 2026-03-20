@@ -38,7 +38,9 @@ function countGtfsEntities(buffer: ArrayBuffer): number {
     let j = i + 1;
 
     while (j < bytes.length && shift < 28) {
-      const b = bytes[j++];
+      const b = bytes[j];
+      if (b === undefined) break;
+      j++;
       len |= (b & 0x7f) << shift;
       shift += 7;
       if ((b & 0x80) === 0) break;

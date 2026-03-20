@@ -55,6 +55,14 @@ interface UpdateOutcomeBody {
 
 type RequestBody = StoreBody | QueryBody | UpdateOutcomeBody;
 
+function isQueryBody(body: RequestBody): body is QueryBody {
+  return body.action === 'query';
+}
+
+function isUpdateOutcomeBody(body: RequestBody): body is UpdateOutcomeBody {
+  return body.action === 'update_outcome';
+}
+
 function vectorToPostgres(vec: number[]): string {
   return `[${vec.map((v) => v.toFixed(6)).join(',')}]`;
 }
@@ -103,7 +111,7 @@ serve(async (req: Request) => {
       const body: RequestBody = await req.json();
 
       // ── Action: query similar contexts ──────────────────────────────────
-      if (body.action === 'query') {
+      if (isQueryBody(body)) {
         const { zone_id, context_vector, limit = 10, min_trips = 1 } = body;
 
         if (!zone_id || !context_vector?.length) {
@@ -147,7 +155,7 @@ serve(async (req: Request) => {
       }
 
       // ── Action: update outcome after trip ───────────────────────────────
-      if (body.action === 'update_outcome') {
+      if (isUpdateOutcomeBody(body)) {
         const { id, actual_earnings_per_hour, trip_count } = body;
 
         if (!id) {

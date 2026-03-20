@@ -122,8 +122,7 @@ function normalizeWeights(w: WeightConfig): WeightConfig {
  *   - Low error overall → no adjustment
  */
 function deriveGradients(
-  predictions: TripPredictionRow[],
-  currentWeights: WeightConfig
+  predictions: TripPredictionRow[]
 ): Partial<Record<keyof WeightConfig, number>> {
   if (predictions.length === 0) return {};
 
@@ -335,7 +334,7 @@ serve(async (req: Request) => {
     const accuracyPct = (accurate / rows.length) * 100;
 
     // 4. Derive gradients + apply
-    const gradients = deriveGradients(rows, currentWeights);
+    const gradients = deriveGradients(rows);
     const newWeights: WeightConfig = { ...currentWeights };
 
     for (const [key, delta] of Object.entries(gradients) as Array<

@@ -149,14 +149,11 @@ serve(async (req: Request) => {
       const hour = now.getHours();
       const dow = now.getDay();
 
-      const { data: baselineData } = await supabase.rpc<BaselineRow>(
-        'get_surge_baseline',
-        {
-          p_zone_id: zone.id,
-          p_hour: hour,
-          p_dow: dow,
-        }
-      );
+      const { data: baselineData } = await supabase.rpc('get_surge_baseline', {
+        p_zone_id: zone.id,
+        p_hour: hour,
+        p_dow: dow,
+      });
 
       const baselineScore: number =
         (baselineData as BaselineRow[] | null)?.[0]?.baseline_score ??

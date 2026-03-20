@@ -130,10 +130,12 @@ function buildBriefing(props: PreShiftBriefingProps): {
   // ── Événements Ticketmaster ───────────────────────────────────────────────
   if (tmEvents.length > 0 && upcomingEvents.length === 0) {
     const first = tmEvents[0];
-    bullets.push(
-      `🎟️ TM: ${first.name} @ ${first.venueName} — surveille les sorties.`
-    );
-    urgencyScore += 1;
+    if (first) {
+      bullets.push(
+        `🎟️ TM: ${first.name} @ ${first.venueName} — surveille les sorties.`
+      );
+      urgencyScore += 1;
+    }
   }
 
   // ── Top zones ────────────────────────────────────────────────────────────
@@ -184,7 +186,7 @@ function buildBriefing(props: PreShiftBriefingProps): {
           ? `🟡 Opportunités présentes.${eventName ? ` ${eventName} en cours.` : ''} Zone : ${bestZone?.name ?? '–'}.`
           : `🟢 Shift tranquille. Optimise avec ${bestZone?.name ?? 'la meilleure zone disponible'}.`;
 
-  const strategyMap: Record<string, string> = {
+  const strategyMap: Record<typeof urgency, string> = {
     critical: `Priorité absolue aux zones métro et événements. Ne quitte pas le périmètre central. Attends les pics de 15 min avant de bouger.`,
     high: `Reste mobile entre les 3 top zones. Active les alertes. Repositionne-toi 20 min avant les fins d'événements.`,
     medium: `Travaille le créneau ${topZones[0]?.name ?? 'central'} et surveille les sorties d'événements. Garde un œil sur les alertes STM.`,

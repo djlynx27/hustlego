@@ -1,6 +1,8 @@
 import { buildFallbackYulStatus, type YulStatus } from '@/lib/yulStatus';
 import { useQuery } from '@tanstack/react-query';
 
+export type { YulStatus } from '@/lib/yulStatus';
+
 const YUL_STATUS_URL = '/api/yul-flights';
 
 async function fetchYulStatus(): Promise<YulStatus> {
