@@ -10,6 +10,8 @@ export default defineConfig(({ mode }) => {
   const stmProxyHeaders = env.VITE_STM_KEY
     ? { apikey: env.VITE_STM_KEY }
     : undefined;
+  const aviationstackKey =
+    env.AVIATIONSTACK_API_KEY || env.VITE_AVIATIONSTACK_KEY;
 
   return {
     resolve: {
@@ -52,6 +54,22 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
           headers: stmProxyHeaders,
           rewrite: () => '/pub/od/gtfs-rt/ic/v2/serviceAlerts',
+        },
+        '/api/yul-flights': {
+          target: 'https://api.aviationstack.com',
+          changeOrigin: true,
+          rewrite: () => {
+            if (!aviationstackKey) {
+              return '/v1/flights?arr_iata=YUL&flight_status=active&limit=0';
+            }
+            const params = new URLSearchParams({
+              access_key: aviationstackKey,
+              arr_iata: 'YUL',
+              flight_status: 'active',
+              limit: '50',
+            });
+            return `/v1/flights?${params.toString()}`;
+          },
         },
       },
     },
