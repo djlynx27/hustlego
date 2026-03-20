@@ -35,6 +35,19 @@ CREATE TABLE IF NOT EXISTS public.weight_history (
   )
 );
 
+ALTER TABLE public.weight_history
+  ADD COLUMN IF NOT EXISTS w_time NUMERIC(6,4) NOT NULL DEFAULT 0.25,
+  ADD COLUMN IF NOT EXISTS w_day NUMERIC(6,4) NOT NULL DEFAULT 0.15,
+  ADD COLUMN IF NOT EXISTS w_weather NUMERIC(6,4) NOT NULL DEFAULT 0.15,
+  ADD COLUMN IF NOT EXISTS w_events NUMERIC(6,4) NOT NULL DEFAULT 0.15,
+  ADD COLUMN IF NOT EXISTS w_historical NUMERIC(6,4) NOT NULL DEFAULT 0.10,
+  ADD COLUMN IF NOT EXISTS trip_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN IF NOT EXISTS mae NUMERIC(6,3),
+  ADD COLUMN IF NOT EXISTS accuracy_pct NUMERIC(5,2),
+  ADD COLUMN IF NOT EXISTS source TEXT NOT NULL DEFAULT 'auto',
+  ADD COLUMN IF NOT EXISTS note TEXT,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
+
 CREATE INDEX IF NOT EXISTS idx_weight_history_created_at
   ON public.weight_history(created_at DESC);
 
@@ -65,6 +78,20 @@ CREATE TABLE IF NOT EXISTS public.trip_predictions (
   day_of_week               SMALLINT,
   created_at                TIMESTAMPTZ NOT NULL DEFAULT now()
 );
+
+ALTER TABLE public.trip_predictions
+  ADD COLUMN IF NOT EXISTS trip_id UUID,
+  ADD COLUMN IF NOT EXISTS zone_id TEXT,
+  ADD COLUMN IF NOT EXISTS zone_score_at_start NUMERIC(6,2),
+  ADD COLUMN IF NOT EXISTS predicted_earnings_per_h NUMERIC(8,2),
+  ADD COLUMN IF NOT EXISTS actual_earnings_per_h NUMERIC(8,2),
+  ADD COLUMN IF NOT EXISTS error NUMERIC(8,3),
+  ADD COLUMN IF NOT EXISTS abs_error NUMERIC(8,3),
+  ADD COLUMN IF NOT EXISTS context_vector_id UUID,
+  ADD COLUMN IF NOT EXISTS shift_date DATE,
+  ADD COLUMN IF NOT EXISTS hour_of_day SMALLINT,
+  ADD COLUMN IF NOT EXISTS day_of_week SMALLINT,
+  ADD COLUMN IF NOT EXISTS created_at TIMESTAMPTZ NOT NULL DEFAULT now();
 
 CREATE INDEX IF NOT EXISTS idx_trip_predictions_trip_id
   ON public.trip_predictions(trip_id);

@@ -183,12 +183,13 @@ CREATE POLICY "notifications_update"
 
 -- ── pg_cron: cleanup old platform_signals weekly ──────────────────────────────
 -- Requires pg_cron extension (enabled by default in Supabase pro tier).
-DO $$
+DO $platform_signals_cleanup$
 BEGIN
   IF EXISTS (SELECT 1 FROM pg_extension WHERE extname = 'pg_cron') THEN
     -- Remove any existing schedule before adding
-    PERFORM cron.unschedule('cleanup-platform-signals')
-      WHERE EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'cleanup-platform-signals');
+    IF EXISTS (SELECT 1 FROM cron.job WHERE jobname = 'cleanup-platform-signals') THEN
+      PERFORM cron.unschedule('cleanup-platform-signals');
+    END IF;
 
     PERFORM cron.schedule(
       'cleanup-platform-signals',
@@ -196,4 +197,4 @@ BEGIN
       $$SELECT public.cleanup_old_platform_signals()$$
     );
   END IF;
-END $$;
+END $platform_signals_cleanup$;

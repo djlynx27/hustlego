@@ -11,7 +11,7 @@ create extension if not exists vector;
 -- ── Main table ────────────────────────────────────────────────────────────────
 create table if not exists public.zone_context_vectors (
   id                       uuid primary key default gen_random_uuid(),
-  zone_id                  uuid not null references public.zones(id) on delete cascade,
+  zone_id                  text not null references public.zones(id) on delete cascade,
 
   -- 8D embedding: [hour_norm, dow_norm, weather, events, traffic,
   --                surge_ratio, deadhead_inv, seasonal]
@@ -85,14 +85,14 @@ create policy "context vectors service update"
  *   })
  */
 create or replace function public.find_similar_contexts(
-  p_zone_id     uuid,
+  p_zone_id     text,
   p_vector      vector(8),
   p_limit       int    default 10,
   p_min_trips   int    default 1
 )
 returns table (
   id                       uuid,
-  zone_id                  uuid,
+  zone_id                  text,
   surge_multiplier         numeric,
   surge_class              text,
   actual_earnings_per_hour numeric,
@@ -128,7 +128,7 @@ $$;
  * Used by surgeEngine to compute the normalized ratio.
  */
 create or replace function public.get_surge_baseline(
-  p_zone_id   uuid,
+  p_zone_id   text,
   p_hour_slot int,   -- 0–23
   p_dow       int    -- 0=Sun…6=Sat
 )
@@ -170,7 +170,7 @@ begin
     perform cron.schedule(
       'cleanup-context-vectors',
       '0 3 * * *',
-      'select public.cleanup_context_vectors()'
+      'select public.cleanup_old_context_vectors()'
     );
   end if;
 exception when others then
