@@ -13,30 +13,17 @@
  */
 
 import { cn } from '@/lib/utils';
+import type {
+  SimilarContextMatch,
+  SimilarContextsResult,
+} from '@/lib/learningSync';
 import { useState } from 'react';
 
 // ── Types (mirroring what useDemandScores returns) ────────────────────────────
 
-interface ContextMatch {
-  id: string;
-  zone_id: string;
-  similarity: number;
-  surge_multiplier: number | null;
-  surge_class: string | null;
-  earnings_per_hour: number | null;
-  trip_count: number | null;
-}
-
-interface ContextQueryResult {
-  ok: boolean;
-  matches: ContextMatch[];
-  averageEarningsPerHour: number;
-  averageSimilarity: number;
-}
-
 export interface ContextSignal {
   zoneId: string;
-  result: ContextQueryResult;
+  result: SimilarContextsResult;
 }
 
 interface ContextSimilarityPanelProps {
@@ -55,19 +42,6 @@ function similarityLabel(s: number): string {
   if (s >= 0.92) return 'Très similaire';
   if (s >= 0.8) return 'Similaire';
   return 'Partiellement';
-}
-
-function surgeClassColor(cls: string | null): string {
-  switch (cls) {
-    case 'peak':
-      return 'text-red-400';
-    case 'high':
-      return 'text-orange-400';
-    case 'elevated':
-      return 'text-yellow-400';
-    default:
-      return 'text-muted-foreground';
-  }
 }
 
 // ── Main component ─────────────────────────────────────────────────────────────
@@ -202,32 +176,17 @@ export function ContextSimilarityPanel({
                     </span>{' '}
                     — {similarityLabel(topMatch.similarity)}
                   </span>
-                  {topMatch.surge_class &&
-                    topMatch.surge_class !== 'normal' && (
-                      <span
-                        className={cn(
-                          'text-[12px] font-body block',
-                          surgeClassColor(topMatch.surge_class)
-                        )}
-                      >
-                        Surge {topMatch.surge_multiplier?.toFixed(2)}× —{' '}
-                        {topMatch.surge_class.toUpperCase()}
-                      </span>
-                    )}
                 </div>
-                {topMatch.earnings_per_hour !== null && (
+                {topMatch.actualEarningsPerHour !== null && (
                   <span className="text-[16px] font-mono font-bold text-primary flex-shrink-0">
-                    ${formatEph(topMatch.earnings_per_hour)}/h
+                    ${formatEph(topMatch.actualEarningsPerHour)}/h
                   </span>
                 )}
               </div>
-              {(topMatch.trip_count ?? 0) > 0 && (
-                <p className="text-[11px] text-muted-foreground font-body mt-1">
-                  Basé sur {topMatch.trip_count} course
-                  {(topMatch.trip_count ?? 0) > 1 ? 's' : ''} enregistrée
-                  {(topMatch.trip_count ?? 0) > 1 ? 's' : ''}
-                </p>
-              )}
+              <p className="text-[11px] text-muted-foreground font-body mt-1">
+                Contexte enregistré le{' '}
+                {new Date(topMatch.createdAt).toLocaleDateString('fr-CA')}
+              </p>
             </div>
           )}
 
@@ -238,7 +197,7 @@ export function ContextSimilarityPanel({
                 Toutes les correspondances
               </p>
               <div className="space-y-1.5">
-                {matches.map((m, i) => (
+                {matches.map((m: SimilarContextMatch, i) => (
                   <div key={m.id ?? i} className="flex items-center gap-2">
                     <span className="text-[10px] text-muted-foreground w-4">
                       {i + 1}.
@@ -252,19 +211,9 @@ export function ContextSimilarityPanel({
                     <span className="text-[11px] font-mono text-muted-foreground w-8 text-right">
                       {Math.round(m.similarity * 100)}%
                     </span>
-                    {m.earnings_per_hour !== null && (
+                    {m.actualEarningsPerHour !== null && (
                       <span className="text-[11px] font-mono font-semibold text-foreground w-16 text-right">
-                        ${formatEph(m.earnings_per_hour)}/h
-                      </span>
-                    )}
-                    {m.surge_class && m.surge_class !== 'normal' && (
-                      <span
-                        className={cn(
-                          'text-[10px] font-bold',
-                          surgeClassColor(m.surge_class)
-                        )}
-                      >
-                        {m.surge_class.toUpperCase()}
+                        ${formatEph(m.actualEarningsPerHour)}/h
                       </span>
                     )}
                   </div>

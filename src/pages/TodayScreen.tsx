@@ -68,6 +68,10 @@ const CITY_CENTERS: Record<string, [number, number]> = {
   lng: [45.5252, -73.5205],
 };
 
+function getCityCenter(cityId: string): [number, number] {
+  return CITY_CENTERS[cityId] ?? CITY_CENTERS.mtl ?? [45.5017, -73.5673];
+}
+
 // Score multipliers by zone type, depending on driver mode
 const RIDESHARE_BOOST: Record<string, number> = {
   tourisme: 1.3,
@@ -374,7 +378,7 @@ export default function TodayScreen() {
 
   const mapCenter = heroZone
     ? ([heroZone.latitude, heroZone.longitude] as [number, number])
-    : (CITY_CENTERS[cityId] ?? CITY_CENTERS.mtl);
+    : getCityCenter(cityId);
 
   const mapMarkers = useMemo(() => {
     return modeZones.map((z) => ({
