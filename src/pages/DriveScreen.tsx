@@ -3,7 +3,9 @@ import { DeadTimeTimer } from '@/components/DeadTimeTimer';
 import { DemandBadge } from '@/components/DemandBadge';
 import { DrivingHUD } from '@/components/DrivingHUD';
 import { NavigationSheet } from '@/components/NavigationSheet';
+import { PlatformArbitrage } from '@/components/PlatformArbitrage';
 import { ScoreFactorIcons } from '@/components/ScoreFactorIcons';
+import { SurgeIndicator } from '@/components/SurgeIndicator';
 import { Button } from '@/components/ui/button';
 import { WeeklyGoalDisplay } from '@/components/WeeklyGoal';
 import { useI18n } from '@/contexts/I18nContext';
@@ -22,7 +24,7 @@ export default function DriveScreen() {
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
   const { data: cities = [] } = useCities();
-  const { scores, factors, zones } = useDemandScores(cityId);
+  const { scores, factors, zones, surgeMap } = useDemandScores(cityId);
   const { location, status } = useUserLocation(15000);
   const [fullScreen, setFullScreen] = useState(false);
   const [navZone, setNavZone] = useState<{
@@ -214,8 +216,19 @@ export default function DriveScreen() {
                 )}
               </div>
 
-              <div className="flex justify-center">
+              <div className="flex justify-center items-center gap-3">
                 <DemandBadge score={heroZone.score} size="giant" />
+                {(() => {
+                  const surge = surgeMap?.get(heroZone.id);
+                  return surge && surge.surgeClass !== 'normal' ? (
+                    <SurgeIndicator
+                      surgeClass={surge.surgeClass}
+                      multiplier={surge.surgeMultiplier}
+                      size="lg"
+                      showMultiplier
+                    />
+                  ) : null;
+                })()}
               </div>
 
               <div className="space-y-2 pt-2">
@@ -252,6 +265,12 @@ export default function DriveScreen() {
                     🧭 {t('waze')}
                   </a>
                 </Button>
+                {/* Platform arbitrage for hero zone */}
+                <PlatformArbitrage
+                  zoneId={heroZone.id}
+                  zoneScore={heroZone.score}
+                  compact={false}
+                />
               </div>
             </>
           ) : (

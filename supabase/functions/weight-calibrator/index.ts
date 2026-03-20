@@ -213,24 +213,61 @@ serve(async (req: Request) => {
     const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, serviceKey);
 
-    // ── GET: return current weights ───────────────────────────────────────────
+    // ── GET: return current weights + history ─────────────────────────────────
     if (req.method === 'GET') {
       const { data, error } = await supabase.rpc('get_latest_weights');
       if (error) throw error;
 
-      const row = (data as WeightHistoryRow[] | null)?.[0];
-      const weights = row
+      const rows =
+        (data as
+          | (WeightHistoryRow & {
+              mae: number | null;
+              accuracy_pct: number | null;
+              trip_count: number | null;
+              source: string | null;
+              created_at: string | null;
+            })[]
+          | null) ?? [];
+
+      const row = rows[0] ?? null;
+
+      const flat = row
         ? {
-            timeOfDay: Number(row.w_time),
-            dayOfWeek: Number(row.w_day),
-            weather: Number(row.w_weather),
-            events: Number(row.w_events),
-            historicalEarnings: Number(row.w_historical),
+            w_time: Number(row.w_time),
+            w_day: Number(row.w_day),
+            w_weather: Number(row.w_weather),
+            w_events: Number(row.w_events),
+            w_historical: Number(row.w_historical),
+            mae: row.mae,
+            accuracy_pct: row.accuracy_pct,
+            trip_count: row.trip_count,
+            source: row.source ?? 'db',
+            created_at: row.created_at,
           }
-        : DEFAULT_WEIGHTS;
+        : {
+            w_time: DEFAULT_WEIGHTS.timeOfDay,
+            w_day: DEFAULT_WEIGHTS.dayOfWeek,
+            w_weather: DEFAULT_WEIGHTS.weather,
+            w_events: DEFAULT_WEIGHTS.events,
+            w_historical: DEFAULT_WEIGHTS.historicalEarnings,
+            mae: null,
+            accuracy_pct: null,
+            trip_count: null,
+            source: 'default',
+            created_at: null,
+          };
+
+      // Fetch calibration history (last 5)
+      const { data: histData } = await supabase
+        .from('weight_history')
+        .select(
+          'w_time, w_day, w_weather, w_events, w_historical, mae, accuracy_pct, trip_count, source, created_at'
+        )
+        .order('created_at', { ascending: false })
+        .limit(5);
 
       return new Response(
-        JSON.stringify({ weights, source: row ? 'db' : 'default' }),
+        JSON.stringify({ ...flat, history: histData ?? [] }),
         {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
@@ -337,12 +374,27 @@ serve(async (req: Request) => {
     return new Response(
       JSON.stringify({
         ok: true,
+        trip_count: rows.length,
         trips_analyzed: rows.length,
         mae: Math.round(mae * 100) / 100,
         accuracy_pct: Math.round(accuracyPct * 10) / 10,
         previous_weights: currentWeights,
-        new_weights: normalized,
-        deltas,
+        new_weights: {
+          w_time: normalized.timeOfDay,
+          w_day: normalized.dayOfWeek,
+          w_weather: normalized.weather,
+          w_events: normalized.events,
+          w_historical: normalized.historicalEarnings,
+          mae: Math.round(mae * 100) / 100,
+          accuracy_pct: Math.round(accuracyPct * 10) / 10,
+        },
+        deltas: {
+          w_time: deltas['timeOfDay'] ?? 0,
+          w_day: deltas['dayOfWeek'] ?? 0,
+          w_weather: deltas['weather'] ?? 0,
+          w_events: deltas['events'] ?? 0,
+          w_historical: deltas['historicalEarnings'] ?? 0,
+        },
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

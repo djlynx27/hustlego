@@ -1,4 +1,5 @@
 import { CitySelect } from '@/components/CitySelect';
+import { ContextSimilarityPanel } from '@/components/ContextSimilarityPanel';
 import { DeadTimeTimer } from '@/components/DeadTimeTimer';
 import { DemandBadge } from '@/components/DemandBadge';
 import { MultiAppStatus } from '@/components/MultiAppStatus';
@@ -133,6 +134,7 @@ export default function TodayScreen() {
     relevantTmEvents,
     stmStatus,
     surgeMap,
+    similarContextSignals,
   } = useDemandScores(cityId);
   const { data: holiday } = useHoliday(getCurrentSlotTime(now).date);
   const { data: habsGame } = useHabsGame(getCurrentSlotTime(now).date);
@@ -944,6 +946,12 @@ export default function TodayScreen() {
                     zoneId={zone.id}
                     zoneScore={zone.arrivalScore}
                     compact
+                    className="mt-1"
+                  />
+                  {/* Context similarity — pgvector k-NN */}
+                  <ContextSimilarityPanel
+                    zoneId={zone.id}
+                    similarContextSignals={similarContextSignals}
                     className="mt-1"
                   />
                 </div>

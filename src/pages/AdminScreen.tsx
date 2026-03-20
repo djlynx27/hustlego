@@ -19,6 +19,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Progress } from '@/components/ui/progress';
 import { UniversalFileAnalyzer } from '@/components/UniversalFileAnalyzer';
+import { WeightCalibratorPanel } from '@/components/WeightCalibratorPanel';
 import { useI18n } from '@/contexts/I18nContext';
 import {
   useAddCity,
@@ -364,6 +365,14 @@ export default function AdminScreen() {
             <TrendingUp className="w-5 h-5 text-primary" /> Rapport de revenus
           </h2>
           <EarningsReport />
+        </div>
+
+        {/* Weight calibrator admin panel */}
+        <div className="space-y-1">
+          <h2 className="text-[18px] font-display font-bold flex items-center gap-2 px-1">
+            <Brain className="w-5 h-5 text-primary" /> Calibration IA
+          </h2>
+          <WeightCalibratorPanel />
         </div>
 
         {/* Daily Reports */}
