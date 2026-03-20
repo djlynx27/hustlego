@@ -12,11 +12,11 @@
  *   <ContextSimilarityPanel zoneId={zone.id} similarContextSignals={similarContextSignals} />
  */
 
-import { cn } from '@/lib/utils';
 import type {
   SimilarContextMatch,
   SimilarContextsResult,
 } from '@/lib/learningSync';
+import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
 // ── Types (mirroring what useDemandScores returns) ────────────────────────────
