@@ -40,7 +40,11 @@ declare module 'npm:web-push@3.6.7' {
   }
 
   interface WebPushModule {
-    setVapidDetails(subject: string, publicKey: string, privateKey: string): void;
+    setVapidDetails(
+      subject: string,
+      publicKey: string,
+      privateKey: string
+    ): void;
     sendNotification(
       subscription: PushSubscriptionLike,
       payload?: string

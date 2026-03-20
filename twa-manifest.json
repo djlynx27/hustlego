@@ -1,6 +1,4 @@
 {
-  "$schema": "https://raw.githubusercontent.com/GoogleChromeLabs/bubblewrap/main/packages/core/schema/twa-manifest.schema.json",
-
   "packageId": "app.hustlego.driver",
   "host": "hustlego.vercel.app",
   "name": "HustleGo — Chauffeur",

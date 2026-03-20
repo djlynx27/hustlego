@@ -1,7 +1,7 @@
 import react from '@vitejs/plugin-react';
-import { buildFallbackYulStatus } from './src/lib/yulStatus';
 import { defineConfig, loadEnv } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { buildFallbackYulStatus } from './src/lib/yulStatus';
 
 // https://vite.dev/config/
 import { resolve } from 'path';
