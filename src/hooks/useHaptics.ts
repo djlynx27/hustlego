@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+
 /**
  * Haptic feedback via the Web Vibration API.
  *
@@ -29,6 +31,27 @@ const PATTERNS: Record<HapticEvent, VibratePattern> = {
   warning: [150, 80, 150], // — — (warning)
 };
 
+let hasUserGesture = false;
+let gestureListenersAttached = false;
+
+function markUserGesture() {
+  hasUserGesture = true;
+}
+
+function ensureGestureListeners() {
+  if (typeof window === 'undefined' || gestureListenersAttached) return;
+
+  gestureListenersAttached = true;
+  window.addEventListener('pointerdown', markUserGesture, {
+    passive: true,
+    capture: true,
+  });
+  window.addEventListener('keydown', markUserGesture, {
+    passive: true,
+    capture: true,
+  });
+}
+
 export interface HapticsController {
   /** Trigger a named haptic pattern */
   vibrate: (event: HapticEvent) => void;
@@ -42,13 +65,17 @@ export function useHaptics(): HapticsController {
   const isSupported =
     typeof navigator !== 'undefined' && 'vibrate' in navigator;
 
+  useEffect(() => {
+    ensureGestureListeners();
+  }, []);
+
   function vibrate(event: HapticEvent): void {
-    if (!isSupported) return;
+    if (!isSupported || !hasUserGesture) return;
     navigator.vibrate(PATTERNS[event]);
   }
 
   function stop(): void {
-    if (!isSupported) return;
+    if (!isSupported || !hasUserGesture) return;
     navigator.vibrate(0);
   }
 
