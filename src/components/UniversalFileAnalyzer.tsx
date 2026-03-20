@@ -26,7 +26,7 @@ import {
   ScanLine,
   Upload,
 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 const ACCEPTED_TYPES = '.jpg,.jpeg,.png,.webp,.gif,.pdf,.docx,.xlsx,.csv,.txt';
