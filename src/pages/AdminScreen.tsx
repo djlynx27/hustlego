@@ -76,9 +76,32 @@ interface AIAnalysisResponse {
   recommendations?: AIRecommendation[];
 }
 
+const LAST_AI_ANALYSIS_STORAGE_KEY = 'hustlego_last_ai_analysis';
+
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) return error.message;
   return fallback;
+}
+
+function getStoredAiAnalysisTimestamp() {
+  if (typeof window === 'undefined') return null;
+
+  try {
+    const raw = localStorage.getItem(LAST_AI_ANALYSIS_STORAGE_KEY);
+    return raw && !Number.isNaN(Date.parse(raw)) ? raw : null;
+  } catch {
+    return null;
+  }
+}
+
+function storeAiAnalysisTimestamp(value: string) {
+  if (typeof window === 'undefined') return;
+
+  try {
+    localStorage.setItem(LAST_AI_ANALYSIS_STORAGE_KEY, value);
+  } catch {
+    // Ignore storage failures and keep UI functional.
+  }
 }
 
 function logAdminGeolocationIssue(...args: unknown[]) {
@@ -106,7 +129,9 @@ export default function AdminScreen() {
   } | null>(null);
   const [aiLoading, setAiLoading] = useState(false);
   const [aiResults, setAiResults] = useState<AIRecommendation[] | null>(null);
-  const [lastAnalyzed, setLastAnalyzed] = useState<string | null>(null);
+  const [lastAnalyzed, setLastAnalyzed] = useState<string | null>(() =>
+    getStoredAiAnalysisTimestamp()
+  );
 
   const agents = useMemo<LearningAgent[]>(() => getDefaultLearningAgents(), []);
   const [agentStates, setAgentStates] = useState<
@@ -131,18 +156,8 @@ export default function AdminScreen() {
     lng: number;
   } | null>(null);
 
-  // Fetch last AI analysis date + recent trips for drift / learning state
+  // Fetch recent trips for drift / learning state.
   useEffect(() => {
-    supabase
-      .from('score_history')
-      .select('created_at')
-      .like('reason', 'AI analysis%')
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .then(({ data }) => {
-        if (data?.[0]) setLastAnalyzed(data[0].created_at);
-      });
-
     supabase
       .from('trips')
       .select('*, zones(name, type, current_score)')
@@ -281,7 +296,9 @@ export default function AdminScreen() {
       const payload = (data ?? {}) as AIAnalysisResponse;
       if (payload.error) throw new Error(payload.error);
       setAiResults(payload.recommendations ?? []);
-      setLastAnalyzed(new Date().toISOString());
+      const analysisTimestamp = new Date().toISOString();
+      setLastAnalyzed(analysisTimestamp);
+      storeAiAnalysisTimestamp(analysisTimestamp);
       toast.success(
         `${t('aiAnalysisDone')} — ${payload.recommendations?.length || 0} ${t('aiRecommendations')}`
       );

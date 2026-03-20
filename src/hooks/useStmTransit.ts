@@ -1,6 +1,8 @@
 import { useQuery } from '@tanstack/react-query';
 
 const ALERTS_URL = '/api/stm-alerts';
+const SHOULD_SKIP_STM_DEV_FETCH =
+  import.meta.env.DEV && import.meta.env.VITE_ENABLE_STM_DEV_FETCH !== 'true';
 
 export interface StmTransitStatus {
   /** true si au moins une alerte de service est active */
@@ -55,6 +57,15 @@ function countGtfsEntities(buffer: ArrayBuffer): number {
 }
 
 async function fetchStmAlerts(): Promise<StmTransitStatus> {
+  if (SHOULD_SKIP_STM_DEV_FETCH) {
+    return {
+      hasDisruption: false,
+      disruptionScore: 0,
+      alertCount: 0,
+      fetchedAt: new Date().toISOString(),
+    };
+  }
+
   try {
     const response = await fetch(ALERTS_URL);
 

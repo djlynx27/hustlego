@@ -1,7 +1,5 @@
 import { Switch } from '@/components/ui/switch';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
-import { supabase } from '@/integrations/supabase/client';
-import type { TablesInsert } from '@/integrations/supabase/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -33,6 +31,60 @@ interface Earning {
   created_at: string;
 }
 
+interface EarningInsert {
+  date: string;
+  amount: number;
+  km: number;
+  duration_min: number;
+  note?: string | null;
+}
+
+const EARNINGS_STORAGE_KEY = 'hustlego_taxi_earnings';
+
+function readStoredEarnings(): Earning[] {
+  if (typeof window === 'undefined') return [];
+
+  try {
+    const raw = localStorage.getItem(EARNINGS_STORAGE_KEY);
+    if (!raw) return [];
+
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+
+    return parsed
+      .filter(
+        (item): item is Partial<Earning> =>
+          typeof item === 'object' && item !== null
+      )
+      .map((item, index) => ({
+        id:
+          typeof item.id === 'string' && item.id.length > 0
+            ? item.id
+            : `earning-${index}-${Date.now()}`,
+        date:
+          typeof item.date === 'string'
+            ? item.date
+            : new Date().toISOString().split('T')[0],
+        amount: Number(item.amount ?? 0),
+        km: Number(item.km ?? 0),
+        duration_min: Number(item.duration_min ?? 0),
+        note: typeof item.note === 'string' ? item.note : '',
+        created_at:
+          typeof item.created_at === 'string' && item.created_at.length > 0
+            ? item.created_at
+            : new Date().toISOString(),
+      }))
+      .sort((left, right) => right.date.localeCompare(left.date));
+  } catch {
+    return [];
+  }
+}
+
+function writeStoredEarnings(entries: Earning[]) {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(EARNINGS_STORAGE_KEY, JSON.stringify(entries));
+}
+
 // ── Hooks ─────────────────────────────────────────────────────────────
 function useEarnings(period: 'day' | 'week' | 'month') {
   const now = new Date();
@@ -52,13 +104,7 @@ function useEarnings(period: 'day' | 'week' | 'month') {
   return useQuery<Earning[]>({
     queryKey: ['earnings', period],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('earnings')
-        .select('*')
-        .gte('date', from)
-        .order('date', { ascending: false });
-      if (error) throw error;
-      return (data ?? []) as unknown as Earning[];
+      return readStoredEarnings().filter((entry) => entry.date >= from);
     },
   });
 }
@@ -66,9 +112,22 @@ function useEarnings(period: 'day' | 'week' | 'month') {
 function useAddEarning() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (entry: TablesInsert<'earnings'>) => {
-      const { error } = await supabase.from('earnings').insert(entry);
-      if (error) throw error;
+    mutationFn: async (entry: EarningInsert) => {
+      const nextEntry: Earning = {
+        id:
+          typeof crypto !== 'undefined' &&
+          typeof crypto.randomUUID === 'function'
+            ? crypto.randomUUID()
+            : `earning-${Date.now()}-${Math.round(Math.random() * 1e6)}`,
+        date: entry.date,
+        amount: entry.amount,
+        km: entry.km,
+        duration_min: entry.duration_min,
+        note: entry.note ?? '',
+        created_at: new Date().toISOString(),
+      };
+
+      writeStoredEarnings([nextEntry, ...readStoredEarnings()]);
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['earnings'] }),
   });
