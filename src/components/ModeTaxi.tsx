@@ -1,6 +1,7 @@
 import { Switch } from '@/components/ui/switch';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { supabase } from '@/integrations/supabase/client';
+import type { TablesInsert } from '@/integrations/supabase/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -65,18 +66,17 @@ function useEarnings(period: 'day' | 'week' | 'month') {
 function useAddEarning() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (entry: {
-      date: string;
-      amount: number;
-      km: number;
-      duration_min: number;
-      note: string;
-    }) => {
-      const { error } = await supabase.from('earnings').insert(entry as any);
+    mutationFn: async (entry: TablesInsert<'earnings'>) => {
+      const { error } = await supabase.from('earnings').insert(entry);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['earnings'] }),
   });
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
 }
 
 // ── Flat Rates ────────────────────────────────────────────────────────
@@ -154,7 +154,7 @@ export function ModeTaxi() {
     }
     const id = setInterval(() => setDwellSeconds((s) => s + 1), 1000);
     return () => clearInterval(id);
-  }, [nearbyZone?.zone.id]);
+  }, [nearbyZone]);
 
   const estimatedWait = nearbyZone
     ? nearbyZone.score > 70
@@ -195,8 +195,8 @@ export function ModeTaxi() {
         note: '',
       });
       toast.success('Entrée ajoutée');
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Impossible d'ajouter l'entrée"));
     }
   };
 
@@ -242,8 +242,8 @@ export function ModeTaxi() {
       toast.success(
         `Trajet enregistré: ${km.toFixed(1)} km, ${durationMin} min`
       );
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Impossible d'enregistrer le trajet"));
     }
     setTripStart(null);
   }, [tripStart, userLocation, addEarning, experimentMode]);

@@ -32,6 +32,12 @@ import { toast } from 'sonner';
 const MapboxHeatmap = lazy(() => import('@/components/MapboxHeatmap'));
 
 const ZONE_TYPES = Constants.public.Enums.zone_type;
+type ZoneType = (typeof ZONE_TYPES)[number];
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
 
 const CITY_CENTERS: Record<string, [number, number]> = {
   mtl: [45.5017, -73.5673],
@@ -90,15 +96,15 @@ export default function ZonesScreen() {
         await addZone.mutateAsync({
           city_id: cityId,
           name: form.name,
-          type: form.type as any,
+          type: form.type as ZoneType,
           latitude: parseFloat(form.latitude),
           longitude: parseFloat(form.longitude),
         });
       }
       toast.success(t('save'));
       setShowDialog(false);
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t('save')));
     }
   }
 
@@ -106,8 +112,8 @@ export default function ZonesScreen() {
     try {
       await deleteZone.mutateAsync(id);
       toast.success(t('deleteZone'));
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t('deleteZone')));
     }
   }
 

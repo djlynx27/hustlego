@@ -31,6 +31,14 @@ type DemandPatternInsert = TablesInsert<'demand_patterns'>;
 type SimilarContextRpcArgs =
   Database['public']['Functions']['match_similar_contexts']['Args'];
 
+type SimilarContextRpcRow = {
+  id: number | string;
+  zone_id: string;
+  actual_earnings_per_hour: number | string | null;
+  similarity: number | string | null;
+  created_at: string;
+};
+
 export interface SimilarContextMatch {
   id: number;
   zoneId: string;
@@ -75,6 +83,11 @@ function clamp01(value: number) {
 
 function serializeContextVector(vector: number[]) {
   return `[${vector.map((value) => round(value, 6).toString()).join(',')}]`;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
 }
 
 export function buildSimilarContextRpcArgs(
@@ -381,7 +394,7 @@ export async function syncLearningAggregates(
       },
       message: 'Patterns EMA, croyances et poids synchronisés.',
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       ok: false,
       syncedCounts: {
@@ -391,7 +404,7 @@ export async function syncLearningAggregates(
         demandPatterns: 0,
         sessionZones: 0,
       },
-      message: error?.message ?? 'Sync Supabase impossible.',
+      message: getErrorMessage(error, 'Sync Supabase impossible.'),
     };
   }
 }
@@ -457,11 +470,11 @@ export async function syncShiftLearning(
       },
       message: 'Shift, prédictions et patterns synchronisés vers Supabase.',
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     return {
       ok: false,
       syncedCounts: aggregateResult.syncedCounts,
-      message: error?.message ?? 'Sync du shift impossible.',
+      message: getErrorMessage(error, 'Sync du shift impossible.'),
     };
   }
 }
@@ -485,7 +498,9 @@ export async function findSimilarContextsForTrip(
     const { data, error } = await supabase.rpc('match_similar_contexts', args);
     if (error) throw error;
 
-    const matches: SimilarContextMatch[] = (data ?? []).map((row) => ({
+    const matches: SimilarContextMatch[] = (
+      (data ?? []) as SimilarContextRpcRow[]
+    ).map((row) => ({
       id: Number(row.id),
       zoneId: row.zone_id,
       actualEarningsPerHour: round(Number(row.actual_earnings_per_hour ?? 0)),
@@ -521,8 +536,12 @@ export async function findSimilarContextsForTrip(
           ? 'Contextes similaires récupérés.'
           : 'Aucun contexte similaire trouvé pour cette zone.',
     };
-  } catch (error: any) {
-    const rawMessage = String(error?.message ?? '').toLowerCase();
+  } catch (error: unknown) {
+    const message = getErrorMessage(
+      error,
+      'Recherche de contextes similaires impossible.'
+    );
+    const rawMessage = message.toLowerCase();
     const migrationMissing =
       rawMessage.includes('match_similar_contexts') ||
       rawMessage.includes('function') ||
@@ -536,7 +555,7 @@ export async function findSimilarContextsForTrip(
       averageSimilarity: 0,
       message: migrationMissing
         ? 'La recherche de contextes similaires sera disponible après application de la migration Supabase.'
-        : (error?.message ?? 'Recherche de contextes similaires impossible.'),
+        : message,
     };
   }
 }
@@ -560,7 +579,9 @@ export async function findSimilarContextsForZoneContext(
     const { data, error } = await supabase.rpc('match_similar_contexts', args);
     if (error) throw error;
 
-    const matches: SimilarContextMatch[] = (data ?? []).map((row) => ({
+    const matches: SimilarContextMatch[] = (
+      (data ?? []) as SimilarContextRpcRow[]
+    ).map((row) => ({
       id: Number(row.id),
       zoneId: row.zone_id,
       actualEarningsPerHour: round(Number(row.actual_earnings_per_hour ?? 0)),
@@ -596,8 +617,12 @@ export async function findSimilarContextsForZoneContext(
           ? 'Contextes similaires récupérés.'
           : 'Aucun contexte similaire trouvé pour cette zone.',
     };
-  } catch (error: any) {
-    const rawMessage = String(error?.message ?? '').toLowerCase();
+  } catch (error: unknown) {
+    const message = getErrorMessage(
+      error,
+      'Recherche de contextes similaires impossible.'
+    );
+    const rawMessage = message.toLowerCase();
     const migrationMissing =
       rawMessage.includes('match_similar_contexts') ||
       rawMessage.includes('function') ||
@@ -611,7 +636,7 @@ export async function findSimilarContextsForZoneContext(
       averageSimilarity: 0,
       message: migrationMissing
         ? 'La recherche de contextes similaires sera disponible après application de la migration Supabase.'
-        : (error?.message ?? 'Recherche de contextes similaires impossible.'),
+        : message,
     };
   }
 }

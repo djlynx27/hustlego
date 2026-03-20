@@ -29,16 +29,17 @@ export function getDefaultLearningAgents(): LearningAgent[] {
       description:
         'Adapte la prédiction selon la tendance historique de la zone',
       weight: 0.55,
-      predict: (zone, baseScore) => {
-        const trend = zone.name.toLowerCase().includes('centre') ? 8 : 0; // placeholder
-        return Math.min(100, Math.max(0, baseScore + trend));
-      },
+      // predict retourne baseScore neutre : l'ajustement réel de tendance
+      // est calculé par learn() → zoneWeightAdjustments, appliqué dans
+      // applyLearningAgents après le mix pondéré.
+      predict: (_zone, baseScore) => baseScore,
       learn: (history) => {
+        // Gradient EMA : accumule l'écart observé/prédit pour chaque zone.
+        // Résultat : delta de correction appliqué directement au score final.
         const adj: Record<string, number> = {};
         for (const item of history) {
-          adj[item.zoneId] =
-            (adj[item.zoneId] || 0) +
-            (item.observedScore - item.expectedScore) * 0.03;
+          const delta = (item.observedScore - item.expectedScore) * 0.03;
+          adj[item.zoneId] = (adj[item.zoneId] ?? 0) + delta;
         }
         return {
           zoneWeightAdjustments: adj,
@@ -57,7 +58,7 @@ export function getDefaultLearningAgents(): LearningAgent[] {
           (hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 19) ? 1.12 : 1;
         return Math.min(100, Math.max(0, Math.round(baseScore * modifier)));
       },
-      learn: (_history) => ({
+      learn: () => ({
         zoneWeightAdjustments: {},
         lastUpdated: new Date().toISOString(),
       }),

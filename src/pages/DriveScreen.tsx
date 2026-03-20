@@ -20,6 +20,12 @@ import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
 import { Car, Crosshair, Maximize2, Minimize2, Navigation } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
+interface WakeLockNavigator extends Navigator {
+  wakeLock?: {
+    request: (type: 'screen') => Promise<WakeLockSentinel>;
+  };
+}
+
 export default function DriveScreen() {
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
@@ -44,17 +50,17 @@ export default function DriveScreen() {
       setHudActive(true);
       vibrate('newOrder'); // alert driver that HUD is now active
     }
-  }, [isInVehicle]);
+  }, [hudActive, isInVehicle, vibrate]);
 
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
   useEffect(() => {
     let cancelled = false;
     async function requestWakeLock() {
-      if (typeof navigator === 'undefined') return;
-      if (!('wakeLock' in navigator)) return;
+      const nav = navigator as WakeLockNavigator;
+      if (!nav.wakeLock) return;
       try {
-        const wl = await (navigator as any).wakeLock.request('screen');
+        const wl = await nav.wakeLock.request('screen');
         if (cancelled) {
           wl.release();
           return;
@@ -119,8 +125,8 @@ export default function DriveScreen() {
           : t('gettingLocation');
 
   const speedLabel =
-    location && 'speed' in location && (location as any).speed != null
-      ? ` · spd ${Math.round(((location as any).speed ?? 0) * 3.6)} km/h`
+    location?.speed != null
+      ? ` · spd ${Math.round(location.speed * 3.6)} km/h`
       : '';
 
   return (

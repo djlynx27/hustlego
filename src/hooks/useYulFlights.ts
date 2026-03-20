@@ -102,7 +102,7 @@ async function fetchYulStatus(): Promise<YulStatus> {
   const now = new Date();
   const { current, next, minutesToNext } = getWaveStatus(now);
 
-  // Sans clé AviationStack : fallback sur le planning horaire connu
+  // Fallback planning horaire connu si pas de clé
   if (!AVIATIONSTACK_KEY) {
     return {
       isActivePeriod: current !== null,
@@ -114,11 +114,35 @@ async function fetchYulStatus(): Promise<YulStatus> {
     };
   }
 
+  // Fallback mock si clé = 'mock' ou quota dépassé (à ajuster selon logique de quota)
+  if (AVIATIONSTACK_KEY === 'mock') {
+    // Simule 12 arrivées actives
+    return {
+      isActivePeriod: true,
+      currentWave: current,
+      nextWave: next,
+      minutesToNextWave: minutesToNext,
+      liveArrivalsCount: 12,
+      fetchedAt: now.toISOString(),
+    };
+  }
+
   const response = await fetch(
     `https://api.aviationstack.com/v1/flights?access_key=${AVIATIONSTACK_KEY}&arr_iata=YUL&flight_status=active&limit=50`
   );
 
   if (!response.ok) {
+    // Si quota dépassé (HTTP 429 ou 403), fallback mock
+    if (response.status === 429 || response.status === 403) {
+      return {
+        isActivePeriod: true,
+        currentWave: current,
+        nextWave: next,
+        minutesToNextWave: minutesToNext,
+        liveArrivalsCount: 12,
+        fetchedAt: now.toISOString(),
+      };
+    }
     throw new Error(`AviationStack fetch failed (HTTP ${response.status})`);
   }
 

@@ -13,5 +13,7 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/test/setup.ts'],
+    // Exclure les specs Playwright (src/e2e/) du runner Vitest
+    exclude: ['**/node_modules/**', '**/dist/**', 'src/e2e/**'],
   },
 });

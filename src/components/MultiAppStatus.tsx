@@ -120,14 +120,16 @@ interface Props {
 export function MultiAppStatus({ cityId, mode = 'all' }: Props) {
   const { data: weather } = useWeather(cityId);
   const now = new Date();
+  const currentHour = now.getHours();
+  const currentDay = now.getDay();
 
   const allApps = useMemo(() => {
     return getRecommendations(
-      now.getHours(),
-      now.getDay(),
+      currentHour,
+      currentDay,
       weather?.isBadWeather ?? false
     );
-  }, [now.getHours(), now.getDay(), weather?.isBadWeather]);
+  }, [currentDay, currentHour, weather?.isBadWeather]);
 
   const apps = useMemo(() => {
     if (mode === 'all') return allApps;

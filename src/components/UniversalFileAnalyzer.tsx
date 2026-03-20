@@ -48,14 +48,22 @@ interface AnalysisResult {
     | 'mileage'
     | 'profit'
     | 'unknown';
-  extracted_data?: any;
+  extracted_data?: Record<string, unknown>;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
 }
 
 export function UniversalFileAnalyzer() {
   const { data: mtlZones = [] } = useZones('mtl');
   const { data: lavalZones = [] } = useZones('lvl');
   const { data: longueuilZones = [] } = useZones('lng');
-  const allZones = [...mtlZones, ...lavalZones, ...longueuilZones];
+  const allZones = useMemo(
+    () => [...mtlZones, ...lavalZones, ...longueuilZones],
+    [lavalZones, longueuilZones, mtlZones]
+  );
 
   const [zoneId, setZoneId] = useState('');
   const [suggestedZoneId, setSuggestedZoneId] = useState('');
@@ -116,7 +124,7 @@ export function UniversalFileAnalyzer() {
 
       const smartRoute = (basedOn: AnalysisResult) => {
         if (basedOn.recommended_target) {
-          setSuggestedArea(basedOn.recommended_target as any);
+          setSuggestedArea(basedOn.recommended_target);
         } else if (
           fileType.includes('csv') ||
           file?.name.toLowerCase().includes('quickbooks') ||
@@ -212,8 +220,8 @@ export function UniversalFileAnalyzer() {
       }
 
       toast.success('Analyse terminée — propositions créées');
-    } catch (e: any) {
-      toast.error(e.message || "Erreur lors de l'analyse");
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Erreur lors de l'analyse"));
     } finally {
       setLoading(false);
     }
@@ -324,8 +332,10 @@ export function UniversalFileAnalyzer() {
       } else {
         toast.error('Type de route inconnu');
       }
-    } catch (e: any) {
-      toast.error(e.message || "Erreur lors de l'application de la suggestion");
+    } catch (error: unknown) {
+      toast.error(
+        getErrorMessage(error, "Erreur lors de l'application de la suggestion")
+      );
     } finally {
       setLoading(false);
     }

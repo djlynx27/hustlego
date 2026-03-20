@@ -1,5 +1,9 @@
 import { supabase } from '@/integrations/supabase/client';
-import type { Tables, TablesInsert } from '@/integrations/supabase/types';
+import type {
+  Tables,
+  TablesInsert,
+  TablesUpdate,
+} from '@/integrations/supabase/types';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export type City = Tables<'cities'>;
@@ -79,7 +83,7 @@ export function useUpdateZone() {
     }) => {
       const { error } = await supabase
         .from('zones')
-        .update(updates as any)
+        .update(updates as TablesUpdate<'zones'>)
         .eq('id', id);
       if (error) throw error;
     },

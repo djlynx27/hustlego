@@ -84,13 +84,17 @@ export function ShiftOptimizer({
   const { data: weather } = useWeather(cityId);
   const { data: trips = [] } = useTrips(300);
 
-  const weatherCond: WeatherCondition | null = weather
-    ? {
-        weatherId: weather.weatherId,
-        temp: weather.temp,
-        demandBoostPoints: weather.demandBoostPoints,
-      }
-    : null;
+  const weatherCond: WeatherCondition | null = useMemo(
+    () =>
+      weather
+        ? {
+            weatherId: weather.weatherId,
+            temp: weather.temp,
+            demandBoostPoints: weather.demandBoostPoints,
+          }
+        : null,
+    [weather]
+  );
 
   // Derive EMA patterns from trip history for $/h estimates
   const learningInsights = useMemo(() => {

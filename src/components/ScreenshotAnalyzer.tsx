@@ -1,18 +1,45 @@
-import { useState } from 'react';
-import { supabase } from '@/integrations/supabase/client';
-import { useZones } from '@/hooks/useSupabase';
-import { Button } from '@/components/ui/button';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Camera, Loader2, Upload, MapPin, Flame } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { useZones } from '@/hooks/useSupabase';
+import { supabase } from '@/integrations/supabase/client';
+import { Camera, Flame, Loader2, MapPin, Upload } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
 
 interface AnalysisResult {
-  zones_detected: { area: string; demand: string; surge_multiplier: number | null; color_intensity: string }[];
+  zones_detected: {
+    area: string;
+    demand: string;
+    surge_multiplier: number | null;
+    color_intensity: string;
+  }[];
   overall_demand: string;
   time_context: string;
   notes: string;
+}
+
+interface AnalyzeScreenshotResponse {
+  error?: string;
+  analysis?: AnalysisResult;
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
 }
 
 export function ScreenshotAnalyzer() {
@@ -60,19 +87,27 @@ export function ScreenshotAnalyzer() {
         .from('driver-screenshots')
         .getPublicUrl(fileName);
 
-      const zoneName = allZones.find(z => z.id === zoneId)?.name || 'Unknown';
+      const zoneName = allZones.find((z) => z.id === zoneId)?.name || 'Unknown';
 
       // Call edge function
-      const { data, error } = await supabase.functions.invoke('analyze-screenshot', {
-        body: { image_url: urlData.publicUrl, zone_id: zoneId, zone_name: zoneName },
-      });
+      const { data, error } = await supabase.functions.invoke(
+        'analyze-screenshot',
+        {
+          body: {
+            image_url: urlData.publicUrl,
+            zone_id: zoneId,
+            zone_name: zoneName,
+          },
+        }
+      );
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
+      const payload = (data ?? {}) as AnalyzeScreenshotResponse;
+      if (payload.error) throw new Error(payload.error);
 
-      setResult(data.analysis);
+      setResult(payload.analysis ?? null);
       toast.success('Analyse terminée — note sauvegardée');
-    } catch (e: any) {
-      toast.error(e.message || 'Erreur lors de l\'analyse');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, "Erreur lors de l'analyse"));
     } finally {
       setLoading(false);
     }
@@ -92,7 +127,8 @@ export function ScreenshotAnalyzer() {
           <Camera className="w-4 h-4 text-primary" /> Analyse de screenshot
         </CardTitle>
         <CardDescription className="text-xs">
-          Uploadez un screenshot Lyft/Uber pour extraire les zones de surge via l'IA
+          Uploadez un screenshot Lyft/Uber pour extraire les zones de surge via
+          l'IA
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
@@ -102,9 +138,12 @@ export function ScreenshotAnalyzer() {
             <SelectValue placeholder="Zone de référence" />
           </SelectTrigger>
           <SelectContent className="bg-card border-border max-h-60">
-            {allZones.map(z => (
+            {allZones.map((z) => (
               <SelectItem key={z.id} value={z.id}>
-                {z.name} — <span className="text-muted-foreground capitalize">{z.type}</span>
+                {z.name} —{' '}
+                <span className="text-muted-foreground capitalize">
+                  {z.type}
+                </span>
               </SelectItem>
             ))}
           </SelectContent>
@@ -113,49 +152,83 @@ export function ScreenshotAnalyzer() {
         {/* File upload */}
         <label className="flex items-center justify-center gap-2 w-full h-28 rounded-lg border-2 border-dashed border-border bg-background cursor-pointer hover:border-primary/50 transition-colors">
           {preview ? (
-            <img src={preview} alt="Preview" className="h-full w-full object-contain rounded-lg" />
+            <img
+              src={preview}
+              alt="Preview"
+              className="h-full w-full object-contain rounded-lg"
+            />
           ) : (
             <div className="flex flex-col items-center gap-1 text-muted-foreground">
               <Upload className="w-6 h-6" />
-              <span className="text-xs">Cliquez pour uploader un screenshot</span>
+              <span className="text-xs">
+                Cliquez pour uploader un screenshot
+              </span>
             </div>
           )}
-          <input type="file" accept="image/*" className="hidden" onChange={handleFile} />
+          <input
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={handleFile}
+          />
         </label>
 
-        <Button onClick={handleAnalyze} className="w-full gap-2" disabled={loading || !file || !zoneId}>
-          {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Camera className="w-4 h-4" />}
-          {loading ? 'Analyse en cours…' : 'Analyser avec l\'IA'}
+        <Button
+          onClick={handleAnalyze}
+          className="w-full gap-2"
+          disabled={loading || !file || !zoneId}
+        >
+          {loading ? (
+            <Loader2 className="w-4 h-4 animate-spin" />
+          ) : (
+            <Camera className="w-4 h-4" />
+          )}
+          {loading ? 'Analyse en cours…' : "Analyser avec l'IA"}
         </Button>
 
         {/* Results */}
         {result && (
           <div className="space-y-2 pt-2 border-t border-border">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-medium text-foreground">Résultat de l'analyse</span>
-              <Badge variant={demandColor(result.overall_demand)} className="text-xs">
+              <span className="text-xs font-medium text-foreground">
+                Résultat de l'analyse
+              </span>
+              <Badge
+                variant={demandColor(result.overall_demand)}
+                className="text-xs"
+              >
                 <Flame className="w-3 h-3 mr-1" />
                 {result.overall_demand}
               </Badge>
             </div>
 
             {result.time_context && (
-              <p className="text-xs text-muted-foreground">⏰ {result.time_context}</p>
+              <p className="text-xs text-muted-foreground">
+                ⏰ {result.time_context}
+              </p>
             )}
 
             {result.zones_detected?.length > 0 && (
               <div className="space-y-1.5">
                 {result.zones_detected.map((z, i) => (
-                  <div key={i} className="bg-background rounded-md border border-border p-2 flex items-center justify-between">
+                  <div
+                    key={i}
+                    className="bg-background rounded-md border border-border p-2 flex items-center justify-between"
+                  >
                     <div className="flex items-center gap-1.5">
                       <MapPin className="w-3.5 h-3.5 text-primary shrink-0" />
                       <span className="text-xs font-medium">{z.area}</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                       {z.surge_multiplier && (
-                        <span className="text-xs text-muted-foreground">×{z.surge_multiplier}</span>
+                        <span className="text-xs text-muted-foreground">
+                          ×{z.surge_multiplier}
+                        </span>
                       )}
-                      <Badge variant={demandColor(z.demand)} className="text-[10px] px-1.5 py-0">
+                      <Badge
+                        variant={demandColor(z.demand)}
+                        className="text-[10px] px-1.5 py-0"
+                      >
                         {z.demand}
                       </Badge>
                     </div>
@@ -165,10 +238,14 @@ export function ScreenshotAnalyzer() {
             )}
 
             {result.notes && (
-              <p className="text-xs text-muted-foreground italic">💡 {result.notes}</p>
+              <p className="text-xs text-muted-foreground italic">
+                💡 {result.notes}
+              </p>
             )}
 
-            <p className="text-[10px] text-muted-foreground text-center">Note sauvegardée automatiquement dans driver_notes</p>
+            <p className="text-[10px] text-muted-foreground text-center">
+              Note sauvegardée automatiquement dans driver_notes
+            </p>
           </div>
         )}
       </CardContent>

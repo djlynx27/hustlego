@@ -35,14 +35,16 @@ export function LeafletMap({
   const containerRef = useRef<HTMLDivElement>(null);
   const mapRef = useRef<L.Map | null>(null);
   const driverMarkerRef = useRef<L.Marker | null>(null);
+  const initialCenterRef = useRef(center);
+  const initialZoomRef = useRef(zoom);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     if (!mapRef.current) {
       mapRef.current = L.map(containerRef.current, {
-        center,
-        zoom,
+        center: initialCenterRef.current,
+        zoom: initialZoomRef.current,
         zoomControl: true,
         attributionControl: true,
       });
@@ -67,7 +69,7 @@ export function LeafletMap({
     if (mapRef.current) {
       mapRef.current.setView(center, zoom);
     }
-  }, [center[0], center[1], zoom]);
+  }, [center, zoom]);
 
   // Update markers
   useEffect(() => {
@@ -126,7 +128,7 @@ export function LeafletMap({
       driverMarkerRef.current.remove();
       driverMarkerRef.current = null;
     }
-  }, [markers]);
+  }, [driverPosition, markers]);
 
   return <div ref={containerRef} className={`w-full h-full ${className}`} />;
 }

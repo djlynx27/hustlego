@@ -58,6 +58,16 @@ export default function PlanningScreen() {
   const { data: zones = [] } = useZones(cityId);
   const { data: weather } = useWeather(cityId);
 
+  type ZoneItem = (typeof zones)[number];
+  type SlotItem = {
+    id: string;
+    start_time: string;
+    end_time: string;
+    zone_id: string;
+    demand_score: number;
+    zones: ZoneItem;
+  };
+
   const slots = useMemo(() => {
     if (zones.length === 0) return [];
 
@@ -69,7 +79,7 @@ export default function PlanningScreen() {
         }
       : null;
     const timeLabels = generate96TimeLabels();
-    const items: any[] = [];
+    const items: SlotItem[] = [];
 
     for (const startTime of timeLabels) {
       const [hours, minutes] = startTime.split(':').map(Number);
@@ -94,7 +104,7 @@ export default function PlanningScreen() {
     }
 
     // Group by HOUR, keep only top 3 zones per hour (best slot per zone)
-    const hourGroups = new Map<number, typeof items>();
+    const hourGroups = new Map<number, SlotItem[]>();
     for (const item of items) {
       const [h] = item.start_time.split(':').map(Number);
       const arr = hourGroups.get(h) ?? [];
@@ -102,10 +112,10 @@ export default function PlanningScreen() {
       hourGroups.set(h, arr);
     }
 
-    const result: typeof items = [];
+    const result: SlotItem[] = [];
     for (const [, group] of hourGroups) {
       // Per zone, keep only the best-scoring slot within this hour
-      const bestPerZone = new Map<string, (typeof items)[0]>();
+      const bestPerZone = new Map<string, SlotItem>();
       for (const item of group) {
         const existing = bestPerZone.get(item.zone_id);
         if (
@@ -145,7 +155,7 @@ export default function PlanningScreen() {
       if (timeDiff !== 0) return timeDiff;
       return (b.demand_score ?? 0) - (a.demand_score ?? 0);
     });
-  }, [zones, cityId, date, userLocation, weather]);
+  }, [zones, date, userLocation, weather]);
 
   const fmtTime = normalize24hTime;
 

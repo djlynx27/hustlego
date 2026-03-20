@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { useZones } from '@/hooks/useSupabase';
+import type { TripWithZone } from '@/hooks/useTrips';
 import { supabase } from '@/integrations/supabase/client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -31,7 +32,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 
 function useRecentTrips() {
-  return useQuery({
+  return useQuery<TripWithZone[]>({
     queryKey: ['recent-trips'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -40,7 +41,7 @@ function useRecentTrips() {
         .order('started_at', { ascending: false })
         .limit(10);
       if (error) throw error;
-      return data;
+      return (data ?? []) as TripWithZone[];
     },
   });
 }
@@ -271,7 +272,7 @@ export function TripLogger() {
             <p className="text-xs font-medium text-foreground">
               10 dernières courses
             </p>
-            {recentTrips.map((trip: any) => (
+            {recentTrips.map((trip) => (
               <div
                 key={trip.id}
                 className="bg-background rounded-lg border border-border p-2.5 space-y-1"

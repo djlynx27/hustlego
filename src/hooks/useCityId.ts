@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useCallback, useState } from 'react';
 
 const STORAGE_KEY = 'geohustle_city_id';
 
@@ -13,7 +13,11 @@ export function useCityId(defaultId = 'mtl') {
 
   const setCityId = useCallback((id: string) => {
     setCityIdState(id);
-    try { localStorage.setItem(STORAGE_KEY, id); } catch {}
+    try {
+      localStorage.setItem(STORAGE_KEY, id);
+    } catch {
+      // localStorage unavailable; selected city remains in memory.
+    }
   }, []);
 
   return [cityId, setCityId] as const;

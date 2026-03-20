@@ -109,7 +109,9 @@ export function MapboxHeatmap({
     setDriverPos(pos);
     try {
       localStorage.setItem(LS_POS_KEY, JSON.stringify(pos));
-    } catch {}
+    } catch {
+      // localStorage unavailable; skip position persistence.
+    }
     // Auto-fly to user position only on first fix
     if (!hasAutoFocused.current && mapRef.current) {
       hasAutoFocused.current = true;

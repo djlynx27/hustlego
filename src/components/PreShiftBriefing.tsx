@@ -215,19 +215,28 @@ const URGENCY_STYLES: Record<string, string> = {
  */
 export function PreShiftBriefing(props: PreShiftBriefingProps) {
   const [expanded, setExpanded] = useState(false);
+  const {
+    cityId,
+    stmStatus,
+    tmEvents,
+    topZones,
+    upcomingEvents,
+    weather,
+    yulStatus,
+  } = props;
 
   const { headline, bullets, strategy, urgency } = useMemo(
-    () => buildBriefing(props),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [
-      props.topZones.map((z) => `${z.id}:${z.score}`).join(','),
-      props.weather?.weatherCode,
-      props.weather?.temp,
-      props.stmStatus?.alertCount,
-      props.yulStatus?.isActivePeriod,
-      props.upcomingEvents.map((e) => e.id).join(','),
-      props.tmEvents.length,
-    ]
+    () =>
+      buildBriefing({
+        cityId,
+        stmStatus,
+        tmEvents,
+        topZones,
+        upcomingEvents,
+        weather,
+        yulStatus,
+      }),
+    [cityId, stmStatus, tmEvents, topZones, upcomingEvents, weather, yulStatus]
   );
 
   return (

@@ -13,7 +13,9 @@ function loadState(): DeadTimeState {
   try {
     const raw = localStorage.getItem(LS_KEY);
     if (raw) return JSON.parse(raw);
-  } catch {}
+  } catch {
+    // localStorage unavailable; fall back to default timer state.
+  }
   return { startedAt: Date.now(), accumulated: 0, paused: false };
 }
 

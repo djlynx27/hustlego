@@ -336,6 +336,10 @@ serve(async (req) => {
     for (const zone of zones as Zone[]) {
       const baseScore = zone.base_score ?? 50;
       const rawScore = baseScore * timeFactor * dayFactor;
+      const clampedScore = Math.min(
+        100,
+        Math.max(0, Math.round(rawScore * 100) / 100)
+      );
       const eventBoostVal = computeEventBoost(zone, events);
       const finalScore = Math.min(
         100,
@@ -344,7 +348,7 @@ serve(async (req) => {
       computedScores.set(zone.id, finalScore);
       scoreRows.push({
         zone_id: zone.id,
-        score: Math.round(rawScore * 100) / 100,
+        score: clampedScore,
         weather_boost: weatherBoostVal,
         event_boost: Math.round(eventBoostVal * 100) / 100,
         final_score: finalScore,

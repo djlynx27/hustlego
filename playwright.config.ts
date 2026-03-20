@@ -49,10 +49,13 @@ export default defineConfig({
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
     env: {
-      // Credentials placeholder — les appels Supabase sont mockés dans les specs
-      VITE_SUPABASE_URL: 'https://placeholder.supabase.co',
+      // Utilise la vraie URL Supabase pour les tests E2E réels
+      VITE_SUPABASE_URL:
+        process.env.VITE_SUPABASE_URL ||
+        'https://hibzhsjgipybfihhzpxr.supabase.co',
       VITE_SUPABASE_ANON_KEY:
-        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJyb2xlIjoiYW5vbiIsImlhdCI6MTcwMDAwMDAwMH0.placeholder',
+        process.env.VITE_SUPABASE_ANON_KEY ||
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhpYnpoc2pnaXB5YmZpaGh6cHhyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzM1NjI4NjAsImV4cCI6MjA4OTEzODg2MH0.3YiwAnLpgbLgyXIWBNEGR6yfIcaFJ3eYO4XCivG2rKU',
     },
   },
 });

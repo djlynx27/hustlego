@@ -28,6 +28,7 @@ import {
   useCities,
   useZones,
 } from '@/hooks/useSupabase';
+import type { TripWithZone } from '@/hooks/useTrips';
 import {
   searchFoursquarePlaces,
   type FoursquarePlace,
@@ -70,6 +71,16 @@ interface AIRecommendation {
   tip: string;
 }
 
+interface AIAnalysisResponse {
+  error?: string;
+  recommendations?: AIRecommendation[];
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) return error.message;
+  return fallback;
+}
+
 export default function AdminScreen() {
   const { t } = useI18n();
   const { data: cities = [] } = useCities();
@@ -102,7 +113,7 @@ export default function AdminScreen() {
     }
   });
   const [learningHistory, setLearningHistory] = useState<ZoneHistory[]>([]);
-  const [recentTrips, setRecentTrips] = useState<any[]>([]);
+  const [recentTrips, setRecentTrips] = useState<TripWithZone[]>([]);
   const [driftMetrics, setDriftMetrics] = useState({ meanError: 0, sample: 0 });
 
   const [foodQuery, setFoodQuery] = useState('');
@@ -163,8 +174,8 @@ export default function AdminScreen() {
       await addCity.mutateAsync({ id, name: newCity.trim() });
       setNewCity('');
       toast.success(t('addCity'));
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t('save')));
     }
   }
 
@@ -181,8 +192,8 @@ export default function AdminScreen() {
       toast.success(
         `${t('simulated')}: ${slots.length} slots (${zones.length} zones × 96 créneaux)`
       );
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t('simulated')));
     } finally {
       setTimeout(() => setSimProgress(null), 1500);
     }
@@ -213,8 +224,8 @@ export default function AdminScreen() {
       toast.success(
         `${t('simulated')}: ${totalSlots} slots (${cities.length} villes)`
       );
-    } catch (e: any) {
-      toast.error(e.message);
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t('simulated')));
     } finally {
       setTimeout(() => setSimProgress(null), 1500);
     }
@@ -226,8 +237,10 @@ export default function AdminScreen() {
       const items = await searchOpenFoodFacts(foodQuery.trim());
       setFoodResults(items);
       toast.success(`${items.length} ${t('productsFound')}`);
-    } catch (e: any) {
-      toast.error(e.message || `${t('searchFailed')} (OpenFoodFacts)`);
+    } catch (error: unknown) {
+      toast.error(
+        getErrorMessage(error, `${t('searchFailed')} (OpenFoodFacts)`)
+      );
     }
   }
 
@@ -244,8 +257,8 @@ export default function AdminScreen() {
       );
       setPlaceResults(places);
       toast.success(`${places.length} ${t('placesFound')}`);
-    } catch (e: any) {
-      toast.error(e.message || 'Foursquare search failed');
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, 'Foursquare search failed'));
     }
   }
 
@@ -256,14 +269,15 @@ export default function AdminScreen() {
       const { data, error } =
         await supabase.functions.invoke('ai-score-analysis');
       if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      setAiResults(data.recommendations || []);
+      const payload = (data ?? {}) as AIAnalysisResponse;
+      if (payload.error) throw new Error(payload.error);
+      setAiResults(payload.recommendations ?? []);
       setLastAnalyzed(new Date().toISOString());
       toast.success(
-        `${t('aiAnalysisDone')} — ${data.recommendations?.length || 0} ${t('aiRecommendations')}`
+        `${t('aiAnalysisDone')} — ${payload.recommendations?.length || 0} ${t('aiRecommendations')}`
       );
-    } catch (e: any) {
-      toast.error(e.message || t('aiAnalysisError'));
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, t('aiAnalysisError')));
     } finally {
       setAiLoading(false);
     }

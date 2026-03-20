@@ -14,6 +14,7 @@ import {
   getAverageTrafficCongestion,
   useTomTomTraffic,
 } from '@/hooks/useTomTomTraffic';
+import type { TripWithZone } from '@/hooks/useTrips';
 import { useWeather } from '@/hooks/useWeather';
 import { useZoneScores } from '@/hooks/useZoneScores';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,14 +59,14 @@ export function useDemandScores(cityId: string) {
   const { data: stmStatus } = useStmTransit();
   const { data: tripLogs = [] } = useQuery({
     queryKey: ['trip-history', cityId],
-    queryFn: async () => {
+    queryFn: async (): Promise<TripWithZone[]> => {
       const { data, error } = await supabase
         .from('trips')
         .select('*, zones(*)')
         .order('started_at', { ascending: false })
         .limit(200);
       if (error) throw error;
-      return data || [];
+      return (data ?? []) as TripWithZone[];
     },
     staleTime: 5 * 60 * 1000,
   });
@@ -121,7 +122,7 @@ export function useDemandScores(cityId: string) {
   const tripHistory: ZoneHistory[] = useMemo(() => {
     if (!tripLogs || tripLogs.length === 0 || zones.length === 0) return [];
     return tripLogs
-      .map((trip: any) => {
+      .map((trip) => {
         const zone = zones.find((z) => z.id === trip.zone_id);
         if (!zone) return null;
         const started = new Date(trip.started_at);
@@ -200,8 +201,7 @@ export function useDemandScores(cityId: string) {
     return [...zones]
       .sort(
         (left, right) =>
-          Number((right as any).current_score ?? 0) -
-          Number((left as any).current_score ?? 0)
+          Number(right.current_score ?? 0) - Number(left.current_score ?? 0)
       )
       .slice(0, 12);
   }, [zones]);
@@ -225,7 +225,7 @@ export function useDemandScores(cityId: string) {
             {
               zoneId: zone.id,
               zoneType: zone.type,
-              currentScore: Number((zone as any).current_score ?? 50),
+              currentScore: Number(zone.current_score ?? 50),
               now,
               trafficCongestion:
                 trafficByZone.get(zone.id) ?? averageTrafficCongestion,
@@ -303,8 +303,7 @@ export function useDemandScores(cityId: string) {
       for (const zone of zones) {
         const dbRow = dbScoreMap.get(zone.id);
         if (dbRow) {
-          const finalScore =
-            dbRow.final_score ?? (zone as any).current_score ?? 50;
+          const finalScore = dbRow.final_score ?? zone.current_score ?? 50;
           const weatherBoost = dbRow.weather_boost ?? 0;
           const eventBoost = dbRow.event_boost ?? 0;
           scores.set(zone.id, finalScore);
@@ -316,7 +315,7 @@ export function useDemandScores(cityId: string) {
           });
         } else {
           // Zone has no DB score yet, use current_score from zone
-          scores.set(zone.id, (zone as any).current_score ?? 50);
+          scores.set(zone.id, zone.current_score ?? 50);
           factors.set(zone.id, {
             hasWeatherBoost: false,
             hasEventBoost: false,

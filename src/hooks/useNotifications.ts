@@ -1,4 +1,5 @@
 import { useDemandScores } from '@/hooks/useDemandScores';
+import type { Zone } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { useCallback, useEffect, useRef, useState } from 'react';
 
@@ -115,7 +116,9 @@ function markEventNotified(eventId: string) {
   if (arr.length > 200) arr.splice(0, arr.length - 200);
   try {
     localStorage.setItem(NOTIFIED_EVENTS_KEY, JSON.stringify(arr));
-  } catch {}
+  } catch {
+    // localStorage unavailable; notification dedupe cache is not persisted.
+  }
 }
 
 interface NotifState {
@@ -153,8 +156,8 @@ async function sendNotification(title: string, body: string, url?: string) {
   new Notification(title, { body, icon: '/pwa-icon-192.png' });
 }
 
-function findNearestZone(lat: number, lng: number, zones: any[]): any | null {
-  let best: any = null;
+function findNearestZone(lat: number, lng: number, zones: Zone[]): Zone | null {
+  let best: Zone | null = null;
   let bestDist = Infinity;
   for (const z of zones) {
     const d = haversineKm(lat, lng, z.latitude, z.longitude);

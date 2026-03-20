@@ -59,7 +59,7 @@ function guessZoneByTime(
   }
 
   for (const type of preferredTypes) {
-    const match = zones.find((z: any) => z.type === type);
+    const match = zones.find((z) => z.type === type);
     if (match) return { id: match.id, name: match.name };
   }
 
@@ -188,16 +188,6 @@ export function CsvImporter() {
           }
 
           const zone = guessZoneByTime(hour, dayOfWeek, allZones);
-
-          // Build ISO timestamps
-          let started_at = dateStr || new Date().toISOString().split('T')[0];
-          if (startTime) {
-            const hh = String(hour).padStart(2, '0');
-            const mm = startTime.match(/:(\d{2})/)?.[1] || '00';
-            started_at = `${started_at}T${hh}:${mm}:00`;
-          } else {
-            started_at = `${started_at}T12:00:00`;
-          }
 
           return {
             date: dateStr,

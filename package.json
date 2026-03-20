@@ -7,8 +7,11 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
+    "lint": "eslint src --max-warnings 0",
     "test": "vitest",
-    "test:e2e": "playwright test"
+    "test:run": "vitest run",
+    "test:e2e": "playwright test",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@radix-ui/react-accordion": "^1.2.12",
@@ -41,6 +44,7 @@
     "@supabase/supabase-js": "^2.99.2",
     "@tanstack/react-query": "^5.90.21",
     "@types/leaflet": "^1.9.21",
+    "canvas": "^3.2.1",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",

@@ -10,7 +10,29 @@ export interface OpenFoodProduct {
   image_url: string;
 }
 
-export async function searchOpenFoodFacts(query: string, limit = 10): Promise<OpenFoodProduct[]> {
+interface OpenFoodFactsProduct {
+  id?: string;
+  _id?: string;
+  product_name?: string;
+  generic_name?: string;
+  brands?: string;
+  quantity?: string;
+  cities?: string;
+  labels?: string;
+  ingredients_text?: string;
+  nutrition_grade_fr?: string;
+  image_url?: string;
+  image_front_url?: string;
+}
+
+interface OpenFoodFactsResponse {
+  products?: OpenFoodFactsProduct[];
+}
+
+export async function searchOpenFoodFacts(
+  query: string,
+  limit = 10
+): Promise<OpenFoodProduct[]> {
   const url = new URL('https://world.openfoodfacts.org/cgi/search.pl');
   url.searchParams.set('search_terms', query);
   url.searchParams.set('search_simple', '1');
@@ -23,10 +45,10 @@ export async function searchOpenFoodFacts(query: string, limit = 10): Promise<Op
     throw new Error(`OpenFoodFacts API error ${res.status}`);
   }
 
-  const data = await res.json();
+  const data = (await res.json()) as OpenFoodFactsResponse;
   if (!data.products) return [];
 
-  return data.products.map((p: any) => ({
+  return data.products.map((p) => ({
     id: p.id || p._id || '',
     product_name: p.product_name || p.generic_name || '',
     brands: p.brands || '',

@@ -156,14 +156,18 @@ export default function TodayScreen() {
       const saved = localStorage.getItem(DRIVER_MODE_KEY);
       if (saved === 'rideshare' || saved === 'delivery' || saved === 'all')
         return saved;
-    } catch {}
+    } catch {
+      // localStorage unavailable; default to all platforms.
+    }
     return 'all';
   });
   const setDriverMode = (mode: 'rideshare' | 'delivery' | 'all') => {
     setDriverModeState(mode);
     try {
       localStorage.setItem(DRIVER_MODE_KEY, mode);
-    } catch {}
+    } catch {
+      // localStorage unavailable; selected driver mode remains in memory.
+    }
   };
 
   // ── "Je suis libre" mode ───────────────────────────────────────────
@@ -181,7 +185,7 @@ export default function TodayScreen() {
     if (!waitTimer) return;
     const id = setInterval(() => setNowTick(Date.now()), 1000);
     return () => clearInterval(id);
-  }, [!!waitTimer]);
+  }, [waitTimer]);
 
   const WAIT_DURATION_MS = 15 * 60 * 1000;
   const waitRemainingMs = waitTimer
@@ -231,12 +235,14 @@ export default function TodayScreen() {
                 body: 'Déplace-toi vers la prochaine zone.',
                 icon: '/pwa-icon-192.png',
               });
-            } catch {}
+            } catch {
+              // Notification API unavailable; no fallback notification.
+            }
           });
       }
     }, remaining);
     return () => clearTimeout(t);
-  }, [waitTimer]);
+  }, [WAIT_DURATION_MS, waitTimer]);
 
   const { data: weather } = useWeather(cityId);
   const AVG_SPEED_KMH = 30;
@@ -317,7 +323,7 @@ export default function TodayScreen() {
   const heroFactors = heroZone ? factors.get(heroZone.id) : undefined;
   const nextZones = modeZones.slice(1, 4);
 
-  const getDistance = (zone: any) => {
+  const getDistance = (zone: (typeof modeZones)[number] | null) => {
     if (!userLocation || !zone) return null;
     return haversineKm(
       userLocation.latitude,
@@ -335,7 +341,7 @@ export default function TodayScreen() {
       if (prevHeroIdRef.current !== null) vibrate('newOrder');
       prevHeroIdRef.current = heroZone.id;
     }
-  }, [heroZone?.id]);
+  }, [heroZone, vibrate]);
 
   // Anti-deadhead: suggest repositioning when in a low-demand zone
   const currentZoneId = useMemo(() => {

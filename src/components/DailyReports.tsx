@@ -1,11 +1,14 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
+import type { Tables } from '@/integrations/supabase/types';
 import { useQuery } from '@tanstack/react-query';
 import { Clock, FileText, MapPin, Sparkles } from 'lucide-react';
 
+type DailyReportRow = Tables<'daily_reports'>;
+
 function useReports() {
-  return useQuery({
+  return useQuery<DailyReportRow[]>({
     queryKey: ['daily-reports'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -14,7 +17,7 @@ function useReports() {
         .order('report_date', { ascending: false })
         .limit(14);
       if (error) throw error;
-      return data;
+      return (data ?? []) as DailyReportRow[];
     },
   });
 }
@@ -48,7 +51,7 @@ export function DailyReports() {
         </CardTitle>
       </CardHeader>
       <CardContent className="space-y-3">
-        {reports.map((r: any) => (
+        {reports.map((r) => (
           <div
             key={r.id}
             className="bg-background rounded-lg border border-border p-3 space-y-2"

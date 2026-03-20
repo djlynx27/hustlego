@@ -88,7 +88,12 @@ const App = () => (
       <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
         <TooltipProvider>
           <Sonner />
-          <BrowserRouter>
+          <BrowserRouter
+            future={{
+              v7_startTransition: true,
+              v7_relativeSplatPath: true,
+            }}
+          >
             <AppErrorBoundary>
               <AppContent />
             </AppErrorBoundary>

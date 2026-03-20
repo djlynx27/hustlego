@@ -35,6 +35,34 @@ export interface TicketmasterEvent {
   boostPoints: number; // 20-35 based on capacity
 }
 
+interface TicketmasterVenue {
+  name?: string;
+  location?: {
+    latitude?: string;
+    longitude?: string;
+  };
+}
+
+interface TicketmasterApiEvent {
+  id?: string;
+  name?: string;
+  dates?: {
+    start?: {
+      dateTime?: string;
+      localDate?: string;
+    };
+  };
+  _embedded?: {
+    venues?: TicketmasterVenue[];
+  };
+}
+
+interface TicketmasterApiResponse {
+  _embedded?: {
+    events?: TicketmasterApiEvent[];
+  };
+}
+
 function capacityToBoost(capacity: number): number {
   if (capacity >= 40000) return 35;
   if (capacity >= 15000) return 30;
@@ -58,12 +86,12 @@ export function useTicketmasterEvents(cityId: string) {
         return [];
       }
 
-      const data = await res.json();
+      const data = (await res.json()) as TicketmasterApiResponse;
       const embedded = data?._embedded?.events;
       if (!Array.isArray(embedded)) return [];
 
       return embedded
-        .map((ev: any) => {
+        .map((ev) => {
           const venue = ev._embedded?.venues?.[0];
           if (!venue?.location) return null;
 

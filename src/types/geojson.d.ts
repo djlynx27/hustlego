@@ -1,7 +1,7 @@
 // Minimal GeoJSON types for MapboxHeatmap
 export type GeoJsonFeature = {
   type: 'Feature';
-  properties: Record<string, any>;
+  properties: Record<string, unknown>;
   geometry: {
     type: 'Point';
     coordinates: [number, number];

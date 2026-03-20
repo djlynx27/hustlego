@@ -155,10 +155,6 @@ export function aggregateTripAnalytics(
   start30Days.setDate(start30Days.getDate() - 29);
   start30Days.setHours(0, 0, 0, 0);
 
-  const trips7Days = trips.filter((trip) => {
-    const startedAt = toDate(trip.started_at);
-    return startedAt && startedAt >= start7Days && startedAt <= now;
-  });
   const trips30Days = trips.filter((trip) => {
     const startedAt = toDate(trip.started_at);
     return startedAt && startedAt >= start30Days && startedAt <= now;
