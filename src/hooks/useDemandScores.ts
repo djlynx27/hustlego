@@ -43,6 +43,12 @@ export interface ScoreFactors {
   learningAvgEarningsPerHour?: number;
 }
 
+function logScoreCalculatorIssue(...args: unknown[]) {
+  if (import.meta.env.DEV) {
+    console.warn(...args);
+  }
+}
+
 /**
  * Hook that provides demand scores for all zones in a city.
  * Primary source: DB scores (calculated by edge function every 30min).
@@ -98,7 +104,10 @@ export function useDemandScores(cityId: string) {
       .invoke('score-calculator')
       .then(({ error }) => {
         if (error) {
-          console.warn('score-calculator edge function error:', error);
+          logScoreCalculatorIssue(
+            'score-calculator edge function error:',
+            error
+          );
           return;
         }
         // Invalidate zone-scores cache so the map re-renders with fresh data
@@ -106,7 +115,7 @@ export function useDemandScores(cityId: string) {
         queryClient.invalidateQueries({ queryKey: ['zones', cityId] });
       })
       .catch((err) => {
-        console.warn('score-calculator invocation failed:', err);
+        logScoreCalculatorIssue('score-calculator invocation failed:', err);
       });
   }, [cityId, dbScores, queryClient]);
 
