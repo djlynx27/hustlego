@@ -1,9 +1,24 @@
 import react from '@vitejs/plugin-react';
+import { buildFallbackYulStatus } from './src/lib/yulStatus';
 import { defineConfig, loadEnv } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
 
 // https://vite.dev/config/
 import { resolve } from 'path';
+
+function sendJson(
+  res: {
+    statusCode: number;
+    setHeader: (name: string, value: string) => void;
+    end: (body: string) => void;
+  },
+  payload: unknown,
+  statusCode = 200
+) {
+  res.statusCode = statusCode;
+  res.setHeader('Content-Type', 'application/json');
+  res.end(JSON.stringify(payload));
+}
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '');
@@ -12,6 +27,108 @@ export default defineConfig(({ mode }) => {
     : undefined;
   const aviationstackKey =
     env.AVIATIONSTACK_API_KEY || env.VITE_AVIATIONSTACK_KEY;
+  const devApiFallbacks = {
+    name: 'dev-api-fallbacks',
+    configureServer(server: {
+      middlewares: {
+        use: (
+          handler: (
+            req: { url?: string; method?: string },
+            res: {
+              statusCode: number;
+              setHeader: (name: string, value: string) => void;
+              end: (body: string) => void;
+            },
+            next: () => void
+          ) => void | Promise<void>
+        ) => void;
+      };
+    }) {
+      server.middlewares.use(async (req, res, next) => {
+        if (!req.url || req.method !== 'GET') {
+          next();
+          return;
+        }
+
+        const url = new URL(req.url, 'http://localhost');
+
+        if (url.pathname === '/api/holidays') {
+          const yearParam = url.searchParams.get('year');
+          const year = /^\d{4}$/.test(yearParam ?? '')
+            ? yearParam!
+            : String(new Date().getFullYear());
+
+          try {
+            const upstream = await fetch(
+              `https://canada-holidays.ca/api/v1/holidays?province=QC&year=${year}`
+            );
+
+            if (!upstream.ok) {
+              sendJson(res, { holidays: [] });
+              return;
+            }
+
+            sendJson(res, await upstream.json());
+            return;
+          } catch {
+            sendJson(res, { holidays: [] });
+            return;
+          }
+        }
+
+        if (url.pathname === '/api/yul-flights') {
+          const now = new Date();
+
+          if (!aviationstackKey) {
+            sendJson(res, buildFallbackYulStatus(now));
+            return;
+          }
+
+          if (aviationstackKey === 'mock') {
+            sendJson(res, buildFallbackYulStatus(now, 12));
+            return;
+          }
+
+          try {
+            const params = new URLSearchParams({
+              access_key: aviationstackKey,
+              arr_iata: 'YUL',
+              flight_status: 'active',
+              limit: '50',
+            });
+            const upstream = await fetch(
+              `https://api.aviationstack.com/v1/flights?${params.toString()}`
+            );
+
+            if (!upstream.ok) {
+              sendJson(res, buildFallbackYulStatus(now));
+              return;
+            }
+
+            const payload = (await upstream.json()) as {
+              data?: unknown[];
+            };
+            const liveArrivalsCount = payload.data?.length ?? 0;
+            const baseStatus = buildFallbackYulStatus(now, liveArrivalsCount);
+
+            sendJson(res, {
+              ...baseStatus,
+              isActivePeriod:
+                baseStatus.isActivePeriod || liveArrivalsCount > 5,
+              liveArrivalsCount,
+              fetchedAt: now.toISOString(),
+            });
+            return;
+          } catch {
+            sendJson(res, buildFallbackYulStatus(now));
+            return;
+          }
+        }
+
+        next();
+      });
+    },
+  };
 
   return {
     resolve: {
@@ -21,17 +138,6 @@ export default defineConfig(({ mode }) => {
     },
     server: {
       proxy: {
-        '/api/holidays': {
-          target: 'https://canada-holidays.ca',
-          changeOrigin: true,
-          rewrite: (path) => {
-            const url = new URL(path, 'http://localhost');
-            const yearParam = url.searchParams.get('year');
-            const params = new URLSearchParams({ province: 'QC' });
-            if (yearParam) params.set('year', yearParam);
-            return `/api/v1/holidays?${params.toString()}`;
-          },
-        },
         '/api/habs-schedule': {
           target: 'https://api-web.nhle.com',
           changeOrigin: true,
@@ -55,25 +161,10 @@ export default defineConfig(({ mode }) => {
           headers: stmProxyHeaders,
           rewrite: () => '/pub/od/gtfs-rt/ic/v2/serviceAlerts',
         },
-        '/api/yul-flights': {
-          target: 'https://api.aviationstack.com',
-          changeOrigin: true,
-          rewrite: () => {
-            if (!aviationstackKey) {
-              return '/v1/flights?arr_iata=YUL&flight_status=active&limit=0';
-            }
-            const params = new URLSearchParams({
-              access_key: aviationstackKey,
-              arr_iata: 'YUL',
-              flight_status: 'active',
-              limit: '50',
-            });
-            return `/v1/flights?${params.toString()}`;
-          },
-        },
       },
     },
     plugins: [
+      devApiFallbacks,
       react(),
       VitePWA({
         strategies: 'injectManifest',
