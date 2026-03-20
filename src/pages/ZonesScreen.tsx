@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
@@ -220,6 +221,11 @@ export default function ZonesScreen() {
             <DialogTitle className="font-display">
               {editing ? t('editZone') : t('addZone')}
             </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              {editing
+                ? 'Modifiez le nom, le type et la position de la zone avant de sauvegarder.'
+                : 'Ajoutez une nouvelle zone avec son type et ses coordonnees pour l afficher sur la carte.'}
+            </DialogDescription>
           </DialogHeader>
           <div className="space-y-3">
             <Input
