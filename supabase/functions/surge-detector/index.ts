@@ -205,6 +205,21 @@ serve(async (req: Request) => {
         metadata: { zones: peakZones, detected_at: now.toISOString() },
         created_at: now.toISOString(),
       });
+
+      await fetch(`${supabaseUrl}/functions/v1/push-notifier`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${serviceKey}`,
+          apikey: serviceKey,
+        },
+        body: JSON.stringify({
+          title: 'Surge Peak Détecté',
+          body: message,
+          url: '/',
+          tag: 'surge-peak',
+        }),
+      });
     }
 
     return new Response(

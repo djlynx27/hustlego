@@ -4,6 +4,99 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 
 const NOTIF_COOLDOWN_MS = 15 * 60_000; // 15 min per notification type
 const NOTIFIED_EVENTS_KEY = 'geohustle_notified_events';
+const PUSH_SUBSCRIPTION_KEY = 'hustlego_push_subscription_registered';
+
+function base64UrlToUint8Array(value: string): Uint8Array {
+  const padding = '='.repeat((4 - (value.length % 4)) % 4);
+  const base64 = (value + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const raw = window.atob(base64);
+  const bytes = new Uint8Array(raw.length);
+
+  for (let index = 0; index < raw.length; index += 1) {
+    bytes[index] = raw.charCodeAt(index);
+  }
+
+  return bytes;
+}
+
+function bufferToBase64Url(buffer: ArrayBuffer): string {
+  const bytes = new Uint8Array(buffer);
+  let binary = '';
+  for (const byte of bytes) {
+    binary += String.fromCharCode(byte);
+  }
+
+  return window
+    .btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/g, '');
+}
+
+async function registerPushSubscription(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  if (!('serviceWorker' in navigator) || !('PushManager' in window)) return;
+  if (Notification.permission !== 'granted') return;
+
+  const env = (
+    import.meta as unknown as { env: Record<string, string | undefined> }
+  ).env;
+  const vapidPublicKey = env.VITE_VAPID_PUBLIC_KEY;
+  const supabaseUrl = env.VITE_SUPABASE_URL;
+  const supabaseAnonKey =
+    env.VITE_SUPABASE_ANON_KEY ?? env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+  if (!vapidPublicKey || !supabaseUrl || !supabaseAnonKey) return;
+
+  const registration = await navigator.serviceWorker.ready;
+  const existingSubscription = await registration.pushManager.getSubscription();
+  const subscription =
+    existingSubscription ??
+    (await registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      applicationServerKey: base64UrlToUint8Array(vapidPublicKey),
+    }));
+
+  const json = subscription.toJSON();
+  const endpoint = json.endpoint;
+  const p256dh = subscription.getKey('p256dh');
+  const auth = subscription.getKey('auth');
+
+  if (!endpoint || !p256dh || !auth) return;
+
+  const registrationFingerprint = `${endpoint}:${bufferToBase64Url(auth)}`;
+  if (localStorage.getItem(PUSH_SUBSCRIPTION_KEY) === registrationFingerprint) {
+    return;
+  }
+
+  const response = await fetch(
+    `${supabaseUrl}/rest/v1/push_subscriptions?on_conflict=endpoint`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        apikey: supabaseAnonKey,
+        Authorization: `Bearer ${supabaseAnonKey}`,
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+      },
+      body: JSON.stringify([
+        {
+          endpoint,
+          p256dh: bufferToBase64Url(p256dh),
+          auth: bufferToBase64Url(auth),
+          user_agent:
+            typeof navigator !== 'undefined' ? navigator.userAgent : null,
+        },
+      ]),
+    }
+  );
+
+  if (!response.ok) {
+    throw new Error(`push_subscriptions upsert failed: ${response.status}`);
+  }
+
+  localStorage.setItem(PUSH_SUBSCRIPTION_KEY, registrationFingerprint);
+}
 
 function getNotifiedEvents(): Set<string> {
   try {
@@ -95,8 +188,23 @@ export function useNotifications(cityId: string) {
       return false;
     const result = await Notification.requestPermission();
     setEnabled(result === 'granted');
+    if (result === 'granted') {
+      try {
+        await registerPushSubscription();
+      } catch (error) {
+        console.error('push subscription registration failed', error);
+      }
+    }
     return result === 'granted';
   }, []);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    void registerPushSubscription().catch((error) => {
+      console.error('push subscription bootstrap failed', error);
+    });
+  }, [enabled]);
 
   // Check demand spikes
   useEffect(() => {

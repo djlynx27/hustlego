@@ -58,7 +58,7 @@ describe('surge class — thresholds', () => {
     const r = computeSurge(baseCtx({ currentScore: 51, baselineScore: 60 }));
     expect(r.surgeClass).toBe('high');
     expect(r.surgeMultiplier).toBeGreaterThanOrEqual(1.45);
-    expect(r.surgeMultiplier).toBeLessThan(1.80);
+    expect(r.surgeMultiplier).toBeLessThan(1.8);
   });
 
   it('returns peak when ratio is extreme (2×+)', () => {

@@ -117,6 +117,49 @@ Le rapport identifie **5 leviers de rendement $/h** pour un chauffeur multi-plat
 
 ---
 
+### PHASE 5 — Architecture Completion + QA (✅ DONE)
+
+**Commit :** `82b29ae` — feat(arch): Phase 5 complete
+**Objectif :** combler les gaps d'architecture identifiés mais non livrés dans les phases précédentes
+
+| #   | Livrable                                                          | Agent responsable | Effort | Status |
+| --- | ----------------------------------------------------------------- | ----------------- | ------ | ------ |
+| 5.1 | `ContextSimilarityPanel` — pgvector k-NN results in TodayScreen   | Frontend Dev      | M      | ✅     |
+| 5.2 | `WeightCalibratorPanel` — Admin UI (GET weights + POST calibrate) | Frontend Dev      | M      | ✅     |
+| 5.3 | `SurgeIndicator + PlatformArbitrage` dans DriveScreen             | Frontend Dev      | S      | ✅     |
+| 5.4 | `surgeEngine.test.ts` — 46 cas Vitest (46/46 ✅)                  | QA                | M      | ✅     |
+| 5.5 | Format EF `weight-calibrator` unifié (clés `w_*` flat)            | Integration Eng.  | S      | ✅     |
+
+**Notes techniques :**
+
+- `adjustedBaseline = baselineScore × DOW × seasonal` — les seuils de surge s'appliquent au multiplicateur (1.0–2.5×), pas au ratio brut
+- `surgeEngine.ts` : à ratio=1.0 → sigmoid(0)=0.5 → multi=1.75 (classe 'high') — comportement intentionnel
+- EF GET `weight-calibrator` retourne désormais flat `{w_time, w_day, w_weather, w_events, w_historical, mae, accuracy_pct, history[]}`
+
+---
+
+### PHASE 6 — E2E + Web Push VAPID (✅ DONE)
+
+**Objectif :** sécuriser les flows critiques UI et envoyer de vraies notifications push background via service worker
+
+| #   | Livrable                                                       | Agent responsable    | Effort | Status |
+| --- | -------------------------------------------------------------- | -------------------- | ------ | ------ |
+| 6.1 | Suite Playwright E2E (`today`, `drive`, `admin`, `navigation`) | QA                   | M      | ✅     |
+| 6.2 | `playwright.config.ts` + script `npm run test:e2e`             | QA                   | S      | ✅     |
+| 6.3 | Migration `push_subscriptions` + RLS                           | Architecte           | S      | ✅     |
+| 6.4 | Edge Function `push-notifier` (VAPID)                          | Integration Engineer | M      | ✅     |
+| 6.5 | Service worker custom `src/sw.ts` + `injectManifest`           | Frontend Dev         | M      | ✅     |
+| 6.6 | `useNotifications` — souscription VAPID côté client            | Frontend Dev         | M      | ✅     |
+| 6.7 | `surge-detector` → dispatch réel vers `push-notifier`          | Integration Engineer | S      | ✅     |
+
+**Validation :**
+
+- `npx tsc --noEmit` → OK
+- `npx vitest run src/test/surgeEngine.test.ts` → 46/46 ✅
+- `npx playwright test` → 25/25 ✅
+
+---
+
 ## Rôles agents et responsabilités
 
 ### 🏗️ Architecte

@@ -1,6 +1,7 @@
 import { CitySelect } from '@/components/CitySelect';
 import { CsvImporter } from '@/components/CsvImporter';
 import { DailyReports } from '@/components/DailyReports';
+import { EarningsReport } from '@/components/EarningsReport';
 import { ExperimentalShiftComparison } from '@/components/ExperimentalShiftComparison';
 import { LearningInsightsPanel } from '@/components/LearningInsightsPanel';
 import { ModeTaxi } from '@/components/ModeTaxi';
