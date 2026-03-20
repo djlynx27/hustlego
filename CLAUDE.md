@@ -27,7 +27,7 @@ Lyft, DoorDash, SkipTheDishes, Hypra Pro S
 ### Structure Supabase
 
 Tables: zones, scores, events, weather_cache, drivers, notifications, zone_context_vectors
-Edge Functions: score-calculator (Gemini 2.5 Flash), ai-score-analysis, analyze-screenshot, generate-daily-report, context-embeddings
+Edge Functions: score-calculator (Gemini 2.5 Flash), ai-score-analysis, analyze-screenshot, generate-daily-report, context-embeddings, surge-detector
 
 ---
 

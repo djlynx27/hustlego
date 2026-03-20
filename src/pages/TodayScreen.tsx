@@ -6,6 +6,7 @@ import { NavigationSheet } from '@/components/NavigationSheet';
 import { NetProfitWidget } from '@/components/NetProfitWidget';
 import { PreShiftBriefing } from '@/components/PreShiftBriefing';
 import { ScoreFactorIcons } from '@/components/ScoreFactorIcons';
+import { SurgeBar, SurgeIndicator } from '@/components/SurgeIndicator';
 import { SwipeToAccept } from '@/components/SwipeToAccept';
 import { Button } from '@/components/ui/button';
 import { VoiceAssistant } from '@/components/VoiceAssistant';
@@ -130,6 +131,7 @@ export default function TodayScreen() {
     activeEvents,
     relevantTmEvents,
     stmStatus,
+    surgeMap,
   } = useDemandScores(cityId);
   const { data: holiday } = useHoliday(getCurrentSlotTime(now).date);
   const { data: habsGame } = useHabsGame(getCurrentSlotTime(now).date);
@@ -878,7 +880,20 @@ export default function TodayScreen() {
                         </span>
                       )}
                     </div>
-                    <DemandBadge score={zone.arrivalScore} size="lg" />
+                    <div className="flex flex-col items-end gap-1">
+                      <DemandBadge score={zone.arrivalScore} size="lg" />
+                      {(() => {
+                        const surge = surgeMap?.get(zone.id);
+                        return surge ? (
+                          <SurgeIndicator
+                            surgeClass={surge.surgeClass}
+                            multiplier={surge.surgeMultiplier}
+                            size="sm"
+                            showMultiplier
+                          />
+                        ) : null;
+                      })()}
+                    </div>
                   </div>
                   <div className="flex gap-2 mt-2">
                     <a
@@ -973,8 +988,17 @@ export default function TodayScreen() {
                     </span>
                   )}
                 </div>
-                <div className="flex-shrink-0">
+                <div className="flex-shrink-0 flex flex-col items-end gap-1.5">
                   <DemandBadge score={zone.score} size="lg" />
+                  {(() => {
+                    const surge = surgeMap?.get(zone.id);
+                    return surge ? (
+                      <SurgeBar
+                        surgeClass={surge.surgeClass}
+                        multiplier={surge.surgeMultiplier}
+                      />
+                    ) : null;
+                  })()}
                 </div>
               </div>
             );

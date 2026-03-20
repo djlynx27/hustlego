@@ -24,8 +24,13 @@ import {
   type ActiveEventBoost,
   type WeatherCondition,
 } from '@/lib/scoringEngine';
+import {
+  buildSurgeContext,
+  computeSurge,
+  type SurgeResult,
+} from '@/lib/surgeEngine';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 export interface ScoreFactors {
   hasWeatherBoost: boolean;
@@ -379,6 +384,65 @@ export function useDemandScores(cityId: string) {
     stmStatus,
   ]);
 
+  // ── Surge computation per zone ──────────────────────────────────────────
+  // Computed client-side from surgeEngine; baseline = current_score from DB
+  // (a 4-week baseline via get_surge_baseline() is available from context-embeddings EF)
+  const surgeMap = useMemo(() => {
+    const map = new Map<string, SurgeResult>();
+    for (const zone of zones) {
+      const currentScore =
+        scores.get(zone.id) ??
+        ((zone as Record<string, unknown>).current_score as number) ??
+        50;
+      const baselineScore =
+        ((zone as Record<string, unknown>).base_score as number) ??
+        currentScore * 0.85;
+      const ctx = buildSurgeContext({
+        now,
+        currentScore,
+        baselineScore: baselineScore > 0 ? baselineScore : 50,
+        weatherScore: weatherCondition?.demandBoostPoints ?? 0,
+        eventProximity: factors.get(zone.id)?.eventBoostPoints ?? 0,
+        trafficIndex: trafficByZone.get(zone.id) ?? 0,
+        deadheadKm: 5, // conservative default; TodayScreen overrides with GPS
+      });
+      map.set(zone.id, computeSurge(ctx));
+    }
+    return map;
+  }, [zones, scores, now, weatherCondition, factors, trafficByZone]);
+
+  // Store surge vectors after each recalculation (fire-and-forget)
+  const storeSurgeVectors = useCallback(() => {
+    for (const zone of zones) {
+      const surge = surgeMap.get(zone.id);
+      if (!surge) continue;
+      // Skip normal-class with no trips to avoid cluttering the DB
+      if (surge.surgeClass === 'normal') continue;
+      supabase.functions
+        .invoke('context-embeddings', {
+          body: {
+            zone_id: zone.id,
+            context_vector: Array.from(surge.contextVector),
+            surge_multiplier: surge.surgeMultiplier,
+            surge_class: surge.surgeClass,
+          },
+        })
+        .catch(() => {
+          // non-blocking — vector storage is best-effort
+        });
+    }
+  }, [zones, surgeMap]);
+
+  // Trigger vector storage once per score refresh
+  const lastStoreRef = useRef<number>(0);
+  useEffect(() => {
+    if (surgeMap.size === 0) return;
+    const now = Date.now();
+    if (now - lastStoreRef.current < 30 * 60 * 1000) return; // max once per 30 min
+    lastStoreRef.current = now;
+    storeSurgeVectors();
+  }, [surgeMap, storeSurgeVectors]);
+
   return {
     scores,
     factors,
@@ -393,5 +457,6 @@ export function useDemandScores(cityId: string) {
     averageTrafficCongestion,
     similarContextSignals,
     stmStatus,
+    surgeMap,
   };
 }
