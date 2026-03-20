@@ -1,4 +1,10 @@
-import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/contexts/I18nContext';
 import { Navigation } from 'lucide-react';
@@ -23,6 +29,9 @@ export function NavigationSheet({ open, onClose, zoneName, latitude, longitude }
       <SheetContent side="bottom" className="rounded-t-2xl px-4 pb-6 pt-4 bg-card border-border">
         <SheetHeader>
           <SheetTitle className="font-display text-[22px] text-foreground">{zoneName}</SheetTitle>
+          <SheetDescription className="text-sm text-muted-foreground">
+            Choisissez votre application de navigation pour vous diriger vers cette zone.
+          </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-2 mt-4">
           <Button asChild className="w-full gap-2 text-[18px] font-display font-bold h-16 bg-primary text-primary-foreground hover:bg-primary/90">
