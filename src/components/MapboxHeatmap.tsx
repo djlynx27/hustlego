@@ -13,6 +13,12 @@ import { LeafletMap } from './LeafletMap';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN as string | undefined;
 
+function logMapGeolocationIssue(...args: unknown[]) {
+  if (import.meta.env.DEV) {
+    console.warn(...args);
+  }
+}
+
 export interface HeatmapZone {
   id: string;
   name: string;
@@ -130,7 +136,7 @@ export function MapboxHeatmap({
     const watchId = navigator.geolocation.watchPosition(
       (pos) => applyPos(pos.coords.latitude, pos.coords.longitude),
       (error) => {
-        console.warn('Geolocation watch error:', error.message);
+        logMapGeolocationIssue('Geolocation watch error:', error.message);
         setLocationError(error.message);
       },
       { enableHighAccuracy: false, timeout: 10000, maximumAge: 10000 }

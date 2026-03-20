@@ -81,6 +81,12 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+function logAdminGeolocationIssue(...args: unknown[]) {
+  if (import.meta.env.DEV) {
+    console.warn(...args);
+  }
+}
+
 export default function AdminScreen() {
   const { t } = useI18n();
   const { data: cities = [] } = useCities();
@@ -157,7 +163,10 @@ export default function AdminScreen() {
           });
         },
         (err) => {
-          console.warn('Geolocation permission denied:', err.message);
+          logAdminGeolocationIssue(
+            'Geolocation permission denied:',
+            err.message
+          );
           toast.error(t('locationPermissionTip'));
         }
       );
