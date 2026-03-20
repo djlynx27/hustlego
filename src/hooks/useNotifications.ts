@@ -29,6 +29,7 @@ interface NotifState {
   lastDemandNotif: number;
   lastWeatherNotif: number;
   lastBarNotif: number;
+  lastSurgeNotif: number;
   prevWeatherId: number | null;
 }
 
@@ -78,13 +79,14 @@ export function useNotifications(cityId: string) {
       typeof Notification !== 'undefined' &&
       Notification.permission === 'granted'
   );
-  const { scores, zones, weather, endingSoon, startingSoon } =
+  const { scores, zones, weather, endingSoon, startingSoon, surgeMap } =
     useDemandScores(cityId);
   const { location: userLocation } = useUserLocation();
   const stateRef = useRef<NotifState>({
     lastDemandNotif: 0,
     lastWeatherNotif: 0,
     lastBarNotif: 0,
+    lastSurgeNotif: 0,
     prevWeatherId: null,
   });
 
@@ -226,6 +228,51 @@ export function useNotifications(cityId: string) {
     }
     s.prevWeatherId = weather.weatherId;
   }, [enabled, weather]);
+
+  // Surge PEAK alert — fires when any zone in the city crosses peak threshold
+  useEffect(() => {
+    if (!enabled || !surgeMap || surgeMap.size === 0) return;
+    const s = stateRef.current;
+    const now = Date.now();
+    if (now - s.lastSurgeNotif < NOTIF_COOLDOWN_MS) return;
+
+    const peakZones = zones.filter(
+      (z) => surgeMap.get(z.id)?.surgeClass === 'peak'
+    );
+    if (peakZones.length === 0) return;
+
+    // If user has GPS, prefer the closest peak zone
+    let targetZone = peakZones[0]!;
+    if (userLocation && peakZones.length > 1) {
+      let bestDist = Infinity;
+      for (const z of peakZones) {
+        const dlat = ((z.latitude - userLocation.latitude) * Math.PI) / 180;
+        const dlng = ((z.longitude - userLocation.longitude) * Math.PI) / 180;
+        const a =
+          Math.sin(dlat / 2) ** 2 +
+          Math.cos((userLocation.latitude * Math.PI) / 180) *
+            Math.cos((z.latitude * Math.PI) / 180) *
+            Math.sin(dlng / 2) ** 2;
+        const d = 6371 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        if (d < bestDist) {
+          bestDist = d;
+          targetZone = z;
+        }
+      }
+    }
+
+    const surge = surgeMap.get(targetZone.id);
+    const multiplier = surge ? `${surge.surgeMultiplier.toFixed(2)}×` : '';
+    const extra =
+      peakZones.length > 1 ? ` + ${peakZones.length - 1} autre(s)` : '';
+
+    sendNotification(
+      `🔴 PEAK Surge ${multiplier} — ${targetZone.name}`,
+      `Demande maximale${extra}. Allez-y maintenant!`,
+      `https://www.google.com/maps/dir/?api=1&destination=${targetZone.latitude},${targetZone.longitude}&travelmode=driving`
+    );
+    s.lastSurgeNotif = now;
+  }, [enabled, surgeMap, zones, userLocation]);
 
   return { enabled, requestPermission };
 }

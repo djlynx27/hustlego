@@ -6,6 +6,7 @@ import { NavigationSheet } from '@/components/NavigationSheet';
 import { NetProfitWidget } from '@/components/NetProfitWidget';
 import { PreShiftBriefing } from '@/components/PreShiftBriefing';
 import { ScoreFactorIcons } from '@/components/ScoreFactorIcons';
+import { PlatformArbitrage } from '@/components/PlatformArbitrage';
 import { SurgeBar, SurgeIndicator } from '@/components/SurgeIndicator';
 import { SwipeToAccept } from '@/components/SwipeToAccept';
 import { Button } from '@/components/ui/button';
@@ -938,6 +939,13 @@ export default function TodayScreen() {
                       </button>
                     )}
                   </div>
+                  {/* Platform arbitrage — shown below GO buttons */}
+                  <PlatformArbitrage
+                    zoneId={zone.id}
+                    zoneScore={zone.arrivalScore}
+                    compact
+                    className="mt-1"
+                  />
                 </div>
               );
             })
@@ -999,6 +1007,11 @@ export default function TodayScreen() {
                       />
                     ) : null;
                   })()}
+                  <PlatformArbitrage
+                    zoneId={zone.id}
+                    zoneScore={zone.score}
+                    compact
+                  />
                 </div>
               </div>
             );

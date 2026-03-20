@@ -74,7 +74,7 @@ Le rapport identifie **5 leviers de rendement $/h** pour un chauffeur multi-plat
 
 ---
 
-### PHASE 2 — Surge Engine + pgvector (🚧 EN COURS)
+### PHASE 2 — Surge Engine + pgvector (✅ DONE)
 
 **Objectif :** détecter les surges 10–15 min en avance via context similarity
 
@@ -83,23 +83,23 @@ Le rapport identifie **5 leviers de rendement $/h** pour un chauffeur multi-plat
 | 2.1 | `surgeEngine.ts` — moteur surge + vecteur 8D | Data Scientist       | S      | ✅     |
 | 2.2 | Migration pgvector `zone_context_vectors`    | Architecte           | S      | ✅     |
 | 2.3 | `context-embeddings` Edge Function           | Integration Engineer | M      | ✅     |
-| 2.4 | `SurgeIndicator` composant React             | Frontend Dev         | M      | P2     |
-| 2.5 | Intégration surge dans `useDemandScores`     | Frontend Dev         | S      | P2     |
-| 2.6 | `surge-detector` Edge Function (cron 5 min)  | Integration Engineer | M      | P2     |
+| 2.4 | `SurgeIndicator` composant React             | Frontend Dev         | M      | ✅     |
+| 2.5 | Intégration surge dans `useDemandScores`     | Frontend Dev         | S      | ✅     |
+| 2.6 | `surge-detector` Edge Function (cron 5 min)  | Integration Engineer | M      | ✅     |
 
 ---
 
-### PHASE 3 — Platform Arbitrage + Deadhead (🔜 PRIORITÉ HAUTE)
+### PHASE 3 — Platform Arbitrage + Deadhead (✅ DONE)
 
 **Objectif :** afficher le meilleur choix de plateforme par zone/moment
 
 | #   | Livrable                                  | Agent responsable    | Effort | Status |
 | --- | ----------------------------------------- | -------------------- | ------ | ------ |
-| 3.1 | Table `platform_signals` en BDD           | Architecte           | S      | P3     |
-| 3.2 | `platform-signal-collector` Edge Function | Integration Engineer | L      | P3     |
-| 3.3 | `PlatformArbitrage` composant             | Frontend Dev         | M      | P3     |
-| 3.4 | Score deadhead en mode libre              | Data Scientist       | S      | P3     |
-| 3.5 | Notification "Bascule vers DoorDash"      | Integration Engineer | M      | P3     |
+| 3.1 | Table `platform_signals` en BDD           | Architecte           | S      | ✅     |
+| 3.2 | `platform-signal-collector` Edge Function | Integration Engineer | L      | ✅     |
+| 3.3 | `PlatformArbitrage` composant             | Frontend Dev         | M      | ✅     |
+| 3.4 | Score deadhead en mode libre              | Data Scientist       | S      | ✅     |
+| 3.5 | Notification "Bascule vers DoorDash"      | Integration Engineer | M      | ✅     |
 
 ---
 
