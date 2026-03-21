@@ -28,6 +28,7 @@ import {
   type Zone,
 } from '@/hooks/useSupabase';
 import { Constants } from '@/integrations/supabase/types';
+import { parseZoneCoordinates } from '@/lib/zoneCoordinates';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { toast } from 'sonner';
@@ -86,22 +87,31 @@ export default function ZonesScreen() {
 
   async function handleSave() {
     if (!form.name || !form.latitude || !form.longitude) return;
+
+    const coordinates = parseZoneCoordinates(form.latitude, form.longitude);
+    if (!coordinates) {
+      toast.error(
+        'Coordonnees invalides: utilise des nombres valides pour latitude et longitude'
+      );
+      return;
+    }
+
     try {
       if (editing) {
         await updateZone.mutateAsync({
           id: editing.id,
           name: form.name,
           type: form.type,
-          latitude: parseFloat(form.latitude),
-          longitude: parseFloat(form.longitude),
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
         });
       } else {
         await addZone.mutateAsync({
           city_id: cityId,
           name: form.name,
           type: form.type as ZoneType,
-          latitude: parseFloat(form.latitude),
-          longitude: parseFloat(form.longitude),
+          latitude: coordinates.latitude,
+          longitude: coordinates.longitude,
         });
       }
       toast.success(t('save'));
