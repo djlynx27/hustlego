@@ -34,6 +34,44 @@ serve(async (req) => {
     const totalDistance =
       trips?.reduce((s, t) => s + (t.distance_km ?? 0), 0) ?? 0;
 
+    const { data: sessions, error: sessionsErr } = await supabase
+      .from('sessions')
+      .select('total_earnings, total_hours, total_rides, started_at, ended_at')
+      .gte('started_at', `${today}T00:00:00Z`)
+      .lt('started_at', `${today}T23:59:59Z`);
+
+    if (sessionsErr) throw sessionsErr;
+
+    const trackedShiftCount = sessions?.length ?? 0;
+    const trackedHours =
+      sessions?.reduce((sum, session) => {
+        const explicitHours = Number(session.total_hours ?? 0);
+        if (explicitHours > 0) return sum + explicitHours;
+
+        if (!session.started_at || !session.ended_at) return sum;
+        const startedAt = new Date(session.started_at).getTime();
+        const endedAt = new Date(session.ended_at).getTime();
+        if (
+          Number.isNaN(startedAt) ||
+          Number.isNaN(endedAt) ||
+          endedAt <= startedAt
+        ) {
+          return sum;
+        }
+
+        return sum + (endedAt - startedAt) / 3_600_000;
+      }, 0) ?? 0;
+    const trackedEarnings =
+      sessions?.reduce(
+        (sum, session) => sum + Number(session.total_earnings ?? 0),
+        0
+      ) ?? 0;
+    const trackedRides =
+      sessions?.reduce(
+        (sum, session) => sum + Number(session.total_rides ?? 0),
+        0
+      ) ?? 0;
+
     // Compute hours worked from trip timestamps
     let hoursWorked = 0;
     for (const trip of trips ?? []) {
@@ -44,6 +82,17 @@ serve(async (req) => {
       }
     }
     hoursWorked = Math.round(hoursWorked * 100) / 100;
+
+    const useTrackedSessions = trackedShiftCount > 0 && trackedHours > 0;
+    const reportHoursWorked = useTrackedSessions
+      ? Math.round(trackedHours * 100) / 100
+      : hoursWorked;
+    const reportEarnings = useTrackedSessions
+      ? Math.round(trackedEarnings * 100) / 100
+      : Math.round(totalEarnings * 100) / 100;
+    const reportTrips = useTrackedSessions
+      ? Math.round(trackedRides)
+      : totalTrips;
 
     // ─── Identify best zone by earnings ──────────────────────────────
     const zoneEarnings: Record<string, number> = {};
@@ -78,15 +127,18 @@ serve(async (req) => {
     if (geminiKey && totalTrips > 0) {
       try {
         const earningsPerHour =
-          hoursWorked > 0 ? (totalEarnings / hoursWorked).toFixed(2) : 'N/A';
+          reportHoursWorked > 0
+            ? (reportEarnings / reportHoursWorked).toFixed(2)
+            : 'N/A';
         const prompt = `Tu es un coach pour chauffeur Lyft/DoorDash à Montréal.
 Données du jour ${today}:
-- Courses: ${totalTrips}
-- Revenus bruts: $${totalEarnings.toFixed(2)} CAD
+- Courses: ${reportTrips}
+- Revenus bruts: $${reportEarnings.toFixed(2)} CAD
 - Distance: ${totalDistance.toFixed(1)} km
-- Heures travaillées: ${hoursWorked.toFixed(1)} h
+- Heures travaillées: ${reportHoursWorked.toFixed(1)} h
 - $/h: ${earningsPerHour}
 - Meilleure zone: ${bestZoneName ?? 'N/A'}
+${useTrackedSessions ? `- Shifts trackés synchronisés: ${trackedShiftCount}` : '- Shifts trackés synchronisés: 0'}
 
 Donne une recommandation courte et actionnable pour demain (max 120 caractères, en français).
 Réponds UNIQUEMENT avec la recommandation, pas d'explication.`;
@@ -117,12 +169,16 @@ Réponds UNIQUEMENT avec la recommandation, pas d'explication.`;
     // ─── Upsert daily_reports row ─────────────────────────────────────
     const reportRow = {
       report_date: today,
-      total_trips: totalTrips,
-      total_earnings: Math.round(totalEarnings * 100) / 100,
+      total_trips: reportTrips,
+      total_earnings: reportEarnings,
       total_distance_km: Math.round(totalDistance * 100) / 100,
-      hours_worked: hoursWorked,
+      hours_worked: reportHoursWorked,
       best_zone_name: bestZoneName,
-      ai_recommendation: aiRecommendation,
+      ai_recommendation: useTrackedSessions
+        ? aiRecommendation
+          ? `${aiRecommendation} · ${trackedShiftCount} shift${trackedShiftCount > 1 ? 's' : ''} tracké${trackedShiftCount > 1 ? 's' : ''}`
+          : `${trackedShiftCount} shift${trackedShiftCount > 1 ? 's' : ''} tracké${trackedShiftCount > 1 ? 's' : ''}`
+        : aiRecommendation,
     };
 
     const { data: existing, error: fetchErr } = await supabase
