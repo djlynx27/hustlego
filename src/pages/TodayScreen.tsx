@@ -47,7 +47,6 @@ import {
   Download,
   Navigation,
   PartyPopper,
-  Ticket,
   Timer,
   WifiOff,
 } from 'lucide-react';
@@ -651,22 +650,6 @@ export default function TodayScreen() {
             </div>
           );
         })}
-        {relevantTmEvents.length > 0 && (
-          <div
-            onClick={() => navigate('/events')}
-            className="flex items-center gap-2 bg-accent/20 border border-accent/40 rounded-lg px-3 py-2 cursor-pointer active:scale-[0.98] transition-transform"
-          >
-            <Ticket className="w-5 h-5 text-accent-foreground flex-shrink-0" />
-            <span className="text-[14px] font-body font-medium text-accent-foreground">
-              🎫 {relevantTmEvents.length} événement
-              {relevantTmEvents.length > 1 ? 's' : ''} en cours/à venir –{' '}
-              {relevantTmEvents
-                .map((e) => e.venueName)
-                .filter((v, i, a) => a.indexOf(v) === i)
-                .join(', ')}
-            </span>
-          </div>
-        )}
       </div>
 
       {/* 2. MEILLEURE ZONE hero card */}
