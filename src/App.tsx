@@ -3,22 +3,31 @@ import { NearestHotspot } from '@/components/NearestHotspot';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { I18nProvider } from '@/contexts/I18nContext';
-import AdminImportsScreen from '@/pages/AdminImportsScreen';
-import AdminLearningScreen from '@/pages/AdminLearningScreen';
-import AdminOperationsScreen from '@/pages/AdminOperationsScreen';
-import AdminReportsScreen from '@/pages/AdminReportsScreen';
-import AdminScreen from '@/pages/AdminScreen';
-import AdminToolsScreen from '@/pages/AdminToolsScreen';
-import DriveScreen from '@/pages/DriveScreen';
-import EventsScreen from '@/pages/EventsScreen';
-import PlanningScreen from '@/pages/PlanningScreen';
-import TodayScreen from '@/pages/TodayScreen';
-import ZonesScreen from '@/pages/ZonesScreen';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider } from 'next-themes';
-import { Component, type ErrorInfo, type ReactNode } from 'react';
+import {
+  Component,
+  Suspense,
+  lazy,
+  type ErrorInfo,
+  type ReactNode,
+} from 'react';
 import { BrowserRouter, Route, Routes, useLocation } from 'react-router-dom';
-import NotFound from './pages/NotFound.tsx';
+
+const DriveScreen = lazy(() => import('@/pages/DriveScreen'));
+const TodayScreen = lazy(() => import('@/pages/TodayScreen'));
+const PlanningScreen = lazy(() => import('@/pages/PlanningScreen'));
+const ZonesScreen = lazy(() => import('@/pages/ZonesScreen'));
+const EventsScreen = lazy(() => import('@/pages/EventsScreen'));
+const AdminScreen = lazy(() => import('@/pages/AdminScreen'));
+const AdminOperationsScreen = lazy(
+  () => import('@/pages/AdminOperationsScreen')
+);
+const AdminReportsScreen = lazy(() => import('@/pages/AdminReportsScreen'));
+const AdminLearningScreen = lazy(() => import('@/pages/AdminLearningScreen'));
+const AdminImportsScreen = lazy(() => import('@/pages/AdminImportsScreen'));
+const AdminToolsScreen = lazy(() => import('@/pages/AdminToolsScreen'));
+const NotFound = lazy(() => import('./pages/NotFound.tsx'));
 
 const queryClient = new QueryClient();
 
@@ -75,21 +84,27 @@ function AppContent() {
 
   return (
     <div className="min-h-screen bg-background text-foreground">
-      <Routes>
-        <Route path="/" element={<DriveScreen />} />
-        <Route path="/today" element={<TodayScreen />} />
-        <Route path="/drive" element={<DriveScreen />} />
-        <Route path="/planning" element={<PlanningScreen />} />
-        <Route path="/zones" element={<ZonesScreen />} />
-        <Route path="/events" element={<EventsScreen />} />
-        <Route path="/admin" element={<AdminScreen />} />
-        <Route path="/admin/operations" element={<AdminOperationsScreen />} />
-        <Route path="/admin/reports" element={<AdminReportsScreen />} />
-        <Route path="/admin/learning" element={<AdminLearningScreen />} />
-        <Route path="/admin/imports" element={<AdminImportsScreen />} />
-        <Route path="/admin/tools" element={<AdminToolsScreen />} />
-        <Route path="*" element={<NotFound />} />
-      </Routes>
+      <Suspense
+        fallback={
+          <div className="min-h-screen bg-background text-foreground" />
+        }
+      >
+        <Routes>
+          <Route path="/" element={<DriveScreen />} />
+          <Route path="/today" element={<TodayScreen />} />
+          <Route path="/drive" element={<DriveScreen />} />
+          <Route path="/planning" element={<PlanningScreen />} />
+          <Route path="/zones" element={<ZonesScreen />} />
+          <Route path="/events" element={<EventsScreen />} />
+          <Route path="/admin" element={<AdminScreen />} />
+          <Route path="/admin/operations" element={<AdminOperationsScreen />} />
+          <Route path="/admin/reports" element={<AdminReportsScreen />} />
+          <Route path="/admin/learning" element={<AdminLearningScreen />} />
+          <Route path="/admin/imports" element={<AdminImportsScreen />} />
+          <Route path="/admin/tools" element={<AdminToolsScreen />} />
+          <Route path="*" element={<NotFound />} />
+        </Routes>
+      </Suspense>
       {showNearestHotspot && <NearestHotspot />}
       <BottomNav />
     </div>
