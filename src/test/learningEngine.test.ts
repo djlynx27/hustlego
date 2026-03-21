@@ -70,6 +70,13 @@ describe('learning engine', () => {
     expect(total).toBeCloseTo(1, 5);
   });
 
+  it('uses threshold-based prediction accuracy', () => {
+    const insights = deriveLearningInsights(trips, DEFAULT_WEIGHTS);
+
+    expect(insights.meanAbsoluteError).toBe(28);
+    expect(insights.accuracyPercent).toBe(33.33);
+  });
+
   it('builds a post-shift summary for a time window', () => {
     const summary = derivePostShiftSummary(
       trips,

@@ -218,7 +218,13 @@ export function deriveLearningInsights(
           ) / predictions.length
         )
       : 0;
-  const accuracyPercent = clamp(round(100 - meanAbsoluteError), 0, 100);
+  const accuratePredictions = predictions.filter(
+    (prediction) => Math.abs(prediction.error) <= 15
+  ).length;
+  const accuracyPercent =
+    predictions.length > 0
+      ? round((accuratePredictions / predictions.length) * 100)
+      : 0;
 
   const baseSuggestions: WeightConfig = { ...weights };
   const sampleCount = predictions.length;
