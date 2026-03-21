@@ -105,13 +105,23 @@ jobs:
         with:
           fetch-depth: 0 # full history so TruffleHog can scan all commits
 
-      - name: TruffleHog — detect leaked secrets
+      - name: TruffleHog — detect leaked secrets (pull requests)
+        if: github.event_name == 'pull_request'
         uses: trufflesecurity/trufflehog@main
         with:
           path: ./
-          base: ${{ github.event.repository.default_branch }}
-          head: HEAD
-          extra_args: --results=verified,unknown
+          base: ${{ github.event.pull_request.base.sha }}
+          head: ${{ github.event.pull_request.head.sha }}
+          extra_args: --results=verified
+
+      - name: TruffleHog — detect leaked secrets (pushes)
+        if: github.event_name == 'push'
+        uses: trufflesecurity/trufflehog@main
+        with:
+          path: ./
+          base: ${{ github.event.before }}
+          head: ${{ github.sha }}
+          extra_args: --results=verified
 
   # ─── CodeQL SAST ────────────────────────────────────────────────────────────
   codeql:

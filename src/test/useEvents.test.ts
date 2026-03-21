@@ -6,6 +6,26 @@ import {
 } from '@/hooks/useEvents';
 import { describe, expect, it } from 'vitest';
 
+function makeLocalDate(
+  year: number,
+  monthIndex: number,
+  day: number,
+  hour: number,
+  minute = 0
+) {
+  return new Date(year, monthIndex, day, hour, minute, 0, 0);
+}
+
+function makeLocalIso(
+  year: number,
+  monthIndex: number,
+  day: number,
+  hour: number,
+  minute = 0
+) {
+  return makeLocalDate(year, monthIndex, day, hour, minute).toISOString();
+}
+
 function makeEvent(overrides: Partial<AppEvent> = {}): AppEvent {
   return {
     id: 'event-1',
@@ -31,9 +51,9 @@ describe('event demand relevance', () => {
   it('filters low-impact guided events overnight', () => {
     const event = makeEvent();
 
-    expect(
-      isDemandRelevantEvent(event, new Date('2026-03-21T02:00:00-04:00'))
-    ).toBe(false);
+    expect(isDemandRelevantEvent(event, makeLocalDate(2026, 2, 21, 2))).toBe(
+      false
+    );
   });
 
   it('keeps large nightlife-relevant events overnight', () => {
@@ -46,17 +66,17 @@ describe('event demand relevance', () => {
       category: 'festival',
     });
 
-    expect(
-      isDemandRelevantEvent(event, new Date('2026-03-21T02:00:00-04:00'))
-    ).toBe(true);
+    expect(isDemandRelevantEvent(event, makeLocalDate(2026, 2, 21, 2))).toBe(
+      true
+    );
   });
 
   it('excludes low-impact overnight events from active events', () => {
-    const now = new Date('2026-03-21T02:00:00-04:00');
+    const now = makeLocalDate(2026, 2, 21, 2);
     const events = [
       makeEvent({
-        start_at: '2026-03-21T04:30:00.000Z',
-        end_at: '2026-03-21T06:30:00.000Z',
+        start_at: makeLocalIso(2026, 2, 21, 0, 30),
+        end_at: makeLocalIso(2026, 2, 21, 2, 30),
       }),
     ];
 
@@ -64,12 +84,12 @@ describe('event demand relevance', () => {
   });
 
   it('keeps upcoming major overnight events in starting soon', () => {
-    const now = new Date('2026-03-21T01:15:00-04:00');
+    const now = makeLocalDate(2026, 2, 21, 1, 15);
     const events = [
       makeEvent({
         name: 'Fin de concert Place Bell',
-        start_at: '2026-03-21T06:00:00.000Z',
-        end_at: '2026-03-21T08:30:00.000Z',
+        start_at: makeLocalIso(2026, 2, 21, 2, 0),
+        end_at: makeLocalIso(2026, 2, 21, 4, 30),
         capacity: 9000,
         demand_impact: 4,
         boost_multiplier: 1.8,

@@ -6,6 +6,16 @@ import type { Zone } from '@/hooks/useSupabase';
 import type { TripWithZone } from '@/hooks/useTrips';
 import { describe, expect, it } from 'vitest';
 
+function makeLocalDate(
+  year: number,
+  monthIndex: number,
+  day: number,
+  hour: number,
+  minute = 0
+) {
+  return new Date(year, monthIndex, day, hour, minute, 0, 0);
+}
+
 const zones: Zone[] = [
   {
     id: 'zone-1',
@@ -92,7 +102,7 @@ describe('applyOvernightRealityCap', () => {
     const capped = applyOvernightRealityCap({
       score: 100,
       zoneType: 'commercial',
-      now: new Date('2026-03-21T02:00:00-04:00'),
+      now: makeLocalDate(2026, 2, 21, 2),
       hasRelevantEvent: false,
       weatherBoostPoints: 0,
       lyftDemandLevel: 3,
@@ -107,7 +117,7 @@ describe('applyOvernightRealityCap', () => {
     const capped = applyOvernightRealityCap({
       score: 92,
       zoneType: 'nightlife',
-      now: new Date('2026-03-21T02:00:00-04:00'),
+      now: makeLocalDate(2026, 2, 21, 2),
       hasRelevantEvent: true,
       weatherBoostPoints: 0,
       lyftDemandLevel: 4,
@@ -122,7 +132,7 @@ describe('applyOvernightRealityCap', () => {
     const capped = applyOvernightRealityCap({
       score: 95,
       zoneType: 'commercial',
-      now: new Date('2026-03-21T14:00:00-04:00'),
+      now: makeLocalDate(2026, 2, 21, 14),
       hasRelevantEvent: false,
       weatherBoostPoints: 0,
       lyftDemandLevel: 3,

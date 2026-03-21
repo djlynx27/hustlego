@@ -9,6 +9,16 @@ import {
 } from '@/lib/scoringEngine';
 import { describe, expect, it } from 'vitest';
 
+function makeLocalDate(
+  year: number,
+  monthIndex: number,
+  day: number,
+  hour: number,
+  minute = 0
+) {
+  return new Date(year, monthIndex, day, hour, minute, 0, 0);
+}
+
 const downtownZone = {
   id: 'mtl-cb',
   name: 'Centre Bell',
@@ -55,7 +65,7 @@ describe('scoring engine', () => {
 
     const result = computeDemandScore(
       downtownZone,
-      new Date('2026-03-20T22:00:00-04:00'),
+      makeLocalDate(2026, 2, 20, 22),
       weather,
       eventBoosts
     );
