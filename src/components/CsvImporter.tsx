@@ -8,6 +8,7 @@ import {
   CardTitle,
 } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
+import { Switch } from '@/components/ui/switch';
 import { useZones, type Zone } from '@/hooks/useSupabase';
 import { supabase } from '@/integrations/supabase/client';
 import { parseCsvRecords } from '@/lib/csv';
@@ -27,7 +28,17 @@ interface ParsedTrip {
   platform: string;
   zone_id: string | null;
   zone_name: string;
+  zone_confidence: 'explicit' | 'heuristic' | 'missing';
   raw: Record<string, string>;
+}
+
+function normalizeZoneToken(value: string) {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
 }
 
 // Map time+day patterns to zone types for auto-assignment
@@ -82,6 +93,41 @@ function findColumn(row: Record<string, string>, candidates: string[]): string {
     if (key && row[key]) return row[key];
   }
   return '';
+}
+
+function findZoneFromRow(
+  row: Record<string, string>,
+  zones: Zone[]
+): { id: string; name: string } | null {
+  const zoneHint = findColumn(row, [
+    'zone',
+    'area',
+    'borough',
+    'region',
+    'pickup_zone',
+    'dropoff_zone',
+    'pickup',
+    'dropoff',
+    'city',
+  ]);
+
+  if (!zoneHint) return null;
+
+  const normalizedHint = normalizeZoneToken(zoneHint);
+  if (!normalizedHint) return null;
+
+  const directMatch = zones.find((zone) => {
+    const normalizedName = normalizeZoneToken(zone.name);
+    const normalizedType = normalizeZoneToken(zone.type ?? '');
+    return (
+      normalizedName === normalizedHint ||
+      normalizedName.includes(normalizedHint) ||
+      normalizedHint.includes(normalizedName) ||
+      (normalizedType.length > 0 && normalizedType === normalizedHint)
+    );
+  });
+
+  return directMatch ? { id: directMatch.id, name: directMatch.name } : null;
 }
 
 function parseEarnings(val: string): number {
@@ -151,6 +197,7 @@ export function CsvImporter() {
   const [importing, setImporting] = useState(false);
   const [progress, setProgress] = useState(0);
   const [imported, setImported] = useState(0);
+  const [includeHeuristicZones, setIncludeHeuristicZones] = useState(false);
 
   const handleFile = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -210,7 +257,11 @@ export function CsvImporter() {
             /* ignore parse errors */
           }
 
-          const zone = guessZoneByTime(hour, dayOfWeek, allZones);
+          const explicitZone = findZoneFromRow(row, allZones);
+          const heuristicZone = explicitZone
+            ? null
+            : guessZoneByTime(hour, dayOfWeek, allZones);
+          const zone = explicitZone ?? heuristicZone;
 
           return {
             source_row: index + 2,
@@ -223,6 +274,11 @@ export function CsvImporter() {
             platform,
             zone_id: zone?.id || null,
             zone_name: zone?.name || 'Auto (aucune)',
+            zone_confidence: explicitZone
+              ? 'explicit'
+              : heuristicZone
+                ? 'heuristic'
+                : 'missing',
             raw: row,
           };
         });
@@ -247,6 +303,11 @@ export function CsvImporter() {
     const skippedMissingZoneRows = parsed
       .filter((trip) => !trip.zone_id)
       .map((trip) => trip.source_row);
+    const skippedHeuristicRows = parsed
+      .filter(
+        (trip) => trip.zone_confidence === 'heuristic' && !includeHeuristicZones
+      )
+      .map((trip) => trip.source_row);
     const skippedMissingDateRows = parsed
       .filter((trip) => !trip.date)
       .map((trip) => trip.source_row);
@@ -256,6 +317,7 @@ export function CsvImporter() {
 
     const skippedRows = new Set<number>([
       ...skippedMissingZoneRows,
+      ...skippedHeuristicRows,
       ...skippedMissingDateRows,
       ...skippedMissingEndTimeRows,
     ]);
@@ -263,6 +325,9 @@ export function CsvImporter() {
     const skippedReasons = [
       skippedMissingZoneRows.length > 0
         ? `sans zone auto (${formatRowList(skippedMissingZoneRows)})`
+        : null,
+      skippedHeuristicRows.length > 0
+        ? `zone heuristique non importée (${formatRowList(skippedHeuristicRows)})`
         : null,
       skippedMissingDateRows.length > 0
         ? `sans date (${formatRowList(skippedMissingDateRows)})`
@@ -289,7 +354,10 @@ export function CsvImporter() {
           earnings: t.earnings,
           tips: t.tips,
           distance_km: t.distance_km,
-          notes: `Import CSV ${t.platform}`,
+          notes:
+            t.zone_confidence === 'heuristic'
+              ? `Import CSV ${t.platform} · zone heuristique`
+              : `Import CSV ${t.platform}`,
         },
       }));
 
@@ -363,11 +431,17 @@ export function CsvImporter() {
           Gridwise
         </CardTitle>
         <CardDescription className="text-xs">
-          Importez un export CSV Gridwise — les zones sont assignées
-          automatiquement par heure et jour
+          Importez un export CSV Gridwise. Les zones explicites sont préférées;
+          les affectations heuristiques restent désactivées par défaut.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+          Les lignes sans zone explicite peuvent être devinées par heure et
+          jour, mais ces affectations sont moins fiables. Elles sont exclues de
+          l’import par défaut pour éviter de polluer les analytics.
+        </div>
+
         {/* File upload */}
         <label className="flex items-center justify-center gap-2 w-full h-20 rounded-lg border-2 border-dashed border-border bg-background cursor-pointer hover:border-primary/50 transition-colors">
           <div className="flex flex-col items-center gap-1 text-muted-foreground">
@@ -391,9 +465,38 @@ export function CsvImporter() {
               <span className="text-xs font-medium text-foreground">
                 {parsed.length} courses détectées
               </span>
-              <Badge variant="secondary" className="text-xs">
-                {parsed.filter((t) => t.zone_id).length} avec zone
-              </Badge>
+              <div className="flex items-center gap-1.5">
+                <Badge variant="secondary" className="text-xs">
+                  {
+                    parsed.filter((t) => t.zone_confidence === 'explicit')
+                      .length
+                  }{' '}
+                  zones explicites
+                </Badge>
+                <Badge variant="outline" className="text-xs">
+                  {
+                    parsed.filter((t) => t.zone_confidence === 'heuristic')
+                      .length
+                  }{' '}
+                  heuristiques
+                </Badge>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between rounded-md border border-border bg-background px-3 py-2">
+              <div className="space-y-0.5">
+                <p className="text-xs font-medium text-foreground">
+                  Inclure les zones heuristiques
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Active seulement si tu as vérifié que le mapping horaire/jour
+                  correspond vraiment à tes zones.
+                </p>
+              </div>
+              <Switch
+                checked={includeHeuristicZones}
+                onCheckedChange={setIncludeHeuristicZones}
+              />
             </div>
 
             <div className="max-h-48 overflow-y-auto space-y-1.5">
@@ -411,6 +514,22 @@ export function CsvImporter() {
                     </span>
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
+                    <Badge
+                      variant={
+                        t.zone_confidence === 'explicit'
+                          ? 'default'
+                          : t.zone_confidence === 'heuristic'
+                            ? 'outline'
+                            : 'secondary'
+                      }
+                      className="text-[10px]"
+                    >
+                      {t.zone_confidence === 'explicit'
+                        ? 'zone fiable'
+                        : t.zone_confidence === 'heuristic'
+                          ? 'zone estimée'
+                          : 'sans zone'}
+                    </Badge>
                     <span className="font-semibold">
                       ${t.earnings.toFixed(2)}
                     </span>
@@ -443,7 +562,7 @@ export function CsvImporter() {
               )}
               {importing
                 ? `Import en cours… ${progress}%`
-                : `Importer ${parsed.filter((t) => t.zone_id).length} courses`}
+                : `Importer ${parsed.filter((t) => t.zone_id && (includeHeuristicZones || t.zone_confidence === 'explicit')).length} courses`}
             </Button>
           </div>
         )}
@@ -468,7 +587,7 @@ export function CsvImporter() {
           <p className="font-medium text-foreground">Colonnes supportées</p>
           <p>
             date, start/time, end, earnings/total/fare, tips, miles/distance,
-            platform
+            platform, zone/area/city/pickup/dropoff
           </p>
           <p>Les miles sont automatiquement convertis en km</p>
         </div>

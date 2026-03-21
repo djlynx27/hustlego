@@ -3,9 +3,35 @@ import {
   aggregateTripAnalytics,
   buildShiftSnapshot,
   getTripHours,
+  summarizeTrackedSessions,
   summarizeTrips,
 } from '@/lib/tripAnalytics';
 import { describe, expect, it } from 'vitest';
+
+const sessions = [
+  {
+    id: 1,
+    created_at: '2026-03-15T12:10:00.000Z',
+    started_at: '2026-03-15T08:00:00.000Z',
+    ended_at: '2026-03-15T12:00:00.000Z',
+    total_earnings: 140,
+    total_hours: 4,
+    total_rides: 6,
+    notes: null,
+    weather_snapshot: null,
+  },
+  {
+    id: 2,
+    created_at: '2026-03-16T16:10:00.000Z',
+    started_at: '2026-03-16T12:00:00.000Z',
+    ended_at: '2026-03-16T16:00:00.000Z',
+    total_earnings: 100,
+    total_hours: 4,
+    total_rides: 5,
+    notes: null,
+    weather_snapshot: null,
+  },
+];
 
 const trips: TripWithZone[] = [
   {
@@ -110,5 +136,18 @@ describe('trip analytics', () => {
     expect(summary.rides).toBe(1);
     expect(summary.hours).toBe(0);
     expect(summary.revenuePerHour).toBe(0);
+  });
+
+  it('summarizes tracked shift sessions separately from trip durations', () => {
+    const summary = summarizeTrackedSessions(
+      sessions,
+      new Date('2026-03-15T00:00:00.000Z'),
+      new Date('2026-03-16T23:59:59.000Z')
+    );
+
+    expect(summary.shiftCount).toBe(2);
+    expect(summary.hours).toBe(8);
+    expect(summary.revenue).toBe(240);
+    expect(summary.revenuePerHour).toBe(30);
   });
 });

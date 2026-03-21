@@ -8,6 +8,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 export type City = Tables<'cities'>;
 export type Zone = Tables<'zones'>;
+export type SessionRow = Tables<'sessions'>;
 export type TimeSlotRow = Tables<'time_slots'>;
 export type TimeSlotWithZone = TimeSlotRow & { zones: Zone | null };
 
@@ -215,5 +216,26 @@ export function useBulkInsertTimeSlots() {
       }
     },
     onSettled: () => qc.invalidateQueries({ queryKey: ['time_slots'] }),
+  });
+}
+
+export function useSessions(startedAfter?: string, limit = 500) {
+  return useQuery({
+    queryKey: ['sessions', startedAfter ?? 'all', limit],
+    queryFn: async () => {
+      let query = supabase
+        .from('sessions')
+        .select('*')
+        .order('started_at', { ascending: false })
+        .limit(limit);
+
+      if (startedAfter) {
+        query = query.gte('started_at', startedAfter);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+      return (data ?? []) as SessionRow[];
+    },
   });
 }

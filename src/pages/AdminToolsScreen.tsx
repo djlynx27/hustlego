@@ -1,6 +1,5 @@
 import { AdminPageShell } from '@/components/admin/AdminPageShell';
 import {
-  AdminExternalDataCard,
   AdminManageCitiesCard,
   AdminSimulationCard,
 } from '@/components/admin/AdminPanelCards';
@@ -21,15 +20,15 @@ export default function AdminToolsScreen() {
         <CardContent className="text-sm text-muted-foreground space-y-1.5">
           <p>La simulation crée des scores synthétiques de test.</p>
           <p>
-            Les connecteurs externes sont annexes et n’améliorent pas
-            directement tes revenus ou la calibration des zones.
+            Les outils qui n’influencent ni les zones, ni les revenus, ni le
+            backend principal ont été retirés de cette page pour éviter de
+            brouiller le workflow admin.
           </p>
         </CardContent>
       </Card>
 
       <AdminManageCitiesCard />
       <AdminSimulationCard />
-      <AdminExternalDataCard />
     </AdminPageShell>
   );
 }

@@ -10,8 +10,12 @@ import {
   ChartTooltip,
   ChartTooltipContent,
 } from '@/components/ui/chart';
+import { useSessions } from '@/hooks/useSupabase';
 import { useTrips } from '@/hooks/useTrips';
-import { aggregateTripAnalytics } from '@/lib/tripAnalytics';
+import {
+  aggregateTripAnalytics,
+  summarizeTrackedSessions,
+} from '@/lib/tripAnalytics';
 import { BarChart3, Clock3, MapPin, Smartphone, Wallet } from 'lucide-react';
 import { useMemo } from 'react';
 import {
@@ -46,7 +50,20 @@ const chartConfig = {
 
 export function RevenueDashboard() {
   const { data: trips = [] } = useTrips(500);
+  const sessionsSince = useMemo(() => {
+    const start = new Date();
+    start.setDate(start.getDate() - 29);
+    start.setHours(0, 0, 0, 0);
+    return start.toISOString();
+  }, []);
+  const { data: sessions = [] } = useSessions(sessionsSince, 300);
   const analytics = useMemo(() => aggregateTripAnalytics(trips), [trips]);
+  const tracked30Days = useMemo(() => {
+    const start = new Date();
+    start.setDate(start.getDate() - 29);
+    start.setHours(0, 0, 0, 0);
+    return summarizeTrackedSessions(sessions, start, new Date());
+  }, [sessions]);
 
   const kpis = [
     {
@@ -56,9 +73,18 @@ export function RevenueDashboard() {
       icon: Wallet,
     },
     {
-      label: '$/h sur 30 jours',
+      label: '$/h en course sur 30 jours',
       value: formatMoney(analytics.last30Days.revenuePerHour),
-      helper: `${analytics.last30Days.hours.toFixed(1)} h roulées`,
+      helper: `${analytics.last30Days.hours.toFixed(1)} h en course`,
+      icon: Clock3,
+    },
+    {
+      label: '$/h shift tracké',
+      value: formatMoney(tracked30Days.revenuePerHour),
+      helper:
+        tracked30Days.shiftCount > 0
+          ? `${tracked30Days.hours.toFixed(1)} h sur ${tracked30Days.shiftCount} shift${tracked30Days.shiftCount > 1 ? 's' : ''}`
+          : 'Aucun shift terminé et syncé',
       icon: Clock3,
     },
     {
@@ -86,6 +112,11 @@ export function RevenueDashboard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">
+          Le taux horaire affiché ici repose sur la durée des trajets présents
+          dans `trips`, pas sur l’intégralité du temps de shift ou d’attente.
+        </div>
+
         {trips.length === 0 ? (
           <div className="rounded-xl border border-dashed border-border bg-background/50 p-4 text-sm text-muted-foreground">
             Aucun trajet disponible pour construire le dashboard. Ajoute des
@@ -93,7 +124,7 @@ export function RevenueDashboard() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-2 gap-2">
+            <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
               {kpis.map((kpi) => (
                 <div
                   key={kpi.label}

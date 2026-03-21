@@ -9,7 +9,7 @@ export default function AdminReportsScreen() {
   return (
     <AdminPageShell
       title="Admin · Rapports"
-      description="Lecture consolidée des revenus, des rapports quotidiens et des comparaisons. À interpréter avec prudence tant que le temps de shift réel n’est pas enregistré séparément."
+      description="Lecture consolidée des revenus, des rapports quotidiens et des comparaisons. Les shifts réellement terminés et synchronisés servent maintenant aussi aux métriques de temps total tracké."
     >
       <Card className="bg-card border-border">
         <CardHeader className="pb-2">
@@ -20,7 +20,8 @@ export default function AdminReportsScreen() {
         <CardContent className="text-sm text-muted-foreground space-y-1.5">
           <p>
             Les dashboards actuels calculent surtout le revenu par heure de
-            course enregistrée, pas par heure totale online.
+            course enregistrée, mais affichent aussi désormais un $/h de shift
+            tracké quand des sessions ont été synchronisées.
           </p>
           <p>
             Si un document agrégé ou un import approximatif a créé des trips

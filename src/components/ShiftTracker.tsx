@@ -52,6 +52,10 @@ function formatMoney(value: number) {
   }).format(value);
 }
 
+function formatMoneyPerHour(value: number) {
+  return `${formatMoney(value)}/h`;
+}
+
 export function ShiftTracker() {
   const { data: trips = [] } = useTrips(500);
   const [activeShift, setActiveShift] = useState<ActiveShift | null>(() =>
@@ -120,6 +124,12 @@ export function ShiftTracker() {
       })
     : null;
 
+  const shiftRevenuePerHour = snapshot
+    ? snapshot.elapsedHours > 0
+      ? snapshot.metrics.revenue / snapshot.elapsedHours
+      : 0
+    : 0;
+
   const stats = snapshot
     ? [
         {
@@ -128,7 +138,7 @@ export function ShiftTracker() {
           icon: Wallet,
         },
         {
-          label: '$/h',
+          label: '$/h en course',
           value: formatMoney(snapshot.metrics.revenuePerHour),
           icon: Clock3,
         },
@@ -197,6 +207,20 @@ export function ShiftTracker() {
               ))}
             </div>
 
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-amber-100">Rythme réel du shift</span>
+                <span className="font-semibold text-foreground">
+                  {formatMoneyPerHour(shiftRevenuePerHour)}
+                </span>
+              </div>
+              <p className="mt-1 text-xs text-amber-100">
+                Basé sur {snapshot.elapsedHours.toFixed(1)} h écoulées depuis le
+                début du shift. Le $/h en course ci-dessus exclut les temps
+                morts.
+              </p>
+            </div>
+
             <div className="grid gap-2 rounded-xl border border-border bg-background p-3 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <span className="text-muted-foreground">
@@ -230,8 +254,8 @@ export function ShiftTracker() {
 
         <p className={cn('text-[11px] leading-relaxed text-muted-foreground')}>
           Le suivi est calculé depuis les courses présentes dans la table
-          `trips`. Si tu ajoutes les courses plus tard, le résumé du shift se
-          mettra à jour.
+          `trips`. Le $/h en course utilise seulement la durée des trajets. Si
+          tu ajoutes les courses plus tard, le résumé du shift se mettra à jour.
         </p>
 
         {lastShiftSummary && (
@@ -245,7 +269,7 @@ export function ShiftTracker() {
                 </span>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <span>Rythme réel</span>
+                <span>Rythme en course</span>
                 <span className="font-semibold">
                   {formatMoney(lastShiftSummary.revenuePerHour)}/h
                 </span>

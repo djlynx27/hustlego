@@ -1,4 +1,7 @@
 import type { TripWithZone } from '@/hooks/useTrips';
+import type { Tables } from '@/integrations/supabase/types';
+
+type SessionRow = Tables<'sessions'>;
 
 export interface MetricSummary {
   revenue: number;
@@ -31,6 +34,14 @@ export interface ShiftSnapshot {
   topPlatform: string | null;
 }
 
+export interface TrackedShiftSummary {
+  shiftCount: number;
+  hours: number;
+  revenue: number;
+  rides: number;
+  revenuePerHour: number;
+}
+
 export interface TripAnalytics {
   last7Days: MetricSummary;
   last30Days: MetricSummary;
@@ -53,6 +64,26 @@ function toDate(value: string | null | undefined) {
   if (!value) return null;
   const parsed = new Date(value);
   return Number.isNaN(parsed.getTime()) ? null : parsed;
+}
+
+function getSessionTrackedTotals(session: SessionRow) {
+  const startedAt = toDate(session.started_at);
+  const endedAt = toDate(session.ended_at);
+  const derivedDurationHours =
+    startedAt && endedAt
+      ? Math.max(0, (endedAt.getTime() - startedAt.getTime()) / 3_600_000)
+      : 0;
+
+  return {
+    startedAt,
+    endedAt,
+    totalHours: Math.max(
+      Number(session.total_hours ?? 0),
+      derivedDurationHours
+    ),
+    totalRevenue: Number(session.total_earnings ?? 0),
+    totalRides: Number(session.total_rides ?? 0),
+  };
 }
 
 export function getTripRevenue(trip: Pick<TripWithZone, 'earnings' | 'tips'>) {
@@ -99,6 +130,45 @@ export function summarizeTrips(
     revenuePerHour: hours > 0 ? round(revenue / hours, 2) : 0,
     averageRide: rides > 0 ? round(revenue / rides, 2) : 0,
     distanceKm: round(distanceKm, 1),
+  };
+}
+
+export function summarizeTrackedSessions(
+  sessions: SessionRow[],
+  start: Date,
+  end = new Date()
+): TrackedShiftSummary {
+  let shiftCount = 0;
+  let hours = 0;
+  let revenue = 0;
+  let rides = 0;
+
+  for (const session of sessions) {
+    const totals = getSessionTrackedTotals(session);
+    if (!totals.startedAt || !totals.endedAt || totals.totalHours <= 0) {
+      continue;
+    }
+
+    const overlapStart = Math.max(totals.startedAt.getTime(), start.getTime());
+    const overlapEnd = Math.min(totals.endedAt.getTime(), end.getTime());
+    if (overlapEnd <= overlapStart) {
+      continue;
+    }
+
+    const overlapHours = (overlapEnd - overlapStart) / 3_600_000;
+    const ratio = Math.min(overlapHours / totals.totalHours, 1);
+    shiftCount += 1;
+    hours += overlapHours;
+    revenue += totals.totalRevenue * ratio;
+    rides += totals.totalRides * ratio;
+  }
+
+  return {
+    shiftCount,
+    hours: round(hours, 1),
+    revenue: round(revenue, 2),
+    rides: round(rides, 1),
+    revenuePerHour: hours > 0 ? round(revenue / hours, 2) : 0,
   };
 }
 

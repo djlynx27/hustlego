@@ -313,10 +313,14 @@ export function AdminLearningAgentsCard() {
         </CardTitle>
         <CardDescription className="text-xs">
           Lecture rapide du drift entre score attendu et revenu observé sur les
-          trips récents.
+          trips récents. Ce tableau reste local à ce navigateur.
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
+        <div className="rounded-lg border border-border bg-background/60 px-3 py-2 text-xs text-muted-foreground">
+          Ce module n’écrit ni dans Supabase ni dans les vrais poids du modèle.
+          Il sert surtout à visualiser un drift local et à tester les agents.
+        </div>
         <div className="text-xs text-muted-foreground space-y-1">
           <p>Échantillon récent: {driftMetrics.sample} trajets</p>
           <p>Drift moyen: {driftMetrics.meanError}%</p>

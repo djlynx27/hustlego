@@ -21,8 +21,9 @@ export default function AdminImportsScreen() {
             l’attribution de zone reste heuristique.
           </p>
           <p>
-            Universal File Analyzer ne doit pas servir à créer des trips à
-            partir d’un rapport global sans vérification humaine.
+            Universal File Analyzer reste maintenant en lecture assistée pour
+            les documents de shift ou de kilométrage: il ne doit plus créer de
+            trips automatiquement à partir d’un rapport global.
           </p>
           <p>
             Après chaque import, vérifie un petit échantillon avant de lancer

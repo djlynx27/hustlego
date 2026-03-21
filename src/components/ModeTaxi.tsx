@@ -329,6 +329,20 @@ export function ModeTaxi() {
 
   return (
     <div className="space-y-4">
+      <Card className="border-amber-500/30 bg-amber-500/10">
+        <CardContent className="px-4 py-3 text-sm text-amber-100 space-y-1">
+          <p className="font-medium text-foreground">Mode taxi local</p>
+          <p>
+            Ce module reste stocké dans ce navigateur et ne nourrit pas encore
+            la base principale de HustleGo.
+          </p>
+          <p>
+            Le $/heure affiché plus bas reflète seulement le temps de trajet
+            enregistré ici, pas tout le temps d’attente ou de shift.
+          </p>
+        </CardContent>
+      </Card>
+
       {/* Dwell Timer */}
       {nearbyZone && (
         <Card className="bg-primary/10 border-primary/30">
@@ -499,7 +513,7 @@ export function ModeTaxi() {
             </div>
             <div className="bg-background rounded-lg px-3 py-2 border border-border">
               <span className="text-[12px] text-muted-foreground block">
-                $/heure
+                $/heure actif
               </span>
               <span className="text-[18px] font-display font-bold">
                 ${totals.perHour.toFixed(2)}

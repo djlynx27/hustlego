@@ -52,6 +52,14 @@ interface AnalysisResult {
   extracted_data?: Record<string, unknown>;
 }
 
+type SuggestedArea =
+  | 'demand'
+  | 'shift'
+  | 'daily'
+  | 'mileage'
+  | 'profit'
+  | 'unknown';
+
 function getErrorMessage(error: unknown, fallback: string) {
   if (error instanceof Error && error.message) return error.message;
   return fallback;
@@ -69,9 +77,7 @@ export function UniversalFileAnalyzer() {
 
   const [zoneId, setZoneId] = useState('');
   const [suggestedZoneId, setSuggestedZoneId] = useState('');
-  const [suggestedArea, setSuggestedArea] = useState<
-    'demand' | 'shift' | 'daily' | 'mileage' | 'profit' | 'unknown'
-  >('unknown');
+  const [suggestedArea, setSuggestedArea] = useState<SuggestedArea>('unknown');
   const [file, setFile] = useState<File | null>(null);
 
   // Auto-select first zone pour simplifier upload statements sans interaction
@@ -239,11 +245,19 @@ export function UniversalFileAnalyzer() {
       suggestedArea !== 'unknown'
         ? suggestedArea
         : result.recommended_target || 'demand';
+    const blocksDirectTripImport = target === 'shift' || target === 'mileage';
     const selectedZone = allZones.find(
       (z) => z.id === zoneId || z.id === suggestedZoneId
     );
     if (!selectedZone) {
       toast.error("Veuillez sélectionner une zone avant d'appliquer");
+      return;
+    }
+
+    if (blocksDirectTripImport) {
+      toast.warning(
+        'Import automatique bloqué: vérifie ce document puis utilise Trip Logger, CSV Importer ou Mode Taxi pour éviter de créer un faux trajet synthétique.'
+      );
       return;
     }
 
@@ -257,46 +271,6 @@ export function UniversalFileAnalyzer() {
         queryClient.invalidateQueries({ queryKey: ['zone-scores'] });
         queryClient.invalidateQueries({ queryKey: ['zones'] });
         toast.success('Recalibrage de la demande déclenché pour la zone');
-      } else if (target === 'shift' || target === 'mileage') {
-        const ed = result.extracted_data || {};
-        if (!ed.earnings) {
-          toast.error('Aucune donnée de gains détectée à enregistrer');
-        } else {
-          const { error } = await supabase.from('trips').insert({
-            zone_id: selectedZone.id,
-            started_at: new Date().toISOString(),
-            ended_at: new Date(Date.now() + 15 * 60 * 1000).toISOString(),
-            earnings: Number(ed.earnings) || 0,
-            tips: Number(ed.tips || 0),
-            distance_km: Number(ed.distance_km || 0),
-            notes:
-              `Import automatique (${target}) de ${file?.name || 'document'}: ${result.notes || ''}`.slice(
-                0,
-                500
-              ),
-          });
-          if (error) throw error;
-          toast.success('Course/mileage auto-ajoutée correctement');
-          queryClient.invalidateQueries({ queryKey: ['trips-feed'] });
-          queryClient.invalidateQueries({ queryKey: ['recent-trips'] });
-
-          // optional score refresh
-          const { error: refreshError } = await supabase.functions.invoke(
-            'ai-score-analysis',
-            {
-              body: { zone_id: selectedZone.id },
-            }
-          );
-
-          if (refreshError) {
-            toast.warning(
-              'Course ajoutée, mais le recalibrage de la zone a échoué'
-            );
-          } else {
-            queryClient.invalidateQueries({ queryKey: ['zone-scores'] });
-            queryClient.invalidateQueries({ queryKey: ['zones'] });
-          }
-        }
       } else if (target === 'daily') {
         const { error } = await supabase.functions.invoke(
           'generate-daily-report'
@@ -368,6 +342,15 @@ export function UniversalFileAnalyzer() {
     if (d === 'high') return 'default';
     if (d === 'medium') return 'secondary';
     return 'outline';
+  };
+
+  const directApplyLabelByArea: Record<SuggestedArea, string> = {
+    demand: 'Lancer le recalcul de demande',
+    shift: 'Import auto bloqué',
+    daily: 'Générer le rapport quotidien',
+    mileage: 'Import auto bloqué',
+    profit: 'Mettre à jour le rapport de profit',
+    unknown: 'Appliquer la suggestion IA',
   };
 
   return (
@@ -515,9 +498,9 @@ export function UniversalFileAnalyzer() {
             </p>
             <p>
               {suggestedArea === 'mileage' &&
-                '→ Intégrez ce document au suivi kilométrique fiscal.'}
+                '→ Vérifie ce document puis intègre-le manuellement au suivi kilométrique fiscal.'}
               {suggestedArea === 'shift' &&
-                '→ Utilisez pour analyse de shift, heures et performance.'}
+                '→ Vérifie ce document puis utilise-le pour analyse de shift, heures et performance.'}
               {suggestedArea === 'daily' &&
                 '→ Utilisez dans rapport quotidien / revenus journaliers.'}
               {suggestedArea === 'profit' &&
@@ -525,13 +508,23 @@ export function UniversalFileAnalyzer() {
               {suggestedArea === 'demand' &&
                 '→ Utilisez pour recalcul de demande / scores zone.'}
             </p>
+            {(suggestedArea === 'shift' || suggestedArea === 'mileage') && (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-amber-100">
+                Les imports automatiques vers la table trips sont désactivés
+                pour les documents de shift ou de kilométrage. Ce type de
+                fichier peut représenter un résumé global et fausser les scores
+                ainsi que les revenus horaires.
+              </div>
+            )}
             <Button
               onClick={handleApplySuggestion}
               size="sm"
               className="w-full"
               disabled={loading || !result}
             >
-              {loading ? 'Traitement...' : 'Appliquer la suggestion IA'}
+              {loading
+                ? 'Traitement...'
+                : directApplyLabelByArea[suggestedArea]}
             </Button>
           </div>
         )}

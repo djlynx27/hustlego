@@ -14,11 +14,13 @@
  */
 
 import { PLATFORM_META } from '@/hooks/usePlatformSignals';
+import { useSessions } from '@/hooks/useSupabase';
 import { useTrips } from '@/hooks/useTrips';
 import { supabase } from '@/integrations/supabase/client';
 import {
   aggregateTripAnalytics,
   type MetricSummary,
+  summarizeTrackedSessions,
 } from '@/lib/tripAnalytics';
 import { cn } from '@/lib/utils';
 import { useEffect, useMemo, useState } from 'react';
@@ -145,6 +147,13 @@ interface EarningsReportProps {
 
 export function EarningsReport({ className }: EarningsReportProps) {
   const { data: trips = [] } = useTrips(400);
+  const sessionsSince = useMemo(() => {
+    const start = new Date();
+    start.setDate(start.getDate() - 29);
+    start.setHours(0, 0, 0, 0);
+    return start.toISOString();
+  }, []);
+  const { data: sessions = [] } = useSessions(sessionsSince, 300);
   const [weights, setWeights] = useState<WeightSnapshot | null>(null);
 
   // Fetch current ML weights from weight-calibrator Edge Function
@@ -184,6 +193,18 @@ export function EarningsReport({ className }: EarningsReportProps) {
   }, []);
 
   const analytics = useMemo(() => aggregateTripAnalytics(trips), [trips]);
+  const tracked7Days = useMemo(() => {
+    const start = new Date();
+    start.setDate(start.getDate() - 6);
+    start.setHours(0, 0, 0, 0);
+    return summarizeTrackedSessions(sessions, start, new Date());
+  }, [sessions]);
+  const tracked30Days = useMemo(() => {
+    const start = new Date();
+    start.setDate(start.getDate() - 29);
+    start.setHours(0, 0, 0, 0);
+    return summarizeTrackedSessions(sessions, start, new Date());
+  }, [sessions]);
 
   const { last7Days, last30Days, platformSeries, zoneSeries, dailySeries } =
     analytics;
@@ -215,9 +236,9 @@ export function EarningsReport({ className }: EarningsReportProps) {
             sub={`${m.rides} courses`}
           />
           <MetricCard
-            label="$/heure"
+            label="$/h en course"
             value={`$${r(m.revenuePerHour)}`}
-            sub={`${r(m.hours)}h`}
+            sub={`${r(m.hours)}h en course`}
           />
           <MetricCard
             label="Avg / course"
@@ -246,7 +267,41 @@ export function EarningsReport({ className }: EarningsReportProps) {
     <div className={cn('space-y-4', className)}>
       {/* ── 7j & 30j metrics ── */}
       <MetricSection title="7 derniers jours" m={last7Days} />
+      <div className="grid gap-2 md:grid-cols-2">
+        <div className="rounded-xl border border-border bg-background p-3 text-sm">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            7 derniers jours · shift tracké
+          </p>
+          <p className="mt-1 text-lg font-semibold font-display">
+            ${r(tracked7Days.revenuePerHour)}/h
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {tracked7Days.shiftCount > 0
+              ? `${tracked7Days.hours.toFixed(1)} h trackées · ${r(tracked7Days.revenue)}$ de revenu`
+              : 'Aucun shift terminé et synchronisé sur la période'}
+          </p>
+        </div>
+        <div className="rounded-xl border border-border bg-background p-3 text-sm">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            30 derniers jours · shift tracké
+          </p>
+          <p className="mt-1 text-lg font-semibold font-display">
+            ${r(tracked30Days.revenuePerHour)}/h
+          </p>
+          <p className="text-[11px] text-muted-foreground">
+            {tracked30Days.shiftCount > 0
+              ? `${tracked30Days.hours.toFixed(1)} h trackées · ${r(tracked30Days.revenue)}$ de revenu`
+              : 'Aucun shift terminé et synchronisé sur la période'}
+          </p>
+        </div>
+      </div>
       <MetricSection title="30 derniers jours" m={last30Days} />
+
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-100">
+        Les métriques horaires de ce rapport utilisent la somme des durées de
+        trajets présentes dans `trips`. Les cartes “shift tracké” ci-dessus
+        utilisent les sessions réellement terminées et synchronisées.
+      </div>
 
       {/* ── Daily sparkline ── */}
       <div className="space-y-1.5">
@@ -286,7 +341,7 @@ export function EarningsReport({ className }: EarningsReportProps) {
       {platformSeries.length > 0 && (
         <div className="space-y-1.5">
           <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide px-0.5">
-            Revenus/h par plateforme
+            Revenus/h en course par plateforme
           </h4>
           <div className="bg-card rounded-xl border border-border p-3 space-y-3">
             {platformSeries
@@ -321,7 +376,7 @@ export function EarningsReport({ className }: EarningsReportProps) {
       {zoneSeries.length > 0 && (
         <div className="space-y-1.5">
           <h4 className="text-[11px] font-bold text-muted-foreground uppercase tracking-wide px-0.5">
-            Top zones rentables
+            Top zones rentables en course
           </h4>
           <div className="bg-card rounded-xl border border-border p-3 space-y-3">
             {zoneSeries
