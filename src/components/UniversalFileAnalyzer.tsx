@@ -184,7 +184,9 @@ export function UniversalFileAnalyzer() {
         }
       }
 
-      const rawZone = zoneId ? allZones.find((z) => z.id === zoneId) : undefined;
+      const rawZone = zoneId
+        ? allZones.find((z) => z.id === zoneId)
+        : undefined;
       const zoneFallback = suggestedZoneId
         ? allZones.find((z) => z.id === suggestedZoneId)
         : undefined;
@@ -283,7 +285,9 @@ export function UniversalFileAnalyzer() {
         const today = new Date().toISOString().split('T')[0];
         const { data: existingReport, error: fetchErr } = await supabase
           .from('daily_reports')
-          .select('id,total_earnings,total_trips,total_distance_km,hours_worked')
+          .select(
+            'id,total_earnings,total_trips,total_distance_km,hours_worked'
+          )
           .eq('report_date', today)
           .single();
         if (fetchErr && fetchErr.code !== 'PGRST116') throw fetchErr;

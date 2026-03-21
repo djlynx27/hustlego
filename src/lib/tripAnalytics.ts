@@ -263,7 +263,7 @@ export function aggregateTripAnalytics(
       rides: metrics.rides,
       hours: metrics.hours,
     };
-  }).filter((entry) => entry.revenue > 0);
+  });
   const platformSeries = buildRankedSeries(
     trips30Days,
     (trip) => trip.platform || 'Non précisé',

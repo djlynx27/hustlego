@@ -103,6 +103,28 @@ describe('trip analytics', () => {
     expect(analytics.zoneSeries[0].revenue).toBe(45);
   });
 
+  it('keeps all dayparts in analytics, including those with zero rides', () => {
+    const analytics = aggregateTripAnalytics(
+      trips,
+      new Date('2026-03-17T12:00:00.000Z')
+    );
+
+    expect(analytics.daypartSeries.map((entry) => entry.label)).toEqual([
+      'Nuit',
+      'Matin',
+      'Après-midi',
+      'Soir',
+    ]);
+    expect(
+      analytics.daypartSeries.find((entry) => entry.label === 'Après-midi')
+    ).toEqual({
+      label: 'Après-midi',
+      revenue: 0,
+      rides: 0,
+      hours: 0,
+    });
+  });
+
   it('tracks an active shift snapshot', () => {
     const snapshot = buildShiftSnapshot(
       trips,
