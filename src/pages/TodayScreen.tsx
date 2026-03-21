@@ -37,6 +37,7 @@ import {
   getDemandClass,
 } from '@/lib/demandUtils';
 import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
+import { GoogleMapsIcon, WazeIcon } from '@/components/NavIcons';
 import { getActiveTimeBoosts } from '@/lib/timeBoosts';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
 import {
@@ -45,7 +46,6 @@ import {
   Car,
   Clock,
   Download,
-  Navigation,
   PartyPopper,
   Timer,
   WifiOff,
@@ -222,8 +222,12 @@ export default function TodayScreen() {
   } | null>(null);
   const [timerExpired, setTimerExpired] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
-  const [autoSelectedZone, setAutoSelectedZone] = useState<SmartZone | null>(null);
-  const [autoNavReason, setAutoNavReason] = useState<'proche' | 'score' | null>(null);
+  const [autoSelectedZone, setAutoSelectedZone] = useState<SmartZone | null>(
+    null
+  );
+  const [autoNavReason, setAutoNavReason] = useState<'proche' | 'score' | null>(
+    null
+  );
 
   // Second-precision tick when timer is active
   useEffect(() => {
@@ -694,8 +698,7 @@ export default function TodayScreen() {
               className="flex items-center gap-2 bg-destructive/20 border border-destructive/40 rounded-lg px-3 py-2"
             >
               <span className="text-[14px] font-body font-bold text-destructive">
-                🔴 {ev.name} se termine dans {minsLeft}min – Demande maximale
-                prévue!
+                🔴 {ev.name} se termine dans {minsLeft} min – Demande maximale prévue !
               </span>
             </div>
           );
@@ -729,13 +732,7 @@ export default function TodayScreen() {
                 </span>
                 {Number(heroFactors?.learningBoostPoints ?? 0) > 0 && (
                   <span className="text-[13px] text-primary/90 font-body block mt-1">
-                    IA contextuelle +{heroFactors?.learningBoostPoints} pts ·{' '}
-                    similarité{' '}
-                    {Math.round((heroFactors?.learningSimilarity ?? 0) * 100)}%
-                    {' · '}
-                    historique{' '}
-                    {formatMoney(heroFactors?.learningAvgEarningsPerHour ?? 0)}
-                    /h
+                    {`IA contextuelle +${heroFactors?.learningBoostPoints} pts · similarité ${Math.round((heroFactors?.learningSimilarity ?? 0) * 100)}% · historique ${formatMoney(heroFactors?.learningAvgEarningsPerHour ?? 0)}/h`}
                   </span>
                 )}
                 {heroDistance !== null && (
@@ -756,7 +753,7 @@ export default function TodayScreen() {
             <div className="mt-4 space-y-2">
               <Button
                 asChild
-                className="w-full h-16 text-[18px] font-display font-bold gap-2 bg-primary text-primary-foreground hover:bg-primary/90"
+                className="w-full h-16 text-[18px] font-display font-bold gap-2.5 bg-primary text-primary-foreground hover:bg-primary/90"
               >
                 <a
                   href={getGoogleMapsNavUrl(
@@ -767,14 +764,13 @@ export default function TodayScreen() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <Navigation className="w-5 h-5" />
-                  🗺️ GO – Google Maps
+                  <GoogleMapsIcon className="w-6 h-6 flex-shrink-0" /> Google Maps
                 </a>
               </Button>
               <Button
                 asChild
                 variant="secondary"
-                className="w-full h-16 text-[18px] font-display font-bold gap-2"
+                className="w-full h-16 text-[18px] font-display font-bold gap-2.5"
               >
                 <a
                   href={getWazeNavUrl(
@@ -785,11 +781,11 @@ export default function TodayScreen() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  🧭 Waze
+                  <WazeIcon className="w-6 h-6 flex-shrink-0" /> Waze
                 </a>
               </Button>
 
-              {/* Swipe-to-accept — safer in-vehicle hero zone confirmation */}
+              {/* Swipe-to-accept — safer in-vehicle hero zone confirmation */
               {isInVehicle && (
                 <SwipeToAccept
                   label="Glisser → confirmer direction"
@@ -930,7 +926,10 @@ export default function TodayScreen() {
                         </span>
                         {isAutoSelected && (
                           <span className="text-[11px] font-display font-bold bg-yellow-400/20 text-yellow-600 dark:text-yellow-300 border border-yellow-400/40 rounded-full px-2 py-0.5">
-                            🎯 {autoNavReason === 'score' ? 'Meilleur score' : 'Le plus proche'}
+                            🎯{' '}
+                            {autoNavReason === 'score'
+                              ? 'Meilleur score'
+                              : 'Le plus proche'}
                           </span>
                         )}
                         {isAirport && (
@@ -970,52 +969,53 @@ export default function TodayScreen() {
                   </div>
                   {isAirport ? (
                     <p className="text-[12px] text-muted-foreground font-body mt-2 px-0.5">
-                      L'aéroport est affiché à titre informatif. Rendez-vous y uniquement avec un client.
+                      L'aéroport est affiché à titre informatif. Rendez-vous y
+                      uniquement avec un client.
                     </p>
                   ) : (
-                  <div className="flex gap-2 mt-2">
-                    <a
-                      href={getGoogleMapsNavUrl(
-                        zone.name,
-                        zone.latitude,
-                        zone.longitude
-                      )}
-                      target="_blank"
-                      rel="noopener noreferrer"
+                    <div className="flex gap-2 mt-2">
+                      <a
+                        href={getGoogleMapsNavUrl(
+                          zone.name,
+                          zone.latitude,
+                          zone.longitude
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
                       onClick={() => startWaitAt(zone)}
-                      className="flex-1 flex items-center justify-center gap-1 bg-primary text-primary-foreground font-display font-bold text-[14px] rounded-lg h-10 hover:bg-primary/90 transition-colors"
-                    >
-                      <Navigation className="w-4 h-4" /> GO · Maps
-                    </a>
-                    <a
-                      href={getWazeNavUrl(
-                        zone.name,
-                        zone.latitude,
-                        zone.longitude
-                      )}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => startWaitAt(zone)}
-                      className="flex-1 flex items-center justify-center gap-1 bg-secondary text-secondary-foreground font-display font-bold text-[14px] rounded-lg h-10 hover:bg-secondary/80 transition-colors"
-                    >
-                      🧭 Waze
-                    </a>
-                    {isWaiting ? (
-                      <button
-                        onClick={() => setWaitTimer(null)}
-                        className="px-3 h-10 rounded-lg border border-border text-[13px] text-muted-foreground hover:text-foreground font-body"
+                        className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground font-display font-bold text-[14px] rounded-lg h-10 hover:bg-primary/90 transition-colors"
                       >
-                        Annuler
-                      </button>
-                    ) : (
-                      <button
+                        <GoogleMapsIcon className="w-4 h-4 flex-shrink-0" /> Maps
+                      </a>
+                      <a
+                        href={getWazeNavUrl(
+                          zone.name,
+                          zone.latitude,
+                          zone.longitude
+                        )}
+                        target="_blank"
+                        rel="noopener noreferrer"
                         onClick={() => startWaitAt(zone)}
-                        className="px-3 h-10 rounded-lg border border-primary/50 text-[13px] text-primary font-body"
+                        className="flex-1 flex items-center justify-center gap-2 bg-secondary text-secondary-foreground font-display font-bold text-[14px] rounded-lg h-10 hover:bg-secondary/80 transition-colors"
                       >
-                        J'arrive
-                      </button>
-                    )}
-                  </div>
+                        <WazeIcon className="w-4 h-4 flex-shrink-0" /> Waze
+                      </a>
+                      {isWaiting ? (
+                        <button
+                          onClick={() => setWaitTimer(null)}
+                          className="px-3 h-10 rounded-lg border border-border text-[13px] text-muted-foreground hover:text-foreground font-body"
+                        >
+                          Annuler
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => startWaitAt(zone)}
+                          className="px-3 h-10 rounded-lg border border-primary/50 text-[13px] text-primary font-body"
+                        >
+                          J'arrive
+                        </button>
+                      )}
+                    </div>
                   )}
                   {/* Platform arbitrage — shown below GO buttons */}
                   <PlatformArbitrage
@@ -1069,14 +1069,12 @@ export default function TodayScreen() {
                     {zone.type}
                     <ScoreFactorIcons factors={factors.get(zone.id)} />
                   </span>
-                  <span className="text-[12px] text-muted-foreground font-body">
+                  <span className="text-[12px] text-muted-foreground font-body block">
                     {start}–{end}
                   </span>
                   {Number(zoneFactors?.learningBoostPoints ?? 0) > 0 && (
                     <span className="text-[12px] text-primary/90 font-body block mt-0.5">
-                      Boost IA +{zoneFactors?.learningBoostPoints} (
-                      {Math.round((zoneFactors?.learningSimilarity ?? 0) * 100)}
-                      %)
+                      {`Boost IA +${zoneFactors?.learningBoostPoints} (${Math.round((zoneFactors?.learningSimilarity ?? 0) * 100)}%)`}
                     </span>
                   )}
                 </div>

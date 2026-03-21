@@ -1,11 +1,11 @@
+import { GoogleMapsIcon } from '@/components/NavIcons';
+import { getDemandLevel } from '@/lib/demandUtils';
+import { getGoogleMapsNavUrl } from '@/lib/venueCoordinates';
 import { useMemo } from 'react';
-import { useUserLocation, haversineKm } from '@/hooks/useUserLocation';
+import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { useZones } from '@/hooks/useSupabase';
 import { useWeather } from '@/hooks/useWeather';
 import { scoreAllZones, type WeatherCondition } from '@/lib/scoringEngine';
-import { getDemandLevel } from '@/lib/demandUtils';
-import { Navigation } from 'lucide-react';
-import { getGoogleMapsNavUrl } from '@/lib/venueCoordinates';
 
 export function NearestHotspot() {
   const { location: userLocation } = useUserLocation(30000);
@@ -62,9 +62,10 @@ export function NearestHotspot() {
           href={googleUrl}
           target="_blank"
           rel="noopener noreferrer"
-          className="flex-shrink-0 flex items-center justify-center gap-1 bg-primary text-primary-foreground font-display font-bold text-[16px] rounded-lg h-12 w-16 hover:bg-primary/90 transition-colors"
+          className="flex-shrink-0 flex items-center justify-center gap-1.5 bg-primary text-primary-foreground font-display font-bold text-[14px] rounded-lg h-12 px-3 hover:bg-primary/90 transition-colors"
         >
-          GO <Navigation className="w-4 h-4" />
+          <GoogleMapsIcon className="w-5 h-5 flex-shrink-0" />
+          GO
         </a>
       </div>
     </div>

@@ -119,7 +119,7 @@ export function DeadTimeTimer({ nearestZoneName }: Props) {
       </div>
       {isWarning && !state.paused && nearestZoneName && (
         <p className="text-[13px] text-yellow-500 font-body mt-1">
-          ⚠️ +10 min d'inactivité — Dirigez-vous vers {nearestZoneName}
+          ⚠️ +10 min d'inactivité — Dirige-toi vers {nearestZoneName}
         </p>
       )}
     </div>

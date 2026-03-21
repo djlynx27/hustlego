@@ -1,3 +1,4 @@
+import { GoogleMapsIcon, WazeIcon } from '@/components/NavIcons';
 import { Button } from '@/components/ui/button';
 import {
   Sheet,
@@ -8,7 +9,7 @@ import {
 } from '@/components/ui/sheet';
 import { useI18n } from '@/contexts/I18nContext';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
-import { Navigation } from 'lucide-react';
+import { X } from 'lucide-react';
 
 interface NavigationSheetProps {
   open: boolean;
@@ -41,35 +42,36 @@ export function NavigationSheet({
             {zoneName}
           </SheetTitle>
           <SheetDescription className="text-sm text-muted-foreground">
-            Choisissez votre application de navigation pour vous diriger vers
-            cette zone.
+            Choisissez votre application de navigation.
           </SheetDescription>
         </SheetHeader>
         <div className="flex flex-col gap-2 mt-4">
           <Button
             asChild
-            className="w-full gap-2 text-[18px] font-display font-bold h-16 bg-primary text-primary-foreground hover:bg-primary/90"
+            className="w-full gap-2.5 text-[18px] font-display font-bold h-16 bg-primary text-primary-foreground hover:bg-primary/90"
           >
             <a href={googleUrl} target="_blank" rel="noopener noreferrer">
-              <Navigation className="w-5 h-5" />
-              🗺️ GO – Google Maps
+              <GoogleMapsIcon className="w-6 h-6 flex-shrink-0" />
+              Google Maps
             </a>
           </Button>
           <Button
             asChild
             variant="secondary"
-            className="w-full gap-2 text-[18px] font-display font-bold h-16"
+            className="w-full gap-2.5 text-[18px] font-display font-bold h-16"
           >
             <a href={wazeUrl} target="_blank" rel="noopener noreferrer">
-              🧭 Waze
+              <WazeIcon className="w-6 h-6 flex-shrink-0" />
+              Waze
             </a>
           </Button>
           <Button
             variant="outline"
-            className="w-full text-[18px] h-16 font-display"
+            className="w-full gap-2 text-[16px] h-12 font-display"
             onClick={onClose}
           >
-            ✕ {t('close')}
+            <X className="w-4 h-4" />
+            {t('close')}
           </Button>
         </div>
       </SheetContent>

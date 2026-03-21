@@ -18,7 +18,8 @@ import { useCities } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { getDemandClass } from '@/lib/demandUtils';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
-import { Car, Crosshair, Maximize2, Minimize2, Navigation } from 'lucide-react';
+import { GoogleMapsIcon, WazeIcon } from '@/components/NavIcons';
+import { Car, Crosshair, Maximize2, Minimize2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
 interface WakeLockNavigator extends Navigator {
@@ -406,7 +407,7 @@ export default function DriveScreen() {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <Navigation className="w-5 h-5" /> 🗺️ {t('goGoogleMaps')}
+                    <GoogleMapsIcon className="w-6 h-6 flex-shrink-0" /> Google Maps
                   </a>
                 </Button>
                 <Button
@@ -423,7 +424,7 @@ export default function DriveScreen() {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    🧭 {t('waze')}
+                    <WazeIcon className="w-6 h-6 flex-shrink-0" /> Waze
                   </a>
                 </Button>
                 {/* Platform arbitrage for hero zone */}

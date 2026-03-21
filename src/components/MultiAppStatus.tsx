@@ -143,7 +143,7 @@ export function MultiAppStatus({ cityId, mode = 'all' }: Props) {
       <div className="flex items-center gap-2">
         <Smartphone className="w-4 h-4 text-primary" />
         <span className="text-[14px] font-display font-bold">
-          Status recommandé
+          Statut recommandé
         </span>
       </div>
       <div className="grid grid-cols-2 gap-2">
