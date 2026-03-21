@@ -99,7 +99,9 @@ serve(async (req) => {
     for (const trip of trips ?? []) {
       if (!trip.zone_id) continue;
       zoneEarnings[trip.zone_id] =
-        (zoneEarnings[trip.zone_id] ?? 0) + (trip.earnings ?? 0);
+        (zoneEarnings[trip.zone_id] ?? 0) +
+        (trip.earnings ?? 0) +
+        (trip.tips ?? 0);
     }
 
     let bestZoneId: string | null = null;
