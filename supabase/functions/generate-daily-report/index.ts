@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { sumTrackedSessionHours } from './reportMetrics.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -46,24 +47,7 @@ serve(async (req) => {
     if (sessionsErr) throw sessionsErr;
 
     const trackedShiftCount = sessions?.length ?? 0;
-    const trackedHours =
-      sessions?.reduce((sum, session) => {
-        const explicitHours = Number(session.total_hours ?? 0);
-        if (explicitHours > 0) return sum + explicitHours;
-
-        if (!session.started_at || !session.ended_at) return sum;
-        const startedAt = new Date(session.started_at).getTime();
-        const endedAt = new Date(session.ended_at).getTime();
-        if (
-          Number.isNaN(startedAt) ||
-          Number.isNaN(endedAt) ||
-          endedAt <= startedAt
-        ) {
-          return sum;
-        }
-
-        return sum + (endedAt - startedAt) / 3_600_000;
-      }, 0) ?? 0;
+    const trackedHours = sessions ? sumTrackedSessionHours(sessions) : 0;
     const trackedEarnings =
       sessions?.reduce(
         (sum, session) => sum + Number(session.total_earnings ?? 0),
