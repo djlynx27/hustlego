@@ -222,6 +222,10 @@ function analyzeFileContent(
   let totalTips = 0;
   let totalDistance = 0;
   let tripsCount = 0;
+  let sawEarnings = false;
+  let sawTips = false;
+  let sawDistance = false;
+  let sawTrips = false;
 
   for (const line of lines.slice(1)) {
     const cols = line.split(',').map((c) => c.replace(/["$]/g, '').trim());
@@ -229,10 +233,22 @@ function analyzeFileContent(
       const header = lines[0].split(',')[i]?.toLowerCase() || '';
       const val = parseFloat(cols[i]);
       if (isNaN(val)) continue;
-      if (/earnings|fare|revenue/.test(header)) totalEarnings += val;
-      if (/tip/.test(header)) totalTips += val;
-      if (/distance|km|mileage/.test(header)) totalDistance += val;
-      if (/trip|ride/.test(header) && Number.isInteger(val)) tripsCount++;
+      if (/earnings|fare|revenue/.test(header)) {
+        sawEarnings = true;
+        totalEarnings += val;
+      }
+      if (/tip/.test(header)) {
+        sawTips = true;
+        totalTips += val;
+      }
+      if (/distance|km|mileage/.test(header)) {
+        sawDistance = true;
+        totalDistance += val;
+      }
+      if (/trip|ride/.test(header) && Number.isInteger(val)) {
+        sawTrips = true;
+        tripsCount += val;
+      }
     }
   }
 
@@ -246,11 +262,10 @@ function analyzeFileContent(
     notes: `Fichier CSV analysé : ${isMileage ? 'kilométrage' : isShift ? 'quart de travail' : 'données'} importé`,
     recommended_target: isMileage ? 'mileage' : isShift ? 'shift' : 'daily',
     extracted_data: {
-      earnings: totalEarnings || null,
-      tips: totalTips || null,
-      distance_km:
-        totalDistance > 0 ? Math.round(totalDistance * 100) / 100 : null,
-      trips_count: tripsCount || null,
+      earnings: sawEarnings ? totalEarnings : null,
+      tips: sawTips ? totalTips : null,
+      distance_km: sawDistance ? Math.round(totalDistance * 100) / 100 : null,
+      trips_count: sawTrips ? tripsCount : null,
     },
   };
 }
