@@ -34,6 +34,7 @@ import {
   type ZoneHistory,
 } from '@/lib/aiAgents';
 import { generateAISimulatedSlots } from '@/lib/aiSimulation';
+import { getObservedZoneScore } from '@/lib/observedScore';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Brain,
@@ -261,15 +262,7 @@ export function AdminLearningAgentsCard() {
         const zone = trip.zones;
         if (!zone) return null;
         const expected = Number(zone.current_score || 50);
-        const observed = Math.min(
-          100,
-          Math.max(
-            0,
-            Math.round(
-              (Number(trip.earnings || 0) + Number(trip.tips || 0)) / 0.75
-            )
-          )
-        );
+        const observed = getObservedZoneScore(trip);
         return {
           zoneId: trip.zone_id,
           expectedScore: expected,

@@ -30,6 +30,7 @@ import {
   applyHabitBoost,
   computeSuccessProbabilityScore,
 } from '@/lib/lyftStrategy';
+import { getObservedZoneScore } from '@/lib/observedScore';
 import {
   scoreAllZonesWithLearning,
   type ActiveEventBoost,
@@ -146,12 +147,7 @@ export function buildTripHistory(
       const durationHours = getTripHours(trip);
       if (durationHours <= 0) return [];
 
-      const avgHourly =
-        (Number(trip.earnings || 0) + Number(trip.tips || 0)) / durationHours;
-      const observedScore = Math.min(
-        100,
-        Math.max(0, Math.round((avgHourly / 60) * 100))
-      );
+      const observedScore = getObservedZoneScore(trip);
       const expectedScore = Number(
         trip.zone_score ?? (zone.current_score || 50)
       );
