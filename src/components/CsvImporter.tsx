@@ -361,9 +361,9 @@ export function CsvImporter() {
           trip.zone_id &&
           trip.date &&
           trip.end_time &&
-            trip.earnings !== null &&
-            trip.tips !== null &&
-            trip.distance_km !== null &&
+          trip.earnings !== null &&
+          trip.tips !== null &&
+          trip.distance_km !== null &&
           !skippedRows.has(trip.source_row)
       )
       .map((t) => ({

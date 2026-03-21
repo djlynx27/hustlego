@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { useZones } from '@/hooks/useSupabase';
 import { supabase } from '@/integrations/supabase/client';
+import { buildProfitReportUpdate } from '@/lib/profitReportExtraction';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   Camera,
@@ -164,8 +165,9 @@ export function UniversalFileAnalyzer() {
           imageUrl = urlData.publicUrl;
         } else {
           fileContent = await file.text();
-          if (fileContent.length > 200000)
+          if (fileContent.length > 200000) {
             fileContent = fileContent.slice(0, 200000);
+          }
 
           if (file.name.toLowerCase().endsWith('.csv')) {
             const lines = fileContent.split('\n').slice(0, 10);
@@ -182,9 +184,7 @@ export function UniversalFileAnalyzer() {
         }
       }
 
-      const rawZone = zoneId
-        ? allZones.find((z) => z.id === zoneId)
-        : undefined;
+      const rawZone = zoneId ? allZones.find((z) => z.id === zoneId) : undefined;
       const zoneFallback = suggestedZoneId
         ? allZones.find((z) => z.id === suggestedZoneId)
         : undefined;
@@ -281,50 +281,39 @@ export function UniversalFileAnalyzer() {
       } else if (target === 'profit') {
         const ed = result.extracted_data || {};
         const today = new Date().toISOString().split('T')[0];
-        if (!ed.earnings) {
-          toast.error('Aucune donnée de gains/profit détectée pour le rapport');
-        } else {
-          const { data: existingReport, error: fetchErr } = await supabase
-            .from('daily_reports')
-            .select(
-              'id,total_earnings,total_trips,total_distance_km,hours_worked'
-            )
-            .eq('report_date', today)
-            .single();
-          if (fetchErr && fetchErr.code !== 'PGRST116') throw fetchErr;
+        const { data: existingReport, error: fetchErr } = await supabase
+          .from('daily_reports')
+          .select('id,total_earnings,total_trips,total_distance_km,hours_worked')
+          .eq('report_date', today)
+          .single();
+        if (fetchErr && fetchErr.code !== 'PGRST116') throw fetchErr;
 
-          const baseUpdate = {
-            report_date: today,
-            total_earnings:
-              (existingReport?.total_earnings || 0) +
-              (Number(ed.earnings) || 0),
-            total_trips:
-              (existingReport?.total_trips || 0) +
-              (Number(ed.trips_count) || 0),
-            total_distance_km:
-              (existingReport?.total_distance_km || 0) +
-              (Number(ed.distance_km) || 0),
-            hours_worked:
-              (existingReport?.hours_worked || 0) +
-              (Number(ed.hours_worked) || 0),
-            ai_recommendation: result.notes || undefined,
-          };
-
-          if (existingReport) {
-            const { error: upErr } = await supabase
-              .from('daily_reports')
-              .update(baseUpdate)
-              .eq('id', existingReport.id);
-            if (upErr) throw upErr;
-          } else {
-            const { error: insErr } = await supabase
-              .from('daily_reports')
-              .insert(baseUpdate);
-            if (insErr) throw insErr;
-          }
-          queryClient.invalidateQueries({ queryKey: ['daily-reports'] });
-          toast.success('Rapport de profit/quotidien mis à jour');
+        const profitUpdate = buildProfitReportUpdate(existingReport, ed);
+        if (!profitUpdate.ok) {
+          toast.error(profitUpdate.message);
+          return;
         }
+
+        const baseUpdate = {
+          report_date: today,
+          ...profitUpdate.values,
+          ai_recommendation: result.notes || undefined,
+        };
+
+        if (existingReport) {
+          const { error: upErr } = await supabase
+            .from('daily_reports')
+            .update(baseUpdate)
+            .eq('id', existingReport.id);
+          if (upErr) throw upErr;
+        } else {
+          const { error: insErr } = await supabase
+            .from('daily_reports')
+            .insert(baseUpdate);
+          if (insErr) throw insErr;
+        }
+        queryClient.invalidateQueries({ queryKey: ['daily-reports'] });
+        toast.success('Rapport de profit/quotidien mis à jour');
       } else {
         toast.error('Type de route inconnu');
       }
