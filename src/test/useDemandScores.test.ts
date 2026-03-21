@@ -3,18 +3,9 @@ import {
   buildTripHistory,
 } from '@/hooks/useDemandScores';
 import type { Zone } from '@/hooks/useSupabase';
+import { makeLocalDate } from '@/test/dateTestUtils';
 import type { TripWithZone } from '@/hooks/useTrips';
 import { describe, expect, it } from 'vitest';
-
-function makeLocalDate(
-  year: number,
-  monthIndex: number,
-  day: number,
-  hour: number,
-  minute = 0
-) {
-  return new Date(year, monthIndex, day, hour, minute, 0, 0);
-}
 
 const zones: Zone[] = [
   {

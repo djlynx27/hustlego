@@ -4,27 +4,8 @@ import {
   isDemandRelevantEvent,
   type AppEvent,
 } from '@/hooks/useEvents';
+import { makeLocalDate, makeLocalIso } from '@/test/dateTestUtils';
 import { describe, expect, it } from 'vitest';
-
-function makeLocalDate(
-  year: number,
-  monthIndex: number,
-  day: number,
-  hour: number,
-  minute = 0
-) {
-  return new Date(year, monthIndex, day, hour, minute, 0, 0);
-}
-
-function makeLocalIso(
-  year: number,
-  monthIndex: number,
-  day: number,
-  hour: number,
-  minute = 0
-) {
-  return makeLocalDate(year, monthIndex, day, hour, minute).toISOString();
-}
 
 function makeEvent(overrides: Partial<AppEvent> = {}): AppEvent {
   return {

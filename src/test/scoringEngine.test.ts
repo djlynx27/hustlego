@@ -7,17 +7,8 @@ import {
   type ActiveEventBoost,
   type WeatherCondition,
 } from '@/lib/scoringEngine';
+import { makeLocalDate } from '@/test/dateTestUtils';
 import { describe, expect, it } from 'vitest';
-
-function makeLocalDate(
-  year: number,
-  monthIndex: number,
-  day: number,
-  hour: number,
-  minute = 0
-) {
-  return new Date(year, monthIndex, day, hour, minute, 0, 0);
-}
 
 const downtownZone = {
   id: 'mtl-cb',
