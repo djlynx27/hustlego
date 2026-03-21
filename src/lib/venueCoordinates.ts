@@ -9,22 +9,22 @@ const VENUE_DROPOFF: Record<string, { lat: number; lng: number }> = {
   // Laval
   'Place Bell': { lat: 45.5559, lng: -73.7217 },
   'CF Carrefour Laval': { lat: 45.5702, lng: -73.7519 },
-  'Métro Montmorency': { lat: 45.5584, lng: -73.7210 },
-  'Centropolis': { lat: 45.5613, lng: -73.7494 },
-  'Gare Sainte-Rose': { lat: 45.6250, lng: -73.7640 },
-  'Hôpital de la Cité-de-la-Santé': { lat: 45.5790, lng: -73.7192 },
+  'Métro Montmorency': { lat: 45.5584, lng: -73.721 },
+  Centropolis: { lat: 45.5613, lng: -73.7494 },
+  'Gare Sainte-Rose': { lat: 45.625, lng: -73.764 },
+  'Hôpital de la Cité-de-la-Santé': { lat: 45.579, lng: -73.7192 },
   // Rive-Sud
   'Quartier DIX30': { lat: 45.4411, lng: -73.4403 },
   'Promenades St-Bruno': { lat: 45.5243, lng: -73.3572 },
-  'Longueuil–Université-de-Sherbrooke': { lat: 45.5250, lng: -73.5219 },
-  'Carrefour Richelieu': { lat: 45.4467, lng: -73.2570 },
+  'Longueuil–Université-de-Sherbrooke': { lat: 45.525, lng: -73.5219 },
+  'Carrefour Richelieu': { lat: 45.4467, lng: -73.257 },
   // Blainville
   'Complexe sportif de Blainville': { lat: 45.6711, lng: -73.8883 },
   'Centre commercial Blainville': { lat: 45.6748, lng: -73.8778 },
   'Gare Blainville-Saint-Martin exo': { lat: 45.6782, lng: -73.8651 },
   'Gare Blainville': { lat: 45.6782, lng: -73.8651 },
   // Rosemère
-  'Gare Sainte-Rose exo': { lat: 45.6250, lng: -73.7640 },
+  'Gare Sainte-Rose exo': { lat: 45.625, lng: -73.764 },
   'Centre commercial Place Rosemère': { lat: 45.6369, lng: -73.7989 },
   'Place Rosemère': { lat: 45.6369, lng: -73.7989 },
   // Sainte-Thérèse
@@ -43,7 +43,11 @@ const VENUE_DROPOFF: Record<string, { lat: number; lng: number }> = {
  * Get the best drop-off coordinates for a venue.
  * Falls back to the provided lat/lng if no override exists.
  */
-export function getDropoffCoords(zoneName: string, fallbackLat: number, fallbackLng: number): { lat: number; lng: number } {
+export function getDropoffCoords(
+  zoneName: string,
+  fallbackLat: number,
+  fallbackLng: number
+): { lat: number; lng: number } {
   // Try exact match first
   if (VENUE_DROPOFF[zoneName]) return VENUE_DROPOFF[zoneName];
   // Try partial match (venue name contained in zone name or vice versa)
@@ -53,12 +57,20 @@ export function getDropoffCoords(zoneName: string, fallbackLat: number, fallback
   return { lat: fallbackLat, lng: fallbackLng };
 }
 
-export function getGoogleMapsNavUrl(zoneName: string, lat: number, lng: number): string {
+export function getGoogleMapsNavUrl(
+  zoneName: string,
+  lat: number,
+  lng: number
+): string {
   const c = getDropoffCoords(zoneName, lat, lng);
   return `https://www.google.com/maps/dir/?api=1&destination=${c.lat},${c.lng}&travelmode=driving`;
 }
 
-export function getWazeNavUrl(zoneName: string, lat: number, lng: number): string {
+export function getWazeNavUrl(
+  zoneName: string,
+  lat: number,
+  lng: number
+): string {
   const c = getDropoffCoords(zoneName, lat, lng);
   return `https://waze.com/ul?ll=${c.lat},${c.lng}&navigate=yes`;
 }
