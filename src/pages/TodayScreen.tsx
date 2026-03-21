@@ -469,11 +469,11 @@ export default function TodayScreen() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[14px] font-display font-bold">
-                Mode Conservative Presence
+                Mode presence prudente Lyft
               </p>
               <p className="text-[12px] text-muted-foreground font-body mt-1">
-                Ne suggère jamais de couper Lyft. Oriente plutôt vers un filtre
-                destination et une présence patiente en zone froide.
+                Garde Lyft actif et prefere une attente strategique avec filtre
+                destination plutot qu'un repositionnement agressif.
               </p>
             </div>
             <span
@@ -483,7 +483,7 @@ export default function TodayScreen() {
                   : 'bg-muted text-muted-foreground'
               }`}
             >
-              {conservativePresence ? 'ACTIF' : 'OFF'}
+              {conservativePresence ? 'ACTIF' : 'INACTIF'}
             </span>
           </div>
         </button>

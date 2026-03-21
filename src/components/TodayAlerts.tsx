@@ -142,8 +142,8 @@ export function TodayAlerts({
         <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2">
           <span className="text-lg flex-shrink-0">🎯</span>
           <span className="text-[13px] font-body text-blue-500">
-            Présence conservatrice active: privilégie les filtres destination
-            Lyft aux déplacements agressifs.
+            Presence prudente Lyft active: privilegie les filtres destination
+            aux deplacements agressifs.
           </span>
         </div>
       )}

@@ -298,11 +298,11 @@ export default function DriveScreen() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[13px] font-display font-bold">
-                Conservative Presence
+                Presence prudente Lyft
               </p>
               <p className="text-[12px] text-muted-foreground font-body mt-1">
-                Reste visible sur Lyft et privilégie les filtres destination
-                plutôt qu'un repositionnement agressif.
+                Reste en ligne sur Lyft et vise une course compatible avec un
+                filtre destination, au lieu d'aller chasser une autre zone.
               </p>
             </div>
             <span
@@ -312,7 +312,7 @@ export default function DriveScreen() {
                   : 'bg-muted text-muted-foreground'
               }`}
             >
-              {conservativePresence ? 'ACTIF' : 'OFF'}
+              {conservativePresence ? 'ACTIF' : 'INACTIF'}
             </span>
           </div>
         </button>
