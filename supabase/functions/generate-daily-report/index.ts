@@ -18,13 +18,16 @@ serve(async (req) => {
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     const today = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+    const nextDayDate = new Date(`${today}T00:00:00Z`);
+    nextDayDate.setUTCDate(nextDayDate.getUTCDate() + 1);
+    const nextDay = nextDayDate.toISOString().split('T')[0];
 
     // ─── Aggregate today's trips ──────────────────────────────────────
     const { data: trips, error: tripsErr } = await supabase
       .from('trips')
       .select('earnings, tips, distance_km, started_at, ended_at, zone_id')
       .gte('started_at', `${today}T00:00:00Z`)
-      .lt('started_at', `${today}T23:59:59Z`);
+      .lt('started_at', `${nextDay}T00:00:00Z`);
 
     if (tripsErr) throw tripsErr;
 
@@ -38,7 +41,7 @@ serve(async (req) => {
       .from('sessions')
       .select('total_earnings, total_hours, total_rides, started_at, ended_at')
       .gte('started_at', `${today}T00:00:00Z`)
-      .lt('started_at', `${today}T23:59:59Z`);
+      .lt('started_at', `${nextDay}T00:00:00Z`);
 
     if (sessionsErr) throw sessionsErr;
 
