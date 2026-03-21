@@ -12,7 +12,7 @@ import { NavLink } from 'react-router-dom';
 
 const navItems = [
   { path: '/drive', icon: Car, label: 'drive' },
-  { path: '/', icon: Calendar, label: 'today' },
+  { path: '/today', icon: Calendar, label: 'today' },
   { path: '/planning', icon: Map, label: 'planning' },
   { path: '/events', icon: PartyPopper, label: 'events' },
   { path: '/zones', icon: Layers, label: 'zones' },
