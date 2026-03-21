@@ -180,9 +180,11 @@ function computeSurgeMultiplier(ctx: SurgeContext): number {
   if (adjustedBaseline <= 0) return MULTIPLIER_MIN;
 
   const ratio = ctx.currentScore / adjustedBaseline;
-  // Sigmoid centrée sur ratio=1, steepness=4
-  const sigmoid = 1 / (1 + Math.exp(-4 * (ratio - 1)));
-  const rawMulti = MULTIPLIER_MIN + (MULTIPLIER_MAX - MULTIPLIER_MIN) * sigmoid;
+  const demandExcess = Math.max(0, ratio - 1.05);
+  const demandBoost =
+    demandExcess <= 0
+      ? 0
+      : (MULTIPLIER_MAX - MULTIPLIER_MIN) * (1 - Math.exp(-1.8 * demandExcess));
 
   const weatherBoost =
     ctx.weatherScore > 50 ? ((ctx.weatherScore - 50) / 100) * 0.3 : 0;
@@ -193,7 +195,7 @@ function computeSurgeMultiplier(ctx: SurgeContext): number {
     MULTIPLIER_MAX,
     Math.max(
       MULTIPLIER_MIN,
-      rawMulti + weatherBoost + eventBoost + trafficBoost
+      MULTIPLIER_MIN + demandBoost + weatherBoost + eventBoost + trafficBoost
     )
   );
 }

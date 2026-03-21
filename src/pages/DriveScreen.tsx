@@ -313,7 +313,23 @@ export default function DriveScreen() {
       {/* Statut chauffeur : Occupé / Libre */}
       <div className="px-4 mt-2">
         <button
-          onClick={() => setLibreMode((l) => !l)}
+          onClick={() => {
+            const nextLibreMode = !libreMode;
+
+            if (nextLibreMode && heroZone) {
+              window.open(
+                getGoogleMapsNavUrl(
+                  heroZone.name,
+                  heroZone.latitude,
+                  heroZone.longitude
+                ),
+                '_blank',
+                'noopener,noreferrer'
+              );
+            }
+
+            setLibreMode(nextLibreMode);
+          }}
           className={`w-full h-11 rounded-xl text-[14px] font-display font-bold border transition-colors flex items-center justify-center gap-2 ${
             libreMode
               ? 'bg-primary text-primary-foreground border-primary'

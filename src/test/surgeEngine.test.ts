@@ -37,25 +37,21 @@ function baseCtx(overrides: Partial<SurgeContext> = {}): SurgeContext {
 
 describe('surge class — thresholds', () => {
   it('returns normal when demand is well below adjusted baseline', () => {
-    // adjustedBaseline = 60 × DOW(tue=0.85) × seasonal(sep=1.0) = 51
-    // currentScore=20 → ratio=0.39 → sigmoid(-2.43)≈0.08 → multi≈1.12
     const r = computeSurge(baseCtx({ currentScore: 20, baselineScore: 60 }));
     expect(r.surgeClass).toBe('normal');
     expect(r.surgeMultiplier).toBeGreaterThanOrEqual(1.0);
     expect(r.surgeMultiplier).toBeLessThan(1.18);
   });
 
-  it('returns elevated when demand is ~65 % of adjusted baseline', () => {
-    // adjustedBaseline=51, currentScore=33 → ratio=0.65 → multi≈1.29
-    const r = computeSurge(baseCtx({ currentScore: 33, baselineScore: 60 }));
+  it('returns elevated when demand is modestly above adjusted baseline', () => {
+    const r = computeSurge(baseCtx({ currentScore: 63, baselineScore: 60 }));
     expect(r.surgeClass).toBe('elevated');
     expect(r.surgeMultiplier).toBeGreaterThanOrEqual(1.18);
     expect(r.surgeMultiplier).toBeLessThan(1.45);
   });
 
-  it('returns high when demand matches adjusted baseline (ratio=1)', () => {
-    // adjustedBaseline=51, currentScore=51 → ratio=1.0 → sigmoid(0)=0.5 → multi=1.75
-    const r = computeSurge(baseCtx({ currentScore: 51, baselineScore: 60 }));
+  it('returns high when demand clearly exceeds adjusted baseline', () => {
+    const r = computeSurge(baseCtx({ currentScore: 70, baselineScore: 60 }));
     expect(r.surgeClass).toBe('high');
     expect(r.surgeMultiplier).toBeGreaterThanOrEqual(1.45);
     expect(r.surgeMultiplier).toBeLessThan(1.8);
@@ -232,9 +228,8 @@ describe('day-of-week baseline modulation', () => {
     const sat = computeSurge(
       baseCtx({ dayOfWeek: 6, currentScore: 80, baselineScore: 60 })
     );
-    // Both should be valid surge values
-    expect(sun.surgeMultiplier).toBeGreaterThan(1.0);
-    expect(sat.surgeMultiplier).toBeGreaterThan(1.0);
+    expect(sun.surgeMultiplier).toBeGreaterThanOrEqual(1.0);
+    expect(sat.surgeMultiplier).toBeGreaterThanOrEqual(1.0);
   });
 });
 
@@ -323,7 +318,7 @@ describe('edge cases', () => {
   it('currentScore = 0 returns modest multiplier', () => {
     const r = computeSurge(baseCtx({ currentScore: 0, baselineScore: 60 }));
     expect(r.surgeMultiplier).toBeGreaterThanOrEqual(1.0);
-    expect(r.surgeMultiplier).toBeLessThan(1.5);
+    expect(r.surgeMultiplier).toBeLessThan(1.18);
   });
 
   it('both scores = 0 returns safe minimum', () => {
@@ -363,9 +358,10 @@ describe('edge cases', () => {
   });
 
   it('estimatedBoostPct = 0 when multiplier = 1.0', () => {
-    const r = computeSurge(baseCtx({ currentScore: 60, baselineScore: 60 }));
-    // multiplier is slightly above 1 (sigmoid at ratio=1 → 0.5 → 1.0 + small), boost is non-negative
-    expect(r.estimatedBoostPct).toBeGreaterThanOrEqual(0);
+    const r = computeSurge(
+      baseCtx({ dayOfWeek: 5, currentScore: 60, baselineScore: 60 })
+    );
+    expect(r.estimatedBoostPct).toBe(0);
   });
 
   it('reasoning is always a non-empty string', () => {

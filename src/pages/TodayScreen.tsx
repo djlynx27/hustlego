@@ -634,17 +634,15 @@ export default function TodayScreen() {
               setAutoNavReason(picked?.reason ?? null);
               if (picked) {
                 rememberUserPreference(picked.zone, 'libre-auto-pick');
-                if (!conservativePresence) {
-                  window.open(
-                    getGoogleMapsNavUrl(
-                      picked.zone.name,
-                      picked.zone.latitude,
-                      picked.zone.longitude
-                    ),
-                    '_blank',
-                    'noopener,noreferrer'
-                  );
-                }
+                window.open(
+                  getGoogleMapsNavUrl(
+                    picked.zone.name,
+                    picked.zone.latitude,
+                    picked.zone.longitude
+                  ),
+                  '_blank',
+                  'noopener,noreferrer'
+                );
               }
             } else {
               setAutoSelectedZone(null);

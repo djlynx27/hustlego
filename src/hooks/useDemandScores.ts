@@ -16,6 +16,7 @@ import {
   useTomTomTraffic,
 } from '@/hooks/useTomTomTraffic';
 import type { TripWithZone } from '@/hooks/useTrips';
+import { haversineKm } from '@/hooks/useUserLocation';
 import { useWeather } from '@/hooks/useWeather';
 import { useZoneScores } from '@/hooks/useZoneScores';
 import { supabase } from '@/integrations/supabase/client';
@@ -58,6 +59,7 @@ export interface ScoreFactors {
   habitBoostPercent?: number;
   habitSimilarity?: number;
   habitSuccessRate?: number;
+  realityCapPoints?: number;
 }
 
 interface UseDemandScoresOptions {
@@ -66,10 +68,61 @@ interface UseDemandScoresOptions {
   conservativePresence?: boolean;
 }
 
+interface OvernightRealityCapInput {
+  score: number;
+  zoneType: string;
+  now: Date;
+  hasRelevantEvent: boolean;
+  weatherBoostPoints?: number;
+  lyftDemandLevel?: number | null;
+  estimatedWaitMin?: number | null;
+  surgeActive?: boolean | null;
+}
+
 function logScoreCalculatorIssue(...args: unknown[]) {
   if (import.meta.env.DEV) {
     console.warn(...args);
   }
+}
+
+export function applyOvernightRealityCap({
+  score,
+  zoneType,
+  now,
+  hasRelevantEvent,
+  weatherBoostPoints = 0,
+  lyftDemandLevel,
+  estimatedWaitMin,
+  surgeActive,
+}: OvernightRealityCapInput) {
+  const hour = now.getHours();
+  const isOvernight = hour >= 1 && hour < 5;
+
+  if (!isOvernight) return score;
+
+  const hasStrongLyftSignal =
+    surgeActive === true ||
+    (lyftDemandLevel ?? 0) >= 8 ||
+    (estimatedWaitMin != null && estimatedWaitMin <= 4);
+
+  if (hasRelevantEvent || weatherBoostPoints >= 10 || hasStrongLyftSignal) {
+    return score;
+  }
+
+  const overnightCaps: Record<string, number> = {
+    nightlife: 88,
+    événements: 82,
+    aéroport: 78,
+    transport: 74,
+    métro: 68,
+    commercial: 60,
+    tourisme: 58,
+    résidentiel: 56,
+    médical: 54,
+    université: 50,
+  };
+
+  return Math.min(score, overnightCaps[zoneType] ?? 65);
 }
 
 export function buildTripHistory(
@@ -235,6 +288,33 @@ export function useDemandScores(
     () => getRelevantTmEvents(tmEvents, now, 3),
     [tmEvents, now]
   );
+
+  const relevantEventCoverageByZone = useMemo(() => {
+    const coverage = new Map<string, boolean>();
+
+    for (const zone of zones) {
+      const hasRelevantEvent = activeEvents.some((event) => {
+        const boostAppliesToZoneType =
+          event.boost_zone_types.length === 0 ||
+          event.boost_zone_types.includes(zone.type);
+
+        if (!boostAppliesToZoneType) return false;
+
+        return (
+          haversineKm(
+            zone.latitude,
+            zone.longitude,
+            event.latitude,
+            event.longitude
+          ) <= event.boost_radius_km
+        );
+      });
+
+      coverage.set(zone.id, hasRelevantEvent);
+    }
+
+    return coverage;
+  }, [zones, activeEvents]);
 
   const eventBoosts: ActiveEventBoost[] = useMemo(() => {
     const dbBoosts: ActiveEventBoost[] = activeEvents.map((e) => ({
@@ -607,7 +687,19 @@ export function useDemandScores(
         successfulMatches: habitSignal?.successfulMatches,
       });
 
-      boostedScores.set(zone.id, habitBoost.score);
+      const realityCheckedScore = applyOvernightRealityCap({
+        score: habitBoost.score,
+        zoneType: zone.type,
+        now,
+        hasRelevantEvent: relevantEventCoverageByZone.get(zone.id) ?? false,
+        weatherBoostPoints:
+          boostedFactors.get(zone.id)?.weatherBoostPoints ?? 0,
+        lyftDemandLevel: lyftSignal?.demandLevel,
+        estimatedWaitMin: lyftSignal?.estimatedWaitMin,
+        surgeActive: lyftSignal?.surgeActive,
+      });
+
+      boostedScores.set(zone.id, realityCheckedScore);
       boostedFactors.set(zone.id, {
         ...(boostedFactors.get(zone.id) ?? {
           hasWeatherBoost: false,
@@ -622,6 +714,7 @@ export function useDemandScores(
         habitBoostPercent: habitBoost.boostPercent,
         habitSimilarity: habitSignal?.averageSimilarity,
         habitSuccessRate: habitSignal?.averageSuccessScore,
+        realityCapPoints: Math.max(0, habitBoost.score - realityCheckedScore),
       });
     }
 
@@ -637,6 +730,7 @@ export function useDemandScores(
     averageTrafficCongestion,
     learningSignalByZone,
     lyftSignalByZone,
+    relevantEventCoverageByZone,
     userPingSignalByZone,
     options.currentLat,
     options.currentLng,
@@ -655,7 +749,8 @@ export function useDemandScores(
         50;
       const baselineScore =
         ((zone as Record<string, unknown>).base_score as number) ??
-        currentScore * 0.85;
+        ((zone as Record<string, unknown>).current_score as number) ??
+        currentScore;
       const ctx = buildSurgeContext({
         now,
         currentScore,

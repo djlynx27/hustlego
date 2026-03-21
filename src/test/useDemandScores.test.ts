@@ -1,4 +1,7 @@
-import { buildTripHistory } from '@/hooks/useDemandScores';
+import {
+  applyOvernightRealityCap,
+  buildTripHistory,
+} from '@/hooks/useDemandScores';
 import type { Zone } from '@/hooks/useSupabase';
 import type { TripWithZone } from '@/hooks/useTrips';
 import { describe, expect, it } from 'vitest';
@@ -81,5 +84,52 @@ describe('buildTripHistory', () => {
     );
 
     expect(history).toEqual([]);
+  });
+});
+
+describe('applyOvernightRealityCap', () => {
+  it('caps unsupported overnight commercial scores', () => {
+    const capped = applyOvernightRealityCap({
+      score: 100,
+      zoneType: 'commercial',
+      now: new Date('2026-03-21T02:00:00-04:00'),
+      hasRelevantEvent: false,
+      weatherBoostPoints: 0,
+      lyftDemandLevel: 3,
+      estimatedWaitMin: 8,
+      surgeActive: false,
+    });
+
+    expect(capped).toBe(60);
+  });
+
+  it('keeps overnight nightlife scores when a real event backs the zone', () => {
+    const capped = applyOvernightRealityCap({
+      score: 92,
+      zoneType: 'nightlife',
+      now: new Date('2026-03-21T02:00:00-04:00'),
+      hasRelevantEvent: true,
+      weatherBoostPoints: 0,
+      lyftDemandLevel: 4,
+      estimatedWaitMin: 7,
+      surgeActive: false,
+    });
+
+    expect(capped).toBe(92);
+  });
+
+  it('does not cap daytime scores', () => {
+    const capped = applyOvernightRealityCap({
+      score: 95,
+      zoneType: 'commercial',
+      now: new Date('2026-03-21T14:00:00-04:00'),
+      hasRelevantEvent: false,
+      weatherBoostPoints: 0,
+      lyftDemandLevel: 3,
+      estimatedWaitMin: 8,
+      surgeActive: false,
+    });
+
+    expect(capped).toBe(95);
   });
 });

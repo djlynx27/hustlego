@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 export interface AppEvent {
   id: string;
@@ -19,6 +19,30 @@ export interface AppEvent {
   is_holiday: boolean;
 }
 
+const HIGH_DEMAND_EVENT_CATEGORIES = new Set(['sport', 'festival', 'holiday']);
+
+function getEventDemandGraceMinutes(event: AppEvent) {
+  if (HIGH_DEMAND_EVENT_CATEGORIES.has(event.category)) return 60;
+  if (event.capacity >= 2500 || event.demand_impact >= 3) return 30;
+  return 10;
+}
+
+export function isDemandRelevantEvent(event: AppEvent, now: Date) {
+  const hour = now.getHours();
+  const isOvernight = hour >= 0 && hour < 5;
+
+  if (!isOvernight) return true;
+
+  if (HIGH_DEMAND_EVENT_CATEGORIES.has(event.category)) return true;
+
+  const supportsNightlife = event.boost_zone_types.includes('nightlife');
+  const hasLargeCrowd = event.capacity >= 1500;
+  const hasStrongDemandSignal =
+    event.demand_impact >= 3 || event.boost_multiplier >= 1.7;
+
+  return supportsNightlife && (hasLargeCrowd || hasStrongDemandSignal);
+}
+
 export function useEvents(cityId?: string) {
   return useQuery<AppEvent[]>({
     queryKey: ['events', cityId ?? 'all'],
@@ -33,32 +57,56 @@ export function useEvents(cityId?: string) {
 }
 
 /** Get events active right now or within the next `windowMinutes` */
-export function getActiveEvents(events: AppEvent[], now: Date, windowMinutes = 60): AppEvent[] {
+export function getActiveEvents(
+  events: AppEvent[],
+  now: Date,
+  windowMinutes = 60
+): AppEvent[] {
   const nowMs = now.getTime();
-  return events.filter(e => {
+  return events.filter((e) => {
     const start = new Date(e.start_at).getTime();
     const end = new Date(e.end_at).getTime();
-    // Active: started and not yet ended + window
-    return nowMs >= start && nowMs <= end + windowMinutes * 60_000;
+    const graceMinutes = Math.min(windowMinutes, getEventDemandGraceMinutes(e));
+    return (
+      nowMs >= start &&
+      nowMs <= end + graceMinutes * 60_000 &&
+      isDemandRelevantEvent(e, now)
+    );
   });
 }
 
 /** Get events ending within X minutes */
-export function getEndingSoonEvents(events: AppEvent[], now: Date, withinMinutes = 60): AppEvent[] {
+export function getEndingSoonEvents(
+  events: AppEvent[],
+  now: Date,
+  withinMinutes = 60
+): AppEvent[] {
   const nowMs = now.getTime();
-  return events.filter(e => {
+  return events.filter((e) => {
     const end = new Date(e.end_at).getTime();
     const diff = end - nowMs;
-    return diff > 0 && diff <= withinMinutes * 60_000;
+    return (
+      diff > 0 &&
+      diff <= withinMinutes * 60_000 &&
+      isDemandRelevantEvent(e, now)
+    );
   });
 }
 
 /** Get events starting within X minutes (not yet started) */
-export function getStartingSoonEvents(events: AppEvent[], now: Date, withinMinutes = 90): AppEvent[] {
+export function getStartingSoonEvents(
+  events: AppEvent[],
+  now: Date,
+  withinMinutes = 90
+): AppEvent[] {
   const nowMs = now.getTime();
-  return events.filter(e => {
+  return events.filter((e) => {
     const start = new Date(e.start_at).getTime();
     const diff = start - nowMs;
-    return diff > 0 && diff <= withinMinutes * 60_000;
+    return (
+      diff > 0 &&
+      diff <= withinMinutes * 60_000 &&
+      isDemandRelevantEvent(e, new Date(e.start_at))
+    );
   });
 }
