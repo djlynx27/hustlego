@@ -9,6 +9,31 @@ import { useMemo } from 'react';
 
 type DailyReportRow = Tables<'daily_reports'>;
 
+function getTrackedSessionHours(session: {
+  total_hours: number | null;
+  started_at: string;
+  ended_at: string | null;
+}) {
+  const explicitHours = Number(session.total_hours ?? 0);
+  if (explicitHours > 0) {
+    return explicitHours;
+  }
+
+  if (!session.ended_at) {
+    return 0;
+  }
+
+  const startedAt = new Date(session.started_at);
+  const endedAt = new Date(session.ended_at);
+  const durationMs = endedAt.getTime() - startedAt.getTime();
+
+  if (!Number.isFinite(durationMs) || durationMs <= 0) {
+    return 0;
+  }
+
+  return durationMs / (1000 * 60 * 60);
+}
+
 function useReports() {
   return useQuery<DailyReportRow[]>({
     queryKey: ['daily-reports'],
@@ -49,7 +74,7 @@ export function DailyReports() {
         rides: 0,
         shifts: 0,
       };
-      current.hours += Number(session.total_hours ?? 0);
+      current.hours += getTrackedSessionHours(session);
       current.revenue += Number(session.total_earnings ?? 0);
       current.rides += Number(session.total_rides ?? 0);
       current.shifts += 1;
