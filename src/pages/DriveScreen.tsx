@@ -40,6 +40,29 @@ interface WakeLockNavigator extends Navigator {
 
 type WakeLockStatus = 'active' | 'inactive' | 'unsupported';
 
+// Mode boost multipliers — module-level constants (no state dependency)
+const RIDESHARE_BOOST: Record<string, number> = {
+  aéroport: 1.2,
+  université: 1.15,
+  transport: 1.1,
+  commercial: 1.05,
+  médical: 1.05,
+  métro: 1.05,
+  résidentiel: 0.75,
+};
+const DELIVERY_BOOST: Record<string, number> = {
+  commercial: 1.3,
+  résidentiel: 1.2,
+  métro: 0.95,
+  transport: 0.85,
+  université: 0.8,
+  médical: 0.75,
+  tourisme: 0.75,
+  nightlife: 0.7,
+  événements: 0.7,
+  aéroport: 0.65,
+};
+
 export default function DriveScreen() {
   usePullToRefresh(() => window.location.reload());
   // Driver mode (rideshare/delivery/all) — shared with TodayScreen
@@ -159,28 +182,7 @@ export default function DriveScreen() {
             label: t('screenInactive'),
           };
 
-  // Mode filter logic (mirrors TodayScreen)
-  const RIDESHARE_BOOST: Record<string, number> = {
-    aéroport: 1.2,
-    université: 1.15,
-    transport: 1.1,
-    commercial: 1.05,
-    médical: 1.05,
-    métro: 1.05,
-    résidentiel: 0.75,
-  };
-  const DELIVERY_BOOST: Record<string, number> = {
-    commercial: 1.3,
-    résidentiel: 1.2,
-    métro: 0.95,
-    transport: 0.85,
-    université: 0.8,
-    médical: 0.75,
-    tourisme: 0.75,
-    nightlife: 0.7,
-    événements: 0.7,
-    aéroport: 0.65,
-  };
+  // Mode filter logic (mirrors TodayScreen) — boost maps defined at module level
 
   // Ranked zones by score descending
   const rankedZones = useMemo(() => {

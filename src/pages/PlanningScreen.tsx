@@ -299,9 +299,6 @@ export default function PlanningScreen() {
             const homeStartMin = parseTimeMinPlanning(
               homeConstraints.returnHomeWindowStart
             );
-            const homeEndMin = parseTimeMinPlanning(
-              homeConstraints.returnHomeWindowEnd
-            );
             const pickupMin = parseTimeMinPlanning(homeConstraints.pickupTime);
             // Morning: mark before the return-home window starts
             if (slotMin >= homeStartMin && prevMin < homeStartMin) {

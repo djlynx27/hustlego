@@ -26,19 +26,17 @@ import { useHabsGame } from '@/hooks/useHabsGame';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useHoliday } from '@/hooks/useHoliday';
 import { useHomeConstraints } from '@/hooks/useHomeConstraints';
+import { useLibreMode } from '@/hooks/useLibreMode';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
+import { useSmartZones } from '@/hooks/useSmartZones';
 import { useCities } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { useWeather } from '@/hooks/useWeather';
 import { useYulFlights } from '@/hooks/useYulFlights';
-import {
-  formatTime24h,
-  getCurrentSlotTime,
-  getDemandClass,
-} from '@/lib/demandUtils';
+import { getCurrentSlotTime, getDemandClass } from '@/lib/demandUtils';
 import {
   getConservativePresencePreference,
   getDriverFingerprint,
@@ -47,8 +45,6 @@ import {
   setStoredDriverMode,
 } from '@/lib/driverPreferences';
 import { recordUserPing } from '@/lib/learningSync';
-import { computeSuccessProbabilityScore } from '@/lib/lyftStrategy';
-import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
 import { getActiveTimeBoosts } from '@/lib/timeBoosts';
 import {
   getGoogleMapsNavUrl,
@@ -118,46 +114,6 @@ function formatMoney(value: number) {
     currency: 'CAD',
     maximumFractionDigits: 0,
   }).format(value);
-}
-
-type SmartZone = {
-  id: string;
-  name: string;
-  type: string;
-  score: number;
-  distKm: number;
-  travelMin: number;
-  arrivalScore: number;
-  arrivalTime: string;
-  latitude: number;
-  longitude: number;
-};
-
-/**
- * Picks the best destination when the driver goes libre.
- * Default: closest non-airport zone.
- * Override: highest-score zone when the score gap ≥ 20 pts
- *           AND the closer zone's score < 62.
- * Airport zones are NEVER auto-selected for navigation.
- */
-function pickBestDestination(
-  zones: SmartZone[]
-): { zone: SmartZone; reason: 'proche' | 'score' } | null {
-  const navZones = zones.filter((z) => z.type !== 'aéroport');
-  if (navZones.length === 0) return null;
-  // zones is already sorted by arrivalScore desc → navZones[0] is the best scorer
-  const bestScore = navZones[0];
-  const closest = [...navZones].sort((a, b) => a.distKm - b.distKm)[0];
-  if (!bestScore || !closest) return null;
-  if (closest.id === bestScore.id) return { zone: closest, reason: 'proche' };
-  // Override to farther zone only when gap is significant AND closer zone is weak
-  if (
-    bestScore.arrivalScore - closest.arrivalScore >= 20 &&
-    closest.arrivalScore < 62
-  ) {
-    return { zone: bestScore, reason: 'score' };
-  }
-  return { zone: closest, reason: 'proche' };
 }
 
 export default function TodayScreen() {
@@ -236,77 +192,21 @@ export default function TodayScreen() {
   };
 
   // ── "Je suis libre" mode ───────────────────────────────────────────
-  const [libreMode, setLibreMode] = useState(false);
-  const [waitTimer, setWaitTimer] = useState<{
-    zoneId: string;
-    zoneName: string;
-    startedAt: number;
-  } | null>(null);
-  const [timerExpired, setTimerExpired] = useState(false);
-  const [nowTick, setNowTick] = useState(Date.now());
-  const [autoSelectedZone, setAutoSelectedZone] = useState<SmartZone | null>(
-    null
-  );
-  const [autoNavReason, setAutoNavReason] = useState<'proche' | 'score' | null>(
-    null
-  );
-
-  // Second-precision tick when timer is active
-  useEffect(() => {
-    if (!waitTimer) return;
-    const id = setInterval(() => setNowTick(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [waitTimer]);
-
-  const WAIT_DURATION_MS = 15 * 60 * 1000;
-  const waitRemainingMs = waitTimer
-    ? Math.max(0, WAIT_DURATION_MS - (nowTick - waitTimer.startedAt))
-    : 0;
-  const waitMin = Math.floor(waitRemainingMs / 60000);
-  const waitSec = Math.floor((waitRemainingMs % 60000) / 1000);
-  const waitDisplay = `${waitMin}:${String(waitSec).padStart(2, '0')}`;
-
-  // 15-min timer completion
-  const smartZonesRef = useRef<SmartZone[]>([]);
-  useEffect(() => {
-    if (!waitTimer) return;
-    const remaining = WAIT_DURATION_MS - (Date.now() - waitTimer.startedAt);
-    if (remaining <= 0) {
-      setTimerExpired(true);
-      setWaitTimer(null);
-      return;
-    }
-    const t = setTimeout(() => {
-      setTimerExpired(true);
-      setWaitTimer(null);
-      const next = smartZonesRef.current[0];
-      if (Notification.permission === 'granted') {
-        navigator.serviceWorker?.ready
-          .then((reg) =>
-            reg.showNotification('⏱ Temps de bouger !', {
-              body: `Dirige-toi vers ${next?.name ?? 'la prochaine zone'}.`,
-              icon: '/pwa-icon-192.png',
-              tag: 'wait-timer',
-              renotify: true,
-            } as NotificationOptions)
-          )
-          .catch(() => {
-            try {
-              new Notification('⏱ Temps de bouger !', {
-                body: 'Déplace-toi vers la prochaine zone.',
-                icon: '/pwa-icon-192.png',
-              });
-            } catch {
-              // Notification API unavailable; no fallback notification.
-            }
-          });
-      }
-    }, remaining);
-    return () => clearTimeout(t);
-  }, [WAIT_DURATION_MS, waitTimer]);
+  const {
+    libreMode,
+    waitTimer,
+    timerExpired,
+    waitDisplay,
+    autoSelectedZone,
+    autoNavReason,
+    startWaitAt,
+    cancelTimer,
+    dismissExpired,
+    toggleLibre,
+    nextSmartZoneRef,
+  } = useLibreMode();
 
   const { data: weather } = useWeather(cityId);
-  const AVG_SPEED_KMH = 30;
 
   const rememberUserPreference = useCallback(
     (
@@ -381,64 +281,19 @@ export default function TodayScreen() {
       .sort((a, b) => b.score - a.score);
   }, [rankedZones, driverMode]);
 
-  // Smart zones: scored at ARRIVAL time considering travel
-  const smartZones = useMemo(() => {
-    if (!userLocation) return [];
-    const weatherCond: WeatherCondition | null = weather
-      ? {
-          weatherId: weather.weatherId,
-          temp: weather.temp,
-          demandBoostPoints: weather.demandBoostPoints,
-        }
-      : null;
-    return modeZones
-      .map((z) => {
-        const distKm = haversineKm(
-          userLocation.latitude,
-          userLocation.longitude,
-          z.latitude,
-          z.longitude
-        );
-        const travelMin = Math.round((distKm / AVG_SPEED_KMH) * 60);
-        const arrivalDate = new Date(now.getTime() + travelMin * 60_000);
-        const { score: arrivalDemandScore } = computeDemandScore(
-          z,
-          arrivalDate,
-          weatherCond
-        );
-        const arrivalScore = computeSuccessProbabilityScore({
-          demandContextScore: arrivalDemandScore,
-          distanceKm: distKm,
-          demandLevel: lyftSignalByZone.get(z.id)?.demandLevel,
-          estimatedWaitMin: lyftSignalByZone.get(z.id)?.estimatedWaitMin,
-          surgeActive: lyftSignalByZone.get(z.id)?.surgeActive,
-        }).score;
-        return {
-          ...z,
-          distKm,
-          travelMin,
-          arrivalScore,
-          arrivalTime: formatTime24h(arrivalDate),
-        };
-      })
-      .filter((z) => z.distKm <= 20 && z.arrivalScore >= 45)
-      .sort((a, b) => b.arrivalScore - a.arrivalScore)
-      .slice(0, 5);
-  }, [lyftSignalByZone, modeZones, now, userLocation, weather]);
+  // Smart zones: scored at ARRIVAL time considering travel — extracted to useSmartZones
+  const { smartZones } = useSmartZones({
+    modeZones,
+    userLocation: userLocation ?? null,
+    weather: weather ?? null,
+    lyftSignalByZone,
+    now,
+  });
 
-  // Keep ref in sync for the timer callback
+  // Keep libre mode ref in sync with latest smart zones for timer callback
   useEffect(() => {
-    smartZonesRef.current = smartZones;
-  }, [smartZones]);
-
-  const startWaitAt = useCallback((zone: (typeof smartZones)[0]) => {
-    setWaitTimer({
-      zoneId: zone.id,
-      zoneName: zone.name,
-      startedAt: Date.now(),
-    });
-    setTimerExpired(false);
-  }, []);
+    nextSmartZoneRef.current = smartZones[0] ?? null;
+  }, [smartZones, nextSmartZoneRef]);
 
   const heroZone = modeZones[0] ?? null;
   const heroFactors = heroZone ? factors.get(heroZone.id) : undefined;
@@ -646,26 +501,17 @@ export default function TodayScreen() {
       <div className="px-3 mt-2">
         <button
           onClick={() => {
-            if (!libreMode) {
-              // Activating libre mode: auto-pick best destination and launch Google Maps
-              const picked = pickBestDestination(smartZones as SmartZone[]);
-              setAutoSelectedZone(picked?.zone ?? null);
-              setAutoNavReason(picked?.reason ?? null);
-              if (picked) {
-                rememberUserPreference(picked.zone, 'libre-auto-pick');
+            toggleLibre({
+              smartZones,
+              onActivate: (zone) => {
+                rememberUserPreference(zone, 'libre-auto-pick');
                 launchGoogleMapsNavigation(
-                  picked.zone.name,
-                  picked.zone.latitude,
-                  picked.zone.longitude
+                  zone.name,
+                  zone.latitude,
+                  zone.longitude
                 );
-              }
-            } else {
-              setAutoSelectedZone(null);
-              setAutoNavReason(null);
-            }
-            setLibreMode((l) => !l);
-            setWaitTimer(null);
-            setTimerExpired(false);
+              },
+            });
           }}
           className={`w-full h-11 rounded-xl text-[14px] font-display font-bold border transition-colors flex items-center justify-center gap-2 ${
             libreMode
@@ -696,7 +542,7 @@ export default function TodayScreen() {
               </span>
             </div>
             <button
-              onClick={() => setWaitTimer(null)}
+              onClick={cancelTimer}
               className="text-muted-foreground hover:text-foreground text-xl leading-none px-1"
               aria-label="Annuler le timer"
             >
@@ -710,7 +556,7 @@ export default function TodayScreen() {
               ⏱ Temps de bouger ! Prochaine zone recommandée ↓
             </span>
             <button
-              onClick={() => setTimerExpired(false)}
+              onClick={dismissExpired}
               className="text-muted-foreground hover:text-foreground text-xl leading-none px-1"
             >
               ×
@@ -1169,7 +1015,7 @@ export default function TodayScreen() {
                       </a>
                       {isWaiting ? (
                         <button
-                          onClick={() => setWaitTimer(null)}
+                          onClick={cancelTimer}
                           className="px-3 h-10 rounded-lg border border-border text-[13px] text-muted-foreground hover:text-foreground font-body"
                         >
                           Annuler

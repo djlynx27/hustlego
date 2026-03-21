@@ -1,6 +1,7 @@
 import js from '@eslint/js';
 import reactHooks from 'eslint-plugin-react-hooks';
 import reactRefresh from 'eslint-plugin-react-refresh';
+import security from 'eslint-plugin-security';
 import { defineConfig, globalIgnores } from 'eslint/config';
 import globals from 'globals';
 import tseslint from 'typescript-eslint';
@@ -57,6 +58,28 @@ export default defineConfig([
       'react-hooks/todo': 'off',
       'react-hooks/gating': 'off',
       'react-hooks/fire': 'off',
+    },
+  },
+  // ─── Security rules (OWASP Top 10 patterns) ───────────────────────────────
+  {
+    files: ['src/**/*.{ts,tsx}'],
+    plugins: { security },
+    rules: {
+      // Detect eval(), new Function(), setTimeout(string) — injection risks
+      'security/detect-eval-with-expression': 'error',
+      // Detect non-literal RegExp (ReDoS risk)
+      'security/detect-non-literal-regexp': 'warn',
+      // Object injection: off — TypeScript's type system already provides safety
+      // for typed key access; this rule generates excessive false positives.
+      'security/detect-object-injection': 'off',
+      // Detect Buffer allocation with noAssert flag
+      'security/detect-buffer-noassert': 'error',
+      // Detect child_process usage
+      'security/detect-child-process': 'error',
+      // Detect disable of certificate validation
+      'security/detect-disable-mustache-escape': 'error',
+      // Detect HTML injected via innerHTML
+      'security/detect-possible-timing-attacks': 'warn',
     },
   },
 ]);

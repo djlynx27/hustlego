@@ -19,7 +19,7 @@ export function usePullToRefresh(onRefresh: () => void, thresholdPx = 60) {
     // Only activate in standalone/PWA mode
     const isStandalone =
       window.matchMedia('(display-mode: standalone)').matches ||
-      (window.navigator as any).standalone;
+      (window.navigator as unknown as { standalone?: boolean }).standalone;
     if (!isStandalone) return;
 
     const el = document.scrollingElement || document.body;
