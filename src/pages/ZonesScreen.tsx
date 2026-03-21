@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { ZonePerformanceHeatmap } from '@/components/ZonePerformanceHeatmap';
 import { useI18n } from '@/contexts/I18nContext';
+import { useAutoCity } from '@/hooks/useAutoCity';
 import { useCityId } from '@/hooks/useCityId';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import {
@@ -27,6 +28,7 @@ import {
   useZones,
   type Zone,
 } from '@/hooks/useSupabase';
+import { useUserLocation } from '@/hooks/useUserLocation';
 import { Constants } from '@/integrations/supabase/types';
 import { parseZoneCoordinates } from '@/lib/zoneCoordinates';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
@@ -52,6 +54,13 @@ export default function ZonesScreen() {
   usePullToRefresh(() => window.location.reload());
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
+  const { location: userLocation } = useUserLocation();
+  useAutoCity(
+    cityId,
+    setCityId,
+    userLocation?.latitude,
+    userLocation?.longitude
+  );
   const { data: cities = [] } = useCities();
   const { data: zones = [] } = useZones(cityId);
   const addZone = useAddZone();

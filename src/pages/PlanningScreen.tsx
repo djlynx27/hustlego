@@ -64,7 +64,12 @@ export default function PlanningScreen() {
   const listRef = useRef<HTMLDivElement>(null);
   const slotRefs = useRef<Map<string, HTMLDivElement>>(new Map());
   const { location: userLocation } = useUserLocation();
-  useAutoCity(setCityId, userLocation?.latitude, userLocation?.longitude);
+  useAutoCity(
+    cityId,
+    setCityId,
+    userLocation?.latitude,
+    userLocation?.longitude
+  );
 
   const [navZone, setNavZone] = useState<{
     name: string;

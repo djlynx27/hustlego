@@ -1,10 +1,12 @@
 import { CitySelect } from '@/components/CitySelect';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/contexts/I18nContext';
+import { useAutoCity } from '@/hooks/useAutoCity';
 import { useCityId } from '@/hooks/useCityId';
 import { useEvents, type AppEvent } from '@/hooks/useEvents';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useCities } from '@/hooks/useSupabase';
+import { useUserLocation } from '@/hooks/useUserLocation';
 import { Calendar, Clock, Navigation, Star, Users } from 'lucide-react';
 import { useMemo } from 'react';
 
@@ -140,6 +142,13 @@ export default function EventsScreen() {
   usePullToRefresh(() => window.location.reload());
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
+  const { location: userLocation } = useUserLocation();
+  useAutoCity(
+    cityId,
+    setCityId,
+    userLocation?.latitude,
+    userLocation?.longitude
+  );
   const { data: cities = [] } = useCities();
   const { data: events = [] } = useEvents(cityId);
 

@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { WeeklyGoalDisplay } from '@/components/WeeklyGoal';
 import { useI18n } from '@/contexts/I18nContext';
 import { useActivityDetection } from '@/hooks/useActivityDetection';
+import { useAutoCity } from '@/hooks/useAutoCity';
 import { useCityId } from '@/hooks/useCityId';
 import { useDemandScores } from '@/hooks/useDemandScores';
 import { useHaptics } from '@/hooks/useHaptics';
@@ -80,6 +81,7 @@ export default function DriveScreen() {
   const [cityId, setCityId] = useCityId();
   const { data: cities = [] } = useCities();
   const { location, status } = useUserLocation(15000);
+  useAutoCity(cityId, setCityId, location?.latitude, location?.longitude);
   const [conservativePresence, setConservativePresence] = useState(() =>
     getConservativePresencePreference()
   );

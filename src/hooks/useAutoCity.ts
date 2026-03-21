@@ -1,6 +1,6 @@
 /**
  * Auto-detects the nearest city (mtl / lvl / lng) from the user's GPS position
- * and updates cityId — fires only once per session on first GPS fix.
+ * and updates cityId when the detected city materially changes.
  *
  * Approximate city centroids (WGS-84):
  *   Montréal  45.508, -73.587
@@ -30,18 +30,33 @@ export function nearestCityId(lat: number, lng: number): string {
 }
 
 /**
- * Fires ONCE per session when GPS first resolves to auto-set the nearest city.
- * The user may still manually override afterwards.
+ * Keeps cityId aligned with the detected city, while avoiding repeated writes for
+ * the same detection so a manual override can still stick until GPS resolves to
+ * a different city.
  */
 export function useAutoCity(
+  currentCityId: string,
   setCityId: (id: string) => void,
   userLat: number | null | undefined,
   userLng: number | null | undefined
 ) {
-  const hasFiredRef = useRef(false);
+  const lastAutoCityRef = useRef<string | null>(null);
+
   useEffect(() => {
-    if (hasFiredRef.current || userLat == null || userLng == null) return;
-    hasFiredRef.current = true;
-    setCityId(nearestCityId(userLat, userLng));
-  }, [userLat, userLng, setCityId]);
+    if (userLat == null || userLng == null) return;
+
+    const detectedCityId = nearestCityId(userLat, userLng);
+
+    if (detectedCityId === currentCityId) {
+      lastAutoCityRef.current = detectedCityId;
+      return;
+    }
+
+    if (detectedCityId === lastAutoCityRef.current) {
+      return;
+    }
+
+    lastAutoCityRef.current = detectedCityId;
+    setCityId(detectedCityId);
+  }, [currentCityId, userLat, userLng, setCityId]);
 }

@@ -125,7 +125,12 @@ export default function TodayScreen() {
       conservativePresence,
     }
   );
-  useAutoCity(setCityId, userLocation?.latitude, userLocation?.longitude);
+  useAutoCity(
+    cityId,
+    setCityId,
+    userLocation?.latitude,
+    userLocation?.longitude
+  );
   const [navZone, setNavZone] = useState<{
     name: string;
     lat: number;
