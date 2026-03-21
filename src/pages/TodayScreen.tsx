@@ -469,11 +469,11 @@ export default function TodayScreen() {
           <div className="flex items-center justify-between gap-3">
             <div>
               <p className="text-[14px] font-display font-bold">
-                Mode presence prudente Lyft
+                Mode présence prudente Lyft
               </p>
               <p className="text-[12px] text-muted-foreground font-body mt-1">
-                Garde Lyft actif et prefere une attente strategique avec filtre
-                destination plutot qu'un repositionnement agressif.
+                Garde Lyft actif et préfère une attente stratégique avec filtre
+                destination plutôt qu'un repositionnement agressif.
               </p>
             </div>
             <span
