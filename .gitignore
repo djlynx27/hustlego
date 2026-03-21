@@ -40,4 +40,5 @@ supabase/.temp/
 # Rapports de test
 test-results/
 playwright-report/
+coverage/
 .env*.local

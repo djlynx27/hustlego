@@ -15,8 +15,12 @@ const WAIT_DURATION_MS = 15 * 60 * 1000;
 export interface LibreModeZone {
   id: string;
   name: string;
+  type: string;
+  score: number;
   latitude: number;
   longitude: number;
+  distKm: number;
+  arrivalScore: number;
 }
 
 export interface UseLibreModeReturn {
@@ -47,9 +51,9 @@ export function useLibreMode(): UseLibreModeReturn {
   const [nowTick, setNowTick] = useState(Date.now());
   const [autoSelectedZone, setAutoSelectedZone] =
     useState<LibreModeZone | null>(null);
-  const [autoNavReason, setAutoNavReason] = useState<
-    'proche' | 'score' | null
-  >(null);
+  const [autoNavReason, setAutoNavReason] = useState<'proche' | 'score' | null>(
+    null
+  );
 
   // Ref so the timer effect can access the latest smart zones without dep issues
   const nextSmartZoneRef = useRef<LibreModeZone | null>(null);
@@ -107,7 +111,11 @@ export function useLibreMode(): UseLibreModeReturn {
   const waitDisplay = `${waitMin}:${String(waitSec).padStart(2, '0')}`;
 
   const startWaitAt = useCallback((zone: LibreModeZone) => {
-    setWaitTimer({ zoneId: zone.id, zoneName: zone.name, startedAt: Date.now() });
+    setWaitTimer({
+      zoneId: zone.id,
+      zoneName: zone.name,
+      startedAt: Date.now(),
+    });
     setTimerExpired(false);
   }, []);
 
@@ -159,25 +167,18 @@ export function useLibreMode(): UseLibreModeReturn {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
-interface ScoredZone extends LibreModeZone {
-  distKm: number;
-  arrivalScore: number;
-}
-
-function pickBest(
+/** Exported for unit testing. Not part of the public hook API. */
+export function pickBest(
   zones: LibreModeZone[]
 ): { zone: LibreModeZone; reason: 'proche' | 'score' } | null {
   // Filter airport zones — never auto-navigate there
-  const navZones = (zones as ScoredZone[]).filter(
-    (z) => !('type' in z) || (z as { type?: string }).type !== 'aéroport'
-  );
+  const navZones = zones.filter((z) => z.type !== 'aéroport');
   if (navZones.length === 0) return null;
 
   const bestScore = navZones[0]; // already sorted by arrivalScore desc
   const closest = [...navZones].sort((a, b) => a.distKm - b.distKm)[0];
   if (!bestScore || !closest) return null;
-  if (closest.id === bestScore.id)
-    return { zone: closest, reason: 'proche' };
+  if (closest.id === bestScore.id) return { zone: closest, reason: 'proche' };
 
   // Prefer farther zone only when the score gap is large AND the closer zone is weak
   if (

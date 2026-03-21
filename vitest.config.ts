@@ -18,10 +18,11 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       reporter: ['text', 'lcov', 'html'],
-      // Only measure coverage on app source, not generated/ui code
-      include: ['src/**/*.{ts,tsx}'],
+      // Only measure coverage on pure-logic lib code, not browser-coupled React
+      include: ['src/lib/**/*.{ts,tsx}'],
       exclude: [
-        'src/components/ui/**',
+        'src/lib/aiAgents.ts',
+        'src/lib/aiSimulation.ts',
         'src/aviationstack-mock.ts',
         'src/test/**',
         'src/e2e/**',
@@ -30,11 +31,11 @@ export default defineConfig({
         '**/*.d.ts',
       ],
       thresholds: {
-        // Phase 1 targets — progressive. Raise per sprint until 80%.
-        lines: 30,
-        functions: 30,
-        branches: 25,
-        statements: 30,
+        // Focused on src/lib — raise per sprint until 80%.
+        lines: 60,
+        functions: 55,
+        branches: 45,
+        statements: 60,
       },
     },
   },

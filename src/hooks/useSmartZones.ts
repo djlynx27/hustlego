@@ -8,10 +8,13 @@
  * Returns the top-5 reachable zones with score ≥ 45 and distance ≤ 20 km.
  */
 import { haversineKm } from '@/hooks/useUserLocation';
-import { computeSuccessProbabilityScore } from '@/lib/lyftStrategy';
-import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
 import { formatTime24h } from '@/lib/demandUtils';
-import { useMemo, useRef, useEffect } from 'react';
+import {
+  computeSuccessProbabilityScore,
+  type LyftMarketSignal,
+} from '@/lib/lyftStrategy';
+import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
+import { useEffect, useMemo, useRef } from 'react';
 
 const AVG_SPEED_KMH = 30;
 const MAX_DISTANCE_KM = 20;
@@ -25,12 +28,6 @@ interface Zone {
   score: number;
   latitude: number;
   longitude: number;
-}
-
-interface LyftSignal {
-  demandLevel?: string;
-  estimatedWaitMin?: number;
-  surgeActive?: boolean;
 }
 
 interface WeatherInput {
@@ -50,7 +47,7 @@ interface UseSmartZonesParams {
   modeZones: Zone[];
   userLocation: { latitude: number; longitude: number } | null;
   weather: WeatherInput | null | undefined;
-  lyftSignalByZone: Map<string, LyftSignal>;
+  lyftSignalByZone: Map<string, LyftMarketSignal>;
   now: Date;
 }
 
@@ -113,7 +110,10 @@ export function useSmartZones({
           arrivalTime: formatTime24h(arrivalDate),
         };
       })
-      .filter((z) => z.distKm <= MAX_DISTANCE_KM && z.arrivalScore >= MIN_ARRIVAL_SCORE)
+      .filter(
+        (z) =>
+          z.distKm <= MAX_DISTANCE_KM && z.arrivalScore >= MIN_ARRIVAL_SCORE
+      )
       .sort((a, b) => b.arrivalScore - a.arrivalScore)
       .slice(0, MAX_RESULTS);
   }, [lyftSignalByZone, modeZones, now, userLocation, weather]);
