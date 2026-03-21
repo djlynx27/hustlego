@@ -26,6 +26,8 @@ interface PreShiftBriefingProps {
   stmStatus: StmTransitStatus | null;
   yulStatus: YulStatus | null;
   cityId: string;
+  /** Active family-schedule constraint message injected by useHomeConstraints. */
+  familyConstraintMessage?: string | null;
 }
 
 // ── Générateur de briefing textuel ───────────────────────────────────────────
@@ -44,10 +46,17 @@ function buildBriefing(props: PreShiftBriefingProps): {
     stmStatus,
     yulStatus,
     cityId,
+    familyConstraintMessage,
   } = props;
 
   const bullets: string[] = [];
   let urgencyScore = 0;
+
+  // ── Planning familial ────────────────────────────────────────────────────
+  if (familyConstraintMessage) {
+    bullets.push(familyConstraintMessage);
+    urgencyScore += 2;
+  }
 
   // ── Météo ────────────────────────────────────────────────────────────────
   if (weather) {
@@ -219,6 +228,7 @@ export function PreShiftBriefing(props: PreShiftBriefingProps) {
   const [expanded, setExpanded] = useState(false);
   const {
     cityId,
+    familyConstraintMessage,
     stmStatus,
     tmEvents,
     topZones,
@@ -231,6 +241,7 @@ export function PreShiftBriefing(props: PreShiftBriefingProps) {
     () =>
       buildBriefing({
         cityId,
+        familyConstraintMessage,
         stmStatus,
         tmEvents,
         topZones,
@@ -238,7 +249,16 @@ export function PreShiftBriefing(props: PreShiftBriefingProps) {
         weather,
         yulStatus,
       }),
-    [cityId, stmStatus, tmEvents, topZones, upcomingEvents, weather, yulStatus]
+    [
+      cityId,
+      familyConstraintMessage,
+      stmStatus,
+      tmEvents,
+      topZones,
+      upcomingEvents,
+      weather,
+      yulStatus,
+    ]
   );
 
   return (

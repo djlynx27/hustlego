@@ -2,6 +2,7 @@ import { CitySelect } from '@/components/CitySelect';
 import { ContextSimilarityPanel } from '@/components/ContextSimilarityPanel';
 import { DeadTimeTimer } from '@/components/DeadTimeTimer';
 import { DemandBadge } from '@/components/DemandBadge';
+import { FamilySchedulePanel } from '@/components/FamilySchedulePanel';
 import { MultiAppStatus } from '@/components/MultiAppStatus';
 import { GoogleMapsIcon, WazeIcon } from '@/components/NavIcons';
 import { NavigationSheet } from '@/components/NavigationSheet';
@@ -24,6 +25,7 @@ import { useDemandScores } from '@/hooks/useDemandScores';
 import { useHabsGame } from '@/hooks/useHabsGame';
 import { useHaptics } from '@/hooks/useHaptics';
 import { useHoliday } from '@/hooks/useHoliday';
+import { useHomeConstraints } from '@/hooks/useHomeConstraints';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
 import { usePullToRefresh } from '@/hooks/usePullToRefresh';
@@ -210,6 +212,13 @@ export default function TodayScreen() {
   const { data: habsGame } = useHabsGame(getCurrentSlotTime(now).date);
   const timeBoosts = useMemo(() => getActiveTimeBoosts(now), [now]);
   const { data: yulStatus } = useYulFlights();
+
+  // ── Family schedule constraints ────────────────────────────────────
+  const homeConstraints = useHomeConstraints(
+    userLocation?.latitude ?? null,
+    userLocation?.longitude ?? null,
+    now
+  );
 
   // ── Compass UX additions ───────────────────────────────────────────
   const { isInVehicle, speedKmh } = useActivityDetection();
@@ -548,6 +557,7 @@ export default function TodayScreen() {
           stmStatus={stmStatus ?? null}
           yulStatus={yulStatus ?? null}
           cityId={cityId}
+          familyConstraintMessage={homeConstraints.alert?.message ?? null}
         />
       </div>
 
@@ -628,6 +638,11 @@ export default function TodayScreen() {
       </div>
 
       {/* Statut chauffeur : Occupé / Libre */}
+      <div className="px-3 mt-2">
+        <FamilySchedulePanel constraints={homeConstraints} />
+      </div>
+
+      {/* Statut chauffeur : Occupé / Libre (real) */}
       <div className="px-3 mt-2">
         <button
           onClick={() => {

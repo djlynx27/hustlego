@@ -24,6 +24,7 @@ import {
   getSlotOrderMinutes,
   normalize24hTime,
 } from '@/lib/demandUtils';
+import { getHomeConstraintsSettings } from '@/lib/driverPreferences';
 import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
 import {
   useCallback,
@@ -36,8 +37,23 @@ import {
 
 const TIME_LABELS = generate96TimeLabels();
 
+function parseTimeMinPlanning(timeStr: string): number {
+  const [h, m] = timeStr.split(':').map(Number);
+  return (h ?? 0) * 60 + (m ?? 0);
+}
+
+function formatMinAsTimePlanning(totalMin: number): string {
+  const clamped = Math.max(0, totalMin);
+  const h = Math.floor(clamped / 60);
+  const m = clamped % 60;
+  return `${String(h).padStart(2, '0')}:${String(m).padStart(2, '0')}`;
+}
+
 export default function PlanningScreen() {
   usePullToRefresh(() => window.location.reload());
+
+  // Family constraints — read once (no reactive update needed in planning view)
+  const homeConstraints = useMemo(() => getHomeConstraintsSettings(), []);
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
   const [date, setDate] = useState(
@@ -272,41 +288,105 @@ export default function PlanningScreen() {
                 )
               : null;
 
+          // Constraint window marker: insert before first slot of each blocked hour
+          const slotMin = getSlotOrderMinutes(slot.start_time);
+          const prevSlot = index > 0 ? slots[index - 1] : null;
+          const prevMin = prevSlot
+            ? getSlotOrderMinutes(prevSlot.start_time)
+            : -1;
+          const familyMarker = (() => {
+            if (!homeConstraints.enabled) return null;
+            const homeStartMin = parseTimeMinPlanning(
+              homeConstraints.returnHomeWindowStart
+            );
+            const homeEndMin = parseTimeMinPlanning(
+              homeConstraints.returnHomeWindowEnd
+            );
+            const pickupMin = parseTimeMinPlanning(homeConstraints.pickupTime);
+            // Morning: mark before the return-home window starts
+            if (slotMin >= homeStartMin && prevMin < homeStartMin) {
+              return (
+                <div
+                  key={`family-home-${index}`}
+                  className="flex items-center gap-2 bg-purple-500/10 border border-purple-500/30 rounded-xl px-3 py-2 my-1"
+                >
+                  <span className="text-base flex-shrink-0">🏠</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-display font-bold text-purple-400 leading-snug">
+                      Rentrer à la maison
+                    </p>
+                    <p className="text-[11px] text-muted-foreground font-body">
+                      {homeConstraints.returnHomeWindowStart}–
+                      {homeConstraints.returnHomeWindowEnd} ·{' '}
+                      {homeConstraints.homeAddress}
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+            // Afternoon: mark ~90 min before pickup (approximate departure window)
+            const approxDepartMin = pickupMin - 60;
+            if (slotMin >= approxDepartMin && prevMin < approxDepartMin) {
+              return (
+                <div
+                  key={`family-pickup-${index}`}
+                  className="flex items-center gap-2 bg-amber-500/10 border border-amber-500/30 rounded-xl px-3 py-2 my-1"
+                >
+                  <span className="text-base flex-shrink-0">🎒</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-[13px] font-display font-bold text-amber-400 leading-snug">
+                      Zone de départ pour {homeConstraints.momWorkName}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground font-body">
+                      Récupération à {homeConstraints.pickupTime} · heure de
+                      pointe · quitter vers{' '}
+                      {formatMinAsTimePlanning(approxDepartMin)}
+                    </p>
+                  </div>
+                </div>
+              );
+            }
+            return null;
+          })();
+
           return (
-            <div
-              key={slot.id || index}
-              ref={(el) => setSlotRef(timeKey, el)}
-              onClick={() =>
-                zone &&
-                setNavZone({
-                  name: zone.name,
-                  lat: zone.latitude,
-                  lng: zone.longitude,
-                })
-              }
-              className={`flex items-center justify-between bg-card rounded-xl border-l-4 ${dc.border} border border-border p-4 gap-3 transition-all duration-500 cursor-pointer active:scale-[0.98] ${
-                isHighlighted
-                  ? 'ring-2 ring-primary bg-primary/20 border-primary shadow-lg shadow-primary/30'
-                  : ''
-              }`}
-            >
-              <div className="flex-1 min-w-0">
-                <span className="text-[14px] text-muted-foreground font-body block">
-                  {fmtTime(slot.start_time)} – {slot.end_time}
-                </span>
-                <span className="text-[18px] font-display font-semibold leading-tight block break-words">
-                  {zone?.name}
-                  {dist !== null && (
-                    <span className="text-muted-foreground text-[14px] font-body ml-2">
-                      · {dist.toFixed(1)} km
-                    </span>
-                  )}
-                </span>
+            <>
+              {familyMarker}
+              <div
+                key={slot.id || index}
+                ref={(el) => setSlotRef(timeKey, el)}
+                onClick={() =>
+                  zone &&
+                  setNavZone({
+                    name: zone.name,
+                    lat: zone.latitude,
+                    lng: zone.longitude,
+                  })
+                }
+                className={`flex items-center justify-between bg-card rounded-xl border-l-4 ${dc.border} border border-border p-4 gap-3 transition-all duration-500 cursor-pointer active:scale-[0.98] ${
+                  isHighlighted
+                    ? 'ring-2 ring-primary bg-primary/20 border-primary shadow-lg shadow-primary/30'
+                    : ''
+                }`}
+              >
+                <div className="flex-1 min-w-0">
+                  <span className="text-[14px] text-muted-foreground font-body block">
+                    {fmtTime(slot.start_time)} – {slot.end_time}
+                  </span>
+                  <span className="text-[18px] font-display font-semibold leading-tight block break-words">
+                    {zone?.name}
+                    {dist !== null && (
+                      <span className="text-muted-foreground text-[14px] font-body ml-2">
+                        · {dist.toFixed(1)} km
+                      </span>
+                    )}
+                  </span>
+                </div>
+                <div className="flex-shrink-0">
+                  <DemandBadge score={slot.demand_score} size="lg" />
+                </div>
               </div>
-              <div className="flex-shrink-0">
-                <DemandBadge score={slot.demand_score} size="lg" />
-              </div>
-            </div>
+            </>
           );
         })}
       </div>
