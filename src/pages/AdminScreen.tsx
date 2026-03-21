@@ -62,8 +62,6 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-// Pull-to-refresh (PWA Android/iOS)
-usePullToRefresh(() => window.location.reload());
 
 interface AIRecommendation {
   zone_id: string;
@@ -121,6 +119,7 @@ function logAdminGeolocationIssue(...args: unknown[]) {
 }
 
 export default function AdminScreen() {
+  usePullToRefresh(() => window.location.reload());
   const { t } = useI18n();
   const { data: cities = [] } = useCities();
   const addCity = useAddCity();

@@ -33,12 +33,11 @@ import {
   useState,
   type FormEvent,
 } from 'react';
-// Pull-to-refresh (PWA Android/iOS)
-usePullToRefresh(() => window.location.reload());
 
 const TIME_LABELS = generate96TimeLabels();
 
 export default function PlanningScreen() {
+  usePullToRefresh(() => window.location.reload());
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
   const [date, setDate] = useState(

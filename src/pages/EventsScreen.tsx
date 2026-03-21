@@ -7,8 +7,6 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useCities } from '@/hooks/useSupabase';
 import { Calendar, Clock, Navigation, Star, Users } from 'lucide-react';
 import { useMemo } from 'react';
-// Pull-to-refresh (PWA Android/iOS)
-usePullToRefresh(() => window.location.reload());
 
 function formatDate(dateStr: string, locale: string): string {
   return new Date(dateStr).toLocaleDateString(locale, {
@@ -139,6 +137,7 @@ function EventCard({ event, isToday }: { event: AppEvent; isToday: boolean }) {
 }
 
 export default function EventsScreen() {
+  usePullToRefresh(() => window.location.reload());
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
   const { data: cities = [] } = useCities();

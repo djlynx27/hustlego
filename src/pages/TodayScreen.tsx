@@ -61,8 +61,6 @@ import {
   useState,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
-// Pull-to-refresh (PWA Android/iOS)
-usePullToRefresh(() => window.location.reload());
 const MapboxHeatmap = lazy(() => import('@/components/MapboxHeatmap'));
 
 const CITY_CENTERS: Record<string, [number, number]> = {
@@ -110,6 +108,7 @@ function formatMoney(value: number) {
 }
 
 export default function TodayScreen() {
+  usePullToRefresh(() => window.location.reload());
   const navigate = useNavigate();
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();

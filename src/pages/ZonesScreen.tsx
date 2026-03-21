@@ -31,8 +31,6 @@ import { Constants } from '@/integrations/supabase/types';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { toast } from 'sonner';
-// Pull-to-refresh (PWA Android/iOS)
-usePullToRefresh(() => window.location.reload());
 const MapboxHeatmap = lazy(() => import('@/components/MapboxHeatmap'));
 
 const ZONE_TYPES = Constants.public.Enums.zone_type;
@@ -50,6 +48,7 @@ const CITY_CENTERS: Record<string, [number, number]> = {
 };
 
 export default function ZonesScreen() {
+  usePullToRefresh(() => window.location.reload());
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
   const { data: cities = [] } = useCities();

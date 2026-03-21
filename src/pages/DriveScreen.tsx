@@ -20,8 +20,6 @@ import { getDemandClass } from '@/lib/demandUtils';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
 import { Car, Crosshair, Maximize2, Minimize2, Navigation } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-// Pull-to-refresh (PWA Android/iOS)
-usePullToRefresh(() => window.location.reload());
 
 interface WakeLockNavigator extends Navigator {
   wakeLock?: {
@@ -35,6 +33,7 @@ type WakeLockStatus = 'active' | 'inactive' | 'unsupported';
 const DRIVER_MODE_KEY = 'geohustle_driver_mode';
 
 export default function DriveScreen() {
+  usePullToRefresh(() => window.location.reload());
   // Driver mode (rideshare/delivery/all) — shared with TodayScreen
   const [driverMode, setDriverModeState] = useState<
     'rideshare' | 'delivery' | 'all'
