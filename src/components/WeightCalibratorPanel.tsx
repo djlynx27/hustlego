@@ -145,20 +145,51 @@ export function WeightCalibratorPanel({
         },
         body: JSON.stringify({ days, min_trips: minTrips }),
       });
+
+      // Parse response body safely — Supabase may return HTML/text for errors
+      let body: unknown;
+      try {
+        body = await res.json();
+      } catch {
+        body = null;
+      }
+
       if (!res.ok) {
-        const err = (await res.json()) as { error?: string };
-        toast.error(err.error ?? `Erreur HTTP ${res.status}`);
+        const errBody = body as { error?: string } | null;
+        const msg =
+          (typeof errBody === 'object' && errBody?.error) ||
+          `Erreur HTTP ${res.status}`;
+        if (res.status === 404) {
+          toast.error(
+            'Edge Function weight-calibrator non déployée. Lance : supabase functions deploy weight-calibrator'
+          );
+        } else if (
+          typeof msg === 'string' &&
+          msg.toLowerCase().includes('not enough')
+        ) {
+          toast.error(
+            `Pas assez de courses (${minTrips} requises). Réduis « Courses min. » ou élargis la fenêtre.`
+          );
+        } else {
+          toast.error(typeof msg === 'string' ? msg : `Erreur HTTP ${res.status}`);
+        }
         return;
       }
-      const result = (await res.json()) as CalibrateResult;
+
+      const result = body as CalibrateResult;
+      if (!result?.new_weights) {
+        toast.error('Réponse inattendue de l\'Edge Function');
+        return;
+      }
       setLastResult(result);
       setCurrentWeights(result.new_weights);
       toast.success(
-        `Calibration terminée · MAE $${result.mae.toFixed(1)}/h · ${result.trip_count} courses`
+        `Calibration terminée · MAE $${result.mae?.toFixed(1) ?? '?'}/h · ${result.trip_count ?? 0} courses`
       );
       void fetchWeights();
     } catch (err) {
-      toast.error('Erreur lors de la calibration');
+      const msg = err instanceof Error ? err.message : 'Erreur inconnue';
+      toast.error(`Erreur lors de la calibration : ${msg}`);
       console.error('[WeightCalibratorPanel] calibrate', err);
     } finally {
       setCalibrating(false);
@@ -189,8 +220,8 @@ export function WeightCalibratorPanel({
             <div className="flex gap-3 text-right">
               <div>
                 <span className="text-[16px] font-mono font-bold block">
-                  {currentWeights.accuracy_pct !== null
-                    ? `${Math.round(currentWeights.accuracy_pct!)}%`
+                  {currentWeights.accuracy_pct != null
+                    ? `${Math.round(currentWeights.accuracy_pct)}%`
                     : '—'}
                 </span>
                 <span className="text-[10px] text-muted-foreground font-body">
@@ -199,7 +230,7 @@ export function WeightCalibratorPanel({
               </div>
               <div>
                 <span className="text-[16px] font-mono font-bold block">
-                  {currentWeights.mae !== null
+                  {currentWeights.mae != null
                     ? `$${currentWeights.mae.toFixed(1)}`
                     : '—'}
                 </span>
