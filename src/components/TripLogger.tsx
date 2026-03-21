@@ -23,6 +23,7 @@ import {
 import { useZones } from '@/hooks/useSupabase';
 import type { TripWithZone } from '@/hooks/useTrips';
 import { supabase } from '@/integrations/supabase/client';
+import { validateTripEntryForm } from '@/lib/tripEntryValidation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Clock,
@@ -136,11 +137,13 @@ export function TripLogger() {
   }
 
   async function handleSubmit() {
-    if (!form.zone_id || !form.date || !form.earnings) {
-      toast.error('Zone, date et montant requis');
+    const validation = validateTripEntryForm(form);
+    if (!validation.ok) {
+      toast.error(validation.message);
       return;
     }
 
+    const { earnings, tips, distanceKm } = validation.values;
     const selectedZone = allZones.find((zone) => zone.id === form.zone_id);
     const zoneScore = Math.round(Number(selectedZone?.current_score ?? 50));
     const started_at = `${form.date}T${form.start_time}:00`;
@@ -150,9 +153,9 @@ export function TripLogger() {
         zone_id: form.zone_id,
         started_at,
         ended_at,
-        earnings: parseFloat(form.earnings) || 0,
-        tips: parseFloat(form.tips) || 0,
-        distance_km: parseFloat(form.distance_km) || 0,
+        earnings,
+        tips,
+        distance_km: distanceKm,
         notes: form.notes.trim().slice(0, 500),
         platform: form.platform || null,
         zone_score: zoneScore,
