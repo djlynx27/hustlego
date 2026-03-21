@@ -35,12 +35,15 @@ interface WeightSnapshot {
 }
 
 interface CalibrateResult {
+  ok?: boolean;
   new_weights: WeightSnapshot;
   deltas: Record<string, number>;
   mae: number;
   accuracy_pct: number;
   trip_count: number;
   message?: string;
+  reason?: string;
+  current_weights?: Record<string, number>;
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -171,14 +174,24 @@ export function WeightCalibratorPanel({
             `Pas assez de courses (${minTrips} requises). Réduis « Courses min. » ou élargis la fenêtre.`
           );
         } else {
-          toast.error(typeof msg === 'string' ? msg : `Erreur HTTP ${res.status}`);
+          toast.error(
+            typeof msg === 'string' ? msg : `Erreur HTTP ${res.status}`
+          );
         }
         return;
       }
 
-      const result = body as CalibrateResult;
+      const result = body as CalibrateResult | null;
+      if (result?.ok === false) {
+        toast.error(
+          result.reason ??
+            'Calibration impossible pour le moment. Réessaie plus tard.'
+        );
+        return;
+      }
+
       if (!result?.new_weights) {
-        toast.error('Réponse inattendue de l\'Edge Function');
+        toast.error("Réponse inattendue de l'Edge Function");
         return;
       }
       setLastResult(result);
