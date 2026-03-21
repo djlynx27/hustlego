@@ -3,8 +3,8 @@ import {
   buildTripHistory,
 } from '@/hooks/useDemandScores';
 import type { Zone } from '@/hooks/useSupabase';
-import { makeLocalDate } from '@/test/dateTestUtils';
 import type { TripWithZone } from '@/hooks/useTrips';
+import { makeLocalDate } from '@/test/dateTestUtils';
 import { describe, expect, it } from 'vitest';
 
 const zones: Zone[] = [
