@@ -12,6 +12,11 @@ import { Switch } from '@/components/ui/switch';
 import { useZones, type Zone } from '@/hooks/useSupabase';
 import { supabase } from '@/integrations/supabase/client';
 import { parseCsvRecords } from '@/lib/csv';
+import {
+  parseOptionalCurrencyValue,
+  parseOptionalMilesToKm,
+  parseRequiredCurrencyValue,
+} from '@/lib/csvTripParsing';
 import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, FileSpreadsheet, Loader2, Upload } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
@@ -22,13 +27,14 @@ interface ParsedTrip {
   date: string;
   start_time: string;
   end_time: string;
-  earnings: number;
-  tips: number;
-  distance_km: number;
+  earnings: number | null;
+  tips: number | null;
+  distance_km: number | null;
   platform: string;
   zone_id: string | null;
   zone_name: string;
   zone_confidence: 'explicit' | 'heuristic' | 'missing';
+  parse_issue: string | null;
   raw: Record<string, string>;
 }
 
@@ -130,15 +136,6 @@ function findZoneFromRow(
   return directMatch ? { id: directMatch.id, name: directMatch.name } : null;
 }
 
-function parseEarnings(val: string): number {
-  return parseFloat(val.replace(/[$,]/g, '')) || 0;
-}
-
-function parseMilesToKm(val: string): number {
-  const miles = parseFloat(val.replace(/[^0-9.]/g, '')) || 0;
-  return Math.round(miles * 1.60934 * 10) / 10;
-}
-
 function normalizeTimeString(value: string): string {
   const trimmed = value.trim();
   if (!trimmed) return '';
@@ -231,15 +228,28 @@ export function CsvImporter() {
           ]);
           const startTime = normalizeTimeString(rawStartTime);
           const endTime = normalizeTimeString(rawEndTime);
-          const earnings = parseEarnings(
-            findColumn(row, ['earnings', 'total', 'fare', 'amount', 'pay'])
-          );
-          const tips = parseEarnings(findColumn(row, ['tip', 'tips']));
-          const distance = parseMilesToKm(
-            findColumn(row, ['miles', 'distance', 'mi'])
-          );
+          const rawEarnings = findColumn(row, [
+            'earnings',
+            'total',
+            'fare',
+            'amount',
+            'pay',
+          ]);
+          const rawTips = findColumn(row, ['tip', 'tips']);
+          const rawDistance = findColumn(row, ['miles', 'distance', 'mi']);
+          const earnings = parseRequiredCurrencyValue(rawEarnings);
+          const tips = parseOptionalCurrencyValue(rawTips);
+          const distance = parseOptionalMilesToKm(rawDistance);
           const platform =
             findColumn(row, ['platform', 'app', 'service']) || 'Gridwise';
+          const parseIssue =
+            earnings === null
+              ? 'montant invalide'
+              : tips === null
+                ? 'pourboire invalide'
+                : distance === null
+                  ? 'distance invalide'
+                  : null;
 
           // Parse date for zone mapping
           let hour = 12;
@@ -279,6 +289,7 @@ export function CsvImporter() {
               : heuristicZone
                 ? 'heuristic'
                 : 'missing',
+            parse_issue: parseIssue,
             raw: row,
           };
         });
@@ -314,12 +325,16 @@ export function CsvImporter() {
     const skippedMissingEndTimeRows = parsed
       .filter((trip) => !trip.end_time)
       .map((trip) => trip.source_row);
+    const skippedInvalidNumericRows = parsed
+      .filter((trip) => trip.parse_issue !== null)
+      .map((trip) => trip.source_row);
 
     const skippedRows = new Set<number>([
       ...skippedMissingZoneRows,
       ...skippedHeuristicRows,
       ...skippedMissingDateRows,
       ...skippedMissingEndTimeRows,
+      ...skippedInvalidNumericRows,
     ]);
 
     const skippedReasons = [
@@ -335,6 +350,9 @@ export function CsvImporter() {
       skippedMissingEndTimeRows.length > 0
         ? `sans heure de fin (${formatRowList(skippedMissingEndTimeRows)})`
         : null,
+      skippedInvalidNumericRows.length > 0
+        ? `valeurs numériques invalides (${formatRowList(skippedInvalidNumericRows)})`
+        : null,
     ].filter((reason): reason is string => reason !== null);
 
     const batch = parsed
@@ -343,6 +361,9 @@ export function CsvImporter() {
           trip.zone_id &&
           trip.date &&
           trip.end_time &&
+            trip.earnings !== null &&
+            trip.tips !== null &&
+            trip.distance_km !== null &&
           !skippedRows.has(trip.source_row)
       )
       .map((t) => ({
@@ -530,10 +551,16 @@ export function CsvImporter() {
                           ? 'zone estimée'
                           : 'sans zone'}
                     </Badge>
-                    <span className="font-semibold">
-                      ${t.earnings.toFixed(2)}
-                    </span>
-                    {t.distance_km > 0 && (
+                    {t.parse_issue ? (
+                      <Badge variant="destructive" className="text-[10px]">
+                        {t.parse_issue}
+                      </Badge>
+                    ) : (
+                      <span className="font-semibold">
+                        ${t.earnings?.toFixed(2) ?? '0.00'}
+                      </span>
+                    )}
+                    {(t.distance_km ?? 0) > 0 && (
                       <span className="text-muted-foreground">
                         {t.distance_km} km
                       </span>
@@ -562,7 +589,7 @@ export function CsvImporter() {
               )}
               {importing
                 ? `Import en cours… ${progress}%`
-                : `Importer ${parsed.filter((t) => t.zone_id && (includeHeuristicZones || t.zone_confidence === 'explicit')).length} courses`}
+                : `Importer ${parsed.filter((t) => t.zone_id && t.parse_issue === null && (includeHeuristicZones || t.zone_confidence === 'explicit')).length} courses`}
             </Button>
           </div>
         )}
