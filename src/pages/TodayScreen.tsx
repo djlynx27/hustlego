@@ -785,7 +785,7 @@ export default function TodayScreen() {
                 </a>
               </Button>
 
-              {/* Swipe-to-accept — safer in-vehicle hero zone confirmation */
+              {/* Swipe-to-accept — safer in-vehicle hero zone confirmation */}
               {isInVehicle && (
                 <SwipeToAccept
                   label="Glisser → confirmer direction"
