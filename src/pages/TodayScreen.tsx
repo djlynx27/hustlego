@@ -106,6 +106,44 @@ function formatMoney(value: number) {
   }).format(value);
 }
 
+type SmartZone = {
+  id: string;
+  name: string;
+  type: string;
+  distKm: number;
+  travelMin: number;
+  arrivalScore: number;
+  arrivalTime: string;
+  latitude: number;
+  longitude: number;
+};
+
+/**
+ * Picks the best destination when the driver goes libre.
+ * Default: closest non-airport zone.
+ * Override: highest-score zone when the score gap ≥ 20 pts
+ *           AND the closer zone's score < 62.
+ * Airport zones are NEVER auto-selected for navigation.
+ */
+function pickBestDestination(
+  zones: SmartZone[]
+): { zone: SmartZone; reason: 'proche' | 'score' } | null {
+  const navZones = zones.filter((z) => z.type !== 'aéroport');
+  if (navZones.length === 0) return null;
+  // zones is already sorted by arrivalScore desc → navZones[0] is the best scorer
+  const bestScore = navZones[0];
+  const closest = [...navZones].sort((a, b) => a.distKm - b.distKm)[0];
+  if (closest.id === bestScore.id) return { zone: closest, reason: 'proche' };
+  // Override to farther zone only when gap is significant AND closer zone is weak
+  if (
+    bestScore.arrivalScore - closest.arrivalScore >= 20 &&
+    closest.arrivalScore < 62
+  ) {
+    return { zone: bestScore, reason: 'score' };
+  }
+  return { zone: closest, reason: 'proche' };
+}
+
 export default function TodayScreen() {
   usePullToRefresh(() => window.location.reload());
   const navigate = useNavigate();
@@ -184,6 +222,8 @@ export default function TodayScreen() {
   } | null>(null);
   const [timerExpired, setTimerExpired] = useState(false);
   const [nowTick, setNowTick] = useState(Date.now());
+  const [autoSelectedZone, setAutoSelectedZone] = useState<SmartZone | null>(null);
+  const [autoNavReason, setAutoNavReason] = useState<'proche' | 'score' | null>(null);
 
   // Second-precision tick when timer is active
   useEffect(() => {
@@ -201,16 +241,6 @@ export default function TodayScreen() {
   const waitDisplay = `${waitMin}:${String(waitSec).padStart(2, '0')}`;
 
   // 15-min timer completion
-  type SmartZone = {
-    id: string;
-    name: string;
-    distKm: number;
-    travelMin: number;
-    arrivalScore: number;
-    arrivalTime: string;
-    latitude: number;
-    longitude: number;
-  };
   const smartZonesRef = useRef<SmartZone[]>([]);
   useEffect(() => {
     if (!waitTimer) return;
@@ -487,6 +517,26 @@ export default function TodayScreen() {
       <div className="px-3 mt-2">
         <button
           onClick={() => {
+            if (!libreMode) {
+              // Activating libre mode: auto-pick best destination and launch Google Maps
+              const picked = pickBestDestination(smartZones as SmartZone[]);
+              setAutoSelectedZone(picked?.zone ?? null);
+              setAutoNavReason(picked?.reason ?? null);
+              if (picked) {
+                window.open(
+                  getGoogleMapsNavUrl(
+                    picked.zone.name,
+                    picked.zone.latitude,
+                    picked.zone.longitude
+                  ),
+                  '_blank',
+                  'noopener,noreferrer'
+                );
+              }
+            } else {
+              setAutoSelectedZone(null);
+              setAutoNavReason(null);
+            }
             setLibreMode((l) => !l);
             setWaitTimer(null);
             setTimerExpired(false);
@@ -855,23 +905,40 @@ export default function TodayScreen() {
               Chargement des zones…
             </p>
           ) : (
-            smartZones.map((zone, i) => {
+            smartZones.map((zone) => {
               const dc = getDemandClass(zone.arrivalScore);
               const isWaiting = waitTimer?.zoneId === zone.id;
               const zoneFactors = factors.get(zone.id);
+              const isAirport = zone.type === 'aéroport';
+              const isAutoSelected = autoSelectedZone?.id === zone.id;
               return (
                 <div
                   key={zone.id}
                   className={`bg-card rounded-xl border-l-4 ${dc.border} border border-border p-3 gap-3 transition-all ${
-                    isWaiting ? 'ring-2 ring-primary' : ''
+                    isWaiting
+                      ? 'ring-2 ring-primary'
+                      : isAutoSelected
+                        ? 'ring-2 ring-yellow-400'
+                        : ''
                   }`}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex-1 min-w-0">
-                      <span className="text-[17px] font-display font-semibold block leading-tight break-words">
-                        {i === 0 && '⭐ '}
-                        {zone.name}
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap mb-0.5">
+                        <span className="text-[17px] font-display font-semibold leading-tight break-words">
+                          {zone.name}
+                        </span>
+                        {isAutoSelected && (
+                          <span className="text-[11px] font-display font-bold bg-yellow-400/20 text-yellow-600 dark:text-yellow-300 border border-yellow-400/40 rounded-full px-2 py-0.5">
+                            🎯 {autoNavReason === 'score' ? 'Meilleur score' : 'Le plus proche'}
+                          </span>
+                        )}
+                        {isAirport && (
+                          <span className="text-[11px] font-display font-bold bg-muted text-muted-foreground border border-border rounded-full px-2 py-0.5">
+                            ℹ️ Info seulement
+                          </span>
+                        )}
+                      </div>
                       <span className="text-[12px] text-muted-foreground font-body">
                         {zone.distKm.toFixed(1)} km · ~{zone.travelMin} min de
                         route · arrivée {zone.arrivalTime}
@@ -901,6 +968,11 @@ export default function TodayScreen() {
                       })()}
                     </div>
                   </div>
+                  {isAirport ? (
+                    <p className="text-[12px] text-muted-foreground font-body mt-2 px-0.5">
+                      L'aéroport est affiché à titre informatif. Rendez-vous y uniquement avec un client.
+                    </p>
+                  ) : (
                   <div className="flex gap-2 mt-2">
                     <a
                       href={getGoogleMapsNavUrl(
@@ -944,6 +1016,7 @@ export default function TodayScreen() {
                       </button>
                     )}
                   </div>
+                  )}
                   {/* Platform arbitrage — shown below GO buttons */}
                   <PlatformArbitrage
                     zoneId={zone.id}
