@@ -126,7 +126,11 @@ interface NotifState {
   lastWeatherNotif: number;
   lastBarNotif: number;
   lastSurgeNotif: number;
+  lastDriftNotif: number;
   prevWeatherId: number | null;
+  stationarySince: number | null;
+  stationaryLat: number | null;
+  stationaryLng: number | null;
 }
 
 function getGoogleMapsUrl(lat: number, lng: number) {
@@ -169,21 +173,32 @@ function findNearestZone(lat: number, lng: number, zones: Zone[]): Zone | null {
   return best;
 }
 
-export function useNotifications(cityId: string) {
+export function useNotifications(
+  cityId: string,
+  options: { conservativePresence?: boolean } = {}
+) {
   const [enabled, setEnabled] = useState(
     () =>
       typeof Notification !== 'undefined' &&
       Notification.permission === 'granted'
   );
-  const { scores, zones, weather, endingSoon, startingSoon, surgeMap } =
-    useDemandScores(cityId);
   const { location: userLocation } = useUserLocation();
+  const { scores, zones, weather, endingSoon, startingSoon, surgeMap } =
+    useDemandScores(cityId, {
+      currentLat: userLocation?.latitude ?? null,
+      currentLng: userLocation?.longitude ?? null,
+      conservativePresence: options.conservativePresence,
+    });
   const stateRef = useRef<NotifState>({
     lastDemandNotif: 0,
     lastWeatherNotif: 0,
     lastBarNotif: 0,
     lastSurgeNotif: 0,
+    lastDriftNotif: 0,
     prevWeatherId: null,
+    stationarySince: null,
+    stationaryLat: null,
+    stationaryLng: null,
   });
 
   const requestPermission = useCallback(async () => {
@@ -384,6 +399,80 @@ export function useNotifications(cityId: string) {
     );
     s.lastSurgeNotif = now;
   }, [enabled, surgeMap, zones, userLocation]);
+
+  useEffect(() => {
+    if (!enabled || !userLocation) return;
+
+    const s = stateRef.current;
+    const now = Date.now();
+    const speedKmh = userLocation.speed == null ? 0 : userLocation.speed * 3.6;
+
+    if (s.stationaryLat == null || s.stationaryLng == null) {
+      s.stationaryLat = userLocation.latitude;
+      s.stationaryLng = userLocation.longitude;
+      s.stationarySince = now;
+      return;
+    }
+
+    const movedKm = haversineKm(
+      s.stationaryLat,
+      s.stationaryLng,
+      userLocation.latitude,
+      userLocation.longitude
+    );
+
+    if (movedKm > 0.12 || speedKmh >= 8) {
+      s.stationaryLat = userLocation.latitude;
+      s.stationaryLng = userLocation.longitude;
+      s.stationarySince = now;
+      return;
+    }
+
+    if (s.stationarySince == null) {
+      s.stationarySince = now;
+      return;
+    }
+
+    if (
+      now - s.stationarySince < 12 * 60_000 ||
+      now - s.lastDriftNotif < NOTIF_COOLDOWN_MS
+    ) {
+      return;
+    }
+
+    const nearbyTarget = [...zones]
+      .map((zone) => ({
+        zone,
+        score: scores.get(zone.id) ?? 0,
+        distKm: haversineKm(
+          userLocation.latitude,
+          userLocation.longitude,
+          zone.latitude,
+          zone.longitude
+        ),
+      }))
+      .filter((entry) => entry.distKm <= 8)
+      .sort((left, right) => right.score - left.score)[0];
+
+    const body = nearbyTarget
+      ? options.conservativePresence
+        ? `Immobile depuis 12 min. Garde Lyft actif et place un filtre destination vers ${nearbyTarget.zone.name} (${nearbyTarget.distKm.toFixed(1)} km).`
+        : `Immobile depuis 12 min. ${nearbyTarget.zone.name} est à ${nearbyTarget.distKm.toFixed(1)} km avec ${nearbyTarget.score}/100.`
+      : 'Immobile depuis 12 min. Réévalue ta zone active sur Lyft.';
+
+    sendNotification(
+      '🧭 Alerte de dérive',
+      body,
+      nearbyTarget
+        ? getGoogleMapsUrl(
+            nearbyTarget.zone.latitude,
+            nearbyTarget.zone.longitude
+          )
+        : undefined
+    );
+    s.lastDriftNotif = now;
+    s.stationarySince = now;
+  }, [enabled, options.conservativePresence, scores, userLocation, zones]);
 
   return { enabled, requestPermission };
 }

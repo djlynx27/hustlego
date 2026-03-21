@@ -2,6 +2,7 @@ import { CitySelect } from '@/components/CitySelect';
 import { DeadTimeTimer } from '@/components/DeadTimeTimer';
 import { DemandBadge } from '@/components/DemandBadge';
 import { DrivingHUD } from '@/components/DrivingHUD';
+import { GoogleMapsIcon, WazeIcon } from '@/components/NavIcons';
 import { NavigationSheet } from '@/components/NavigationSheet';
 import { PlatformArbitrage } from '@/components/PlatformArbitrage';
 import { ScoreFactorIcons } from '@/components/ScoreFactorIcons';
@@ -17,8 +18,13 @@ import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useCities } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { getDemandClass } from '@/lib/demandUtils';
+import {
+  getConservativePresencePreference,
+  getStoredDriverMode,
+  setConservativePresencePreference,
+  setStoredDriverMode,
+} from '@/lib/driverPreferences';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
-import { GoogleMapsIcon, WazeIcon } from '@/components/NavIcons';
 import { Car, Crosshair, Maximize2, Minimize2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -30,27 +36,15 @@ interface WakeLockNavigator extends Navigator {
 
 type WakeLockStatus = 'active' | 'inactive' | 'unsupported';
 
-// Driver mode and libre mode keys (shared with TodayScreen)
-const DRIVER_MODE_KEY = 'geohustle_driver_mode';
-
 export default function DriveScreen() {
   usePullToRefresh(() => window.location.reload());
   // Driver mode (rideshare/delivery/all) — shared with TodayScreen
   const [driverMode, setDriverModeState] = useState<
     'rideshare' | 'delivery' | 'all'
-  >(() => {
-    try {
-      const saved = localStorage.getItem(DRIVER_MODE_KEY);
-      if (saved === 'rideshare' || saved === 'delivery' || saved === 'all')
-        return saved;
-    } catch {}
-    return 'all';
-  });
+  >(() => getStoredDriverMode());
   const setDriverMode = (mode: 'rideshare' | 'delivery' | 'all') => {
     setDriverModeState(mode);
-    try {
-      localStorage.setItem(DRIVER_MODE_KEY, mode);
-    } catch {}
+    setStoredDriverMode(mode);
   };
 
   // "Je suis libre" mode — shared with TodayScreen
@@ -58,8 +52,15 @@ export default function DriveScreen() {
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
   const { data: cities = [] } = useCities();
-  const { scores, factors, zones, surgeMap } = useDemandScores(cityId);
   const { location, status } = useUserLocation(15000);
+  const [conservativePresence, setConservativePresence] = useState(() =>
+    getConservativePresencePreference()
+  );
+  const { scores, factors, zones, surgeMap } = useDemandScores(cityId, {
+    currentLat: location?.latitude ?? null,
+    currentLng: location?.longitude ?? null,
+    conservativePresence,
+  });
   const [fullScreen, setFullScreen] = useState(false);
   const [navZone, setNavZone] = useState<{
     name: string;
@@ -273,6 +274,42 @@ export default function DriveScreen() {
         </div>
       </div>
 
+      <div className="px-4 mt-2">
+        <button
+          onClick={() => {
+            const nextValue = !conservativePresence;
+            setConservativePresence(nextValue);
+            setConservativePresencePreference(nextValue);
+          }}
+          className={`w-full rounded-xl border px-3 py-2.5 text-left transition-colors ${
+            conservativePresence
+              ? 'border-primary/40 bg-primary/10'
+              : 'border-border bg-card'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[13px] font-display font-bold">
+                Conservative Presence
+              </p>
+              <p className="text-[12px] text-muted-foreground font-body mt-1">
+                Reste visible sur Lyft et privilégie les filtres destination
+                plutôt qu'un repositionnement agressif.
+              </p>
+            </div>
+            <span
+              className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                conservativePresence
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {conservativePresence ? 'ACTIF' : 'OFF'}
+            </span>
+          </div>
+        </button>
+      </div>
+
       {/* Statut chauffeur : Occupé / Libre */}
       <div className="px-4 mt-2">
         <button
@@ -287,7 +324,9 @@ export default function DriveScreen() {
             <Car className="w-4 h-4" />
           </span>
           {libreMode
-            ? '🟢 Je suis libre – Où aller ?'
+            ? conservativePresence
+              ? '🟢 Je suis libre – Où rester visible ?'
+              : '🟢 Je suis libre – Où aller ?'
             : '🔴 Occupé (course en cours)'}
         </button>
       </div>
@@ -407,7 +446,8 @@ export default function DriveScreen() {
                     target="_blank"
                     rel="noopener noreferrer"
                   >
-                    <GoogleMapsIcon className="w-6 h-6 flex-shrink-0" /> Google Maps
+                    <GoogleMapsIcon className="w-6 h-6 flex-shrink-0" /> Google
+                    Maps
                   </a>
                 </Button>
                 <Button

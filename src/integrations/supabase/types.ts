@@ -283,6 +283,53 @@ export type Database = {
           },
         ];
       };
+      platform_signals: {
+        Row: {
+          captured_at: string;
+          created_at: string;
+          demand_level: number;
+          estimated_wait_min: number | null;
+          id: string;
+          platform: string;
+          source: string;
+          surge_active: boolean;
+          surge_multiplier: number | null;
+          zone_id: string;
+        };
+        Insert: {
+          captured_at?: string;
+          created_at?: string;
+          demand_level?: number;
+          estimated_wait_min?: number | null;
+          id?: string;
+          platform: string;
+          source?: string;
+          surge_active?: boolean;
+          surge_multiplier?: number | null;
+          zone_id: string;
+        };
+        Update: {
+          captured_at?: string;
+          created_at?: string;
+          demand_level?: number;
+          estimated_wait_min?: number | null;
+          id?: string;
+          platform?: string;
+          source?: string;
+          surge_active?: boolean;
+          surge_multiplier?: number | null;
+          zone_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'platform_signals_zone_id_fkey';
+            columns: ['zone_id'];
+            isOneToOne: false;
+            referencedRelation: 'zones';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       predictions: {
         Row: {
           actual_earnings_per_hour: number | null;
@@ -588,6 +635,50 @@ export type Database = {
           },
         ];
       };
+      user_pings: {
+        Row: {
+          captured_at: string;
+          context_vector: string;
+          created_at: string;
+          driver_fingerprint: string;
+          id: string;
+          metadata: Json | null;
+          platform: string;
+          success_score: number;
+          zone_id: string;
+        };
+        Insert: {
+          captured_at?: string;
+          context_vector: string;
+          created_at?: string;
+          driver_fingerprint: string;
+          id?: string;
+          metadata?: Json | null;
+          platform?: string;
+          success_score?: number;
+          zone_id: string;
+        };
+        Update: {
+          captured_at?: string;
+          context_vector?: string;
+          created_at?: string;
+          driver_fingerprint?: string;
+          id?: string;
+          metadata?: Json | null;
+          platform?: string;
+          success_score?: number;
+          zone_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'user_pings_zone_id_fkey';
+            columns: ['zone_id'];
+            isOneToOne: false;
+            referencedRelation: 'zones';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       weight_history: {
         Row: {
           created_at: string;
@@ -711,6 +802,22 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      match_user_pings: {
+        Args: {
+          match_count?: number;
+          query_driver_fingerprint: string;
+          query_platform?: string;
+          query_vector: string;
+          query_zone_id?: string | null;
+        };
+        Returns: {
+          created_at: string;
+          id: string;
+          similarity: number;
+          success_score: number;
+          zone_id: string;
+        }[];
+      };
       match_similar_contexts: {
         Args: {
           match_count?: number;

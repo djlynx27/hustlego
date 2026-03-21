@@ -3,9 +3,11 @@ import {
   buildLearningPersistencePayload,
   buildShiftPersistencePayload,
   buildSimilarContextRpcArgs,
+  buildUserPingCacheKey,
   buildZoneSimilarContextRpcArgs,
   encodeContextVector,
   encodeZoneContextVector,
+  shouldThrottleUserPing,
 } from '@/lib/learningSync';
 import { DEFAULT_WEIGHTS } from '@/lib/scoringEngine';
 import { describe, expect, it } from 'vitest';
@@ -113,6 +115,18 @@ describe('learning sync payloads', () => {
     );
 
     expect(args).toBeNull();
+  });
+
+  it('builds a deterministic cache key for user pings', () => {
+    expect(buildUserPingCacheKey('driver-1', 'zone-1', 'libre-auto-pick')).toBe(
+      'driver-1:zone-1:libre-auto-pick'
+    );
+  });
+
+  it('throttles duplicate user pings during cooldown', () => {
+    expect(shouldThrottleUserPing(1_000, 1_500, 1_000)).toBe(true);
+    expect(shouldThrottleUserPing(1_000, 2_500, 1_000)).toBe(false);
+    expect(shouldThrottleUserPing(null, 2_500, 1_000)).toBe(false);
   });
 
   it('builds aggregate payloads for EMA and beliefs', () => {

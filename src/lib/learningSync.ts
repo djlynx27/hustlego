@@ -28,13 +28,24 @@ type SessionInsert = TablesInsert<'sessions'>;
 type SessionZoneInsert = TablesInsert<'session_zones'>;
 type PredictionInsert = TablesInsert<'predictions'>;
 type DemandPatternInsert = TablesInsert<'demand_patterns'>;
+type UserPingInsert = TablesInsert<'user_pings'>;
 type SimilarContextRpcArgs =
   Database['public']['Functions']['match_similar_contexts']['Args'];
+type UserPingRpcArgs =
+  Database['public']['Functions']['match_user_pings']['Args'];
 
 type SimilarContextRpcRow = {
   id: number | string;
   zone_id: string;
   actual_earnings_per_hour: number | string | null;
+  similarity: number | string | null;
+  created_at: string;
+};
+
+type UserPingRpcRow = {
+  id: string;
+  zone_id: string;
+  success_score: number | string | null;
   similarity: number | string | null;
   created_at: string;
 };
@@ -51,6 +62,29 @@ export interface SimilarContextsResult {
   ok: boolean;
   matches: SimilarContextMatch[];
   averageEarningsPerHour: number;
+  averageSimilarity: number;
+  message: string;
+}
+
+export interface UserPingContextInput extends ZoneContextInput {
+  distanceKm?: number | null;
+  lyftDemandLevel?: number | null;
+  estimatedWaitMin?: number | null;
+  conservativePresence?: boolean;
+}
+
+export interface UserPingMatch {
+  id: string;
+  zoneId: string;
+  successScore: number;
+  similarity: number;
+  createdAt: string;
+}
+
+export interface UserPingMatchesResult {
+  ok: boolean;
+  matches: UserPingMatch[];
+  averageSuccessScore: number;
   averageSimilarity: number;
   message: string;
 }
@@ -83,6 +117,60 @@ function clamp01(value: number) {
 
 function serializeContextVector(vector: number[]) {
   return `[${vector.map((value) => round(value, 6).toString()).join(',')}]`;
+}
+
+const USER_PING_CACHE_KEY = 'hustlego_user_ping_cache';
+const USER_PING_COOLDOWN_MS = 15 * 60 * 1000;
+
+export function buildUserPingCacheKey(
+  driverFingerprint: string,
+  zoneId: string,
+  source = 'unknown'
+) {
+  return `${driverFingerprint}:${zoneId}:${source}`;
+}
+
+export function shouldThrottleUserPing(
+  lastRecordedAt: number | null,
+  nowMs: number,
+  cooldownMs = USER_PING_COOLDOWN_MS
+) {
+  return lastRecordedAt != null && nowMs - lastRecordedAt < cooldownMs;
+}
+
+function readUserPingCache() {
+  if (typeof localStorage === 'undefined') return {} as Record<string, number>;
+
+  try {
+    const raw = localStorage.getItem(USER_PING_CACHE_KEY);
+    if (!raw) return {} as Record<string, number>;
+
+    const parsed = JSON.parse(raw) as Record<string, number>;
+    return parsed ?? {};
+  } catch {
+    return {} as Record<string, number>;
+  }
+}
+
+function writeUserPingCache(cache: Record<string, number>) {
+  if (typeof localStorage === 'undefined') return;
+
+  try {
+    localStorage.setItem(USER_PING_CACHE_KEY, JSON.stringify(cache));
+  } catch {
+    // localStorage unavailable; cooldown cache is not persisted.
+  }
+}
+
+function rememberUserPing(cacheKey: string, nowMs: number) {
+  const cache = readUserPingCache();
+  const prunedEntries = Object.entries(cache)
+    .filter(([, value]) => nowMs - value < USER_PING_COOLDOWN_MS)
+    .slice(-100);
+
+  const nextCache = Object.fromEntries(prunedEntries);
+  nextCache[cacheKey] = nowMs;
+  writeUserPingCache(nextCache);
 }
 
 function getErrorMessage(error: unknown, fallback: string) {
@@ -143,6 +231,50 @@ export function buildZoneSimilarContextRpcArgs(
   return {
     query_zone_id: input.zoneId,
     query_vector: serializeContextVector(encodeZoneContextVector(input)),
+    match_count: Math.max(1, Math.round(matchCount)),
+  };
+}
+
+export function encodeUserPingContextVector(
+  input: UserPingContextInput
+): number[] {
+  const base = encodeZoneContextVector(input);
+  const normalizedDistance = clamp01((input.distanceKm ?? 0) / 20);
+  const normalizedLyftDemand = clamp01((input.lyftDemandLevel ?? 0) / 10);
+  const normalizedWait = clamp01((input.estimatedWaitMin ?? 0) / 20);
+
+  return [
+    base[0] ?? 0,
+    base[1] ?? 0,
+    base[2] ?? 0,
+    base[3] ?? 0,
+    base[4] ?? 0,
+    base[5] ?? 0,
+    base[6] ?? 0,
+    round(normalizedDistance, 6),
+    round(normalizedLyftDemand, 6),
+    round(normalizedWait, 6),
+    1,
+    input.conservativePresence ? 1 : 0,
+    base[11] ?? 0,
+    base[12] ?? 0,
+    base[13] ?? 0,
+    base[14] ?? 0,
+  ];
+}
+
+export function buildUserPingMatchRpcArgs(
+  driverFingerprint: string,
+  input: UserPingContextInput,
+  matchCount = 5
+): UserPingRpcArgs | null {
+  if (!driverFingerprint || !input.zoneId) return null;
+
+  return {
+    query_driver_fingerprint: driverFingerprint,
+    query_platform: 'lyft',
+    query_vector: serializeContextVector(encodeUserPingContextVector(input)),
+    query_zone_id: input.zoneId,
     match_count: Math.max(1, Math.round(matchCount)),
   };
 }
@@ -678,4 +810,135 @@ export async function findSimilarContextsForZoneContext(
         : message,
     };
   }
+}
+
+export async function findSimilarUserPings(
+  driverFingerprint: string,
+  input: UserPingContextInput,
+  matchCount = 5
+): Promise<UserPingMatchesResult> {
+  const args = buildUserPingMatchRpcArgs(driverFingerprint, input, matchCount);
+  if (!args) {
+    return {
+      ok: false,
+      matches: [],
+      averageSuccessScore: 0,
+      averageSimilarity: 0,
+      message: 'Contexte utilisateur invalide.',
+    };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc('match_user_pings', args);
+    if (error) throw error;
+
+    const matches: UserPingMatch[] = ((data ?? []) as UserPingRpcRow[]).map(
+      (row) => ({
+        id: row.id,
+        zoneId: row.zone_id,
+        successScore: round(Number(row.success_score ?? 0), 4),
+        similarity: round(Number(row.similarity ?? 0), 4),
+        createdAt: row.created_at,
+      })
+    );
+
+    const averageSuccessScore =
+      matches.length > 0
+        ? round(
+            matches.reduce((sum, match) => sum + match.successScore, 0) /
+              matches.length,
+            4
+          )
+        : 0;
+    const averageSimilarity =
+      matches.length > 0
+        ? round(
+            matches.reduce((sum, match) => sum + match.similarity, 0) /
+              matches.length,
+            4
+          )
+        : 0;
+
+    return {
+      ok: true,
+      matches,
+      averageSuccessScore,
+      averageSimilarity,
+      message:
+        matches.length > 0
+          ? 'Habitudes similaires récupérées.'
+          : 'Aucune habitude similaire trouvée pour cette zone.',
+    };
+  } catch (error: unknown) {
+    const message = getErrorMessage(
+      error,
+      'Recherche des habitudes utilisateur impossible.'
+    );
+
+    return {
+      ok: false,
+      matches: [],
+      averageSuccessScore: 0,
+      averageSimilarity: 0,
+      message,
+    };
+  }
+}
+
+export async function recordUserPing(
+  driverFingerprint: string,
+  input: UserPingContextInput & {
+    successScore?: number;
+    metadata?: Record<string, unknown>;
+  }
+) {
+  if (!driverFingerprint || !input.zoneId) {
+    return { ok: false, message: 'Signal utilisateur incomplet.' };
+  }
+
+  const source =
+    typeof input.metadata?.source === 'string'
+      ? input.metadata.source
+      : 'unknown';
+  const cacheKey = buildUserPingCacheKey(
+    driverFingerprint,
+    input.zoneId,
+    source
+  );
+  const nowMs = Date.now();
+  const lastRecordedAt = readUserPingCache()[cacheKey] ?? null;
+
+  if (shouldThrottleUserPing(lastRecordedAt, nowMs)) {
+    return {
+      ok: true,
+      message: 'Ping utilisateur ignoré: doublon récent.',
+    };
+  }
+
+  const payload: UserPingInsert = {
+    driver_fingerprint: driverFingerprint,
+    zone_id: input.zoneId,
+    platform: 'lyft',
+    context_vector: serializeContextVector(encodeUserPingContextVector(input)),
+    success_score: round(clamp01(input.successScore ?? 1), 3),
+    metadata: input.metadata ?? null,
+  };
+
+  const { error } = await supabase.from('user_pings').insert(payload);
+  if (error) {
+    return {
+      ok: false,
+      message: getErrorMessage(
+        error,
+        'Enregistrement du ping utilisateur impossible.'
+      ),
+    };
+  }
+
+  rememberUserPing(cacheKey, nowMs);
+
+  return {
+    ok: true,
+    message: 'Ping utilisateur enregistré.',
+  };
 }

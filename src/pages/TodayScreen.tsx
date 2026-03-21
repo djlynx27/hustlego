@@ -3,6 +3,7 @@ import { ContextSimilarityPanel } from '@/components/ContextSimilarityPanel';
 import { DeadTimeTimer } from '@/components/DeadTimeTimer';
 import { DemandBadge } from '@/components/DemandBadge';
 import { MultiAppStatus } from '@/components/MultiAppStatus';
+import { GoogleMapsIcon, WazeIcon } from '@/components/NavIcons';
 import { NavigationSheet } from '@/components/NavigationSheet';
 import { NetProfitWidget } from '@/components/NetProfitWidget';
 import { PlatformArbitrage } from '@/components/PlatformArbitrage';
@@ -36,8 +37,16 @@ import {
   getCurrentSlotTime,
   getDemandClass,
 } from '@/lib/demandUtils';
+import {
+  getConservativePresencePreference,
+  getDriverFingerprint,
+  getStoredDriverMode,
+  setConservativePresencePreference,
+  setStoredDriverMode,
+} from '@/lib/driverPreferences';
+import { recordUserPing } from '@/lib/learningSync';
+import { computeSuccessProbabilityScore } from '@/lib/lyftStrategy';
 import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
-import { GoogleMapsIcon, WazeIcon } from '@/components/NavIcons';
 import { getActiveTimeBoosts } from '@/lib/timeBoosts';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
 import {
@@ -59,7 +68,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { useNavigate } from 'react-router-dom';
 const MapboxHeatmap = lazy(() => import('@/components/MapboxHeatmap'));
 
 const CITY_CENTERS: Record<string, [number, number]> = {
@@ -110,6 +118,7 @@ type SmartZone = {
   id: string;
   name: string;
   type: string;
+  score: number;
   distKm: number;
   travelMin: number;
   arrivalScore: number;
@@ -133,6 +142,7 @@ function pickBestDestination(
   // zones is already sorted by arrivalScore desc → navZones[0] is the best scorer
   const bestScore = navZones[0];
   const closest = [...navZones].sort((a, b) => a.distKm - b.distKm)[0];
+  if (!bestScore || !closest) return null;
   if (closest.id === bestScore.id) return { zone: closest, reason: 'proche' };
   // Override to farther zone only when gap is significant AND closer zone is weak
   if (
@@ -146,20 +156,28 @@ function pickBestDestination(
 
 export default function TodayScreen() {
   usePullToRefresh(() => window.location.reload());
-  const navigate = useNavigate();
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
   const [now, setNow] = useState(new Date());
   const { canInstall, install, dismiss: dismissInstall } = usePwaInstall();
   const isOnline = useOnlineStatus();
-  const { enabled: notifEnabled, requestPermission } = useNotifications(cityId);
   const { location: userLocation } = useUserLocation();
+  const [conservativePresence, setConservativePresence] = useState(() =>
+    getConservativePresencePreference()
+  );
+  const { enabled: notifEnabled, requestPermission } = useNotifications(
+    cityId,
+    {
+      conservativePresence,
+    }
+  );
   useAutoCity(setCityId, userLocation?.latitude, userLocation?.longitude);
   const [navZone, setNavZone] = useState<{
     name: string;
     lat: number;
     lng: number;
   } | null>(null);
+  const driverFingerprint = useMemo(() => getDriverFingerprint(), []);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 15000);
@@ -178,7 +196,12 @@ export default function TodayScreen() {
     stmStatus,
     surgeMap,
     similarContextSignals,
-  } = useDemandScores(cityId);
+    lyftSignalByZone,
+  } = useDemandScores(cityId, {
+    currentLat: userLocation?.latitude ?? null,
+    currentLng: userLocation?.longitude ?? null,
+    conservativePresence,
+  });
   const { data: holiday } = useHoliday(getCurrentSlotTime(now).date);
   const { data: habsGame } = useHabsGame(getCurrentSlotTime(now).date);
   const timeBoosts = useMemo(() => getActiveTimeBoosts(now), [now]);
@@ -191,26 +214,12 @@ export default function TodayScreen() {
   // Haptic feedback when the top zone changes (new demand opportunity)
   const prevHeroIdRef = useRef<string | null>(null);
 
-  const DRIVER_MODE_KEY = 'geohustle_driver_mode';
   const [driverMode, setDriverModeState] = useState<
     'rideshare' | 'delivery' | 'all'
-  >(() => {
-    try {
-      const saved = localStorage.getItem(DRIVER_MODE_KEY);
-      if (saved === 'rideshare' || saved === 'delivery' || saved === 'all')
-        return saved;
-    } catch {
-      // localStorage unavailable; default to all platforms.
-    }
-    return 'all';
-  });
+  >(() => getStoredDriverMode());
   const setDriverMode = (mode: 'rideshare' | 'delivery' | 'all') => {
     setDriverModeState(mode);
-    try {
-      localStorage.setItem(DRIVER_MODE_KEY, mode);
-    } catch {
-      // localStorage unavailable; selected driver mode remains in memory.
-    }
+    setStoredDriverMode(mode);
   };
 
   // ── "Je suis libre" mode ───────────────────────────────────────────
@@ -286,6 +295,59 @@ export default function TodayScreen() {
   const { data: weather } = useWeather(cityId);
   const AVG_SPEED_KMH = 30;
 
+  const rememberUserPreference = useCallback(
+    (
+      zone: {
+        id: string;
+        name: string;
+        type: string;
+        score: number;
+        latitude: number;
+        longitude: number;
+        distKm?: number;
+      },
+      source: string
+    ) => {
+      const distanceKm =
+        zone.distKm ??
+        (userLocation
+          ? haversineKm(
+              userLocation.latitude,
+              userLocation.longitude,
+              zone.latitude,
+              zone.longitude
+            )
+          : null);
+
+      void recordUserPing(driverFingerprint, {
+        zoneId: zone.id,
+        zoneType: zone.type,
+        currentScore: zone.score,
+        now,
+        weatherDemandBoostPoints: weather?.demandBoostPoints,
+        distanceKm,
+        lyftDemandLevel: lyftSignalByZone.get(zone.id)?.demandLevel,
+        estimatedWaitMin: lyftSignalByZone.get(zone.id)?.estimatedWaitMin,
+        conservativePresence,
+        successScore: 1,
+        metadata: {
+          source,
+          zoneName: zone.name,
+          driverMode,
+        },
+      });
+    },
+    [
+      conservativePresence,
+      driverFingerprint,
+      driverMode,
+      lyftSignalByZone,
+      now,
+      userLocation,
+      weather?.demandBoostPoints,
+    ]
+  );
+
   // Ranked zones by score descending
   const rankedZones = useMemo(() => {
     return zones
@@ -326,11 +388,18 @@ export default function TodayScreen() {
         );
         const travelMin = Math.round((distKm / AVG_SPEED_KMH) * 60);
         const arrivalDate = new Date(now.getTime() + travelMin * 60_000);
-        const { score: arrivalScore } = computeDemandScore(
+        const { score: arrivalDemandScore } = computeDemandScore(
           z,
           arrivalDate,
           weatherCond
         );
+        const arrivalScore = computeSuccessProbabilityScore({
+          demandContextScore: arrivalDemandScore,
+          distanceKm: distKm,
+          demandLevel: lyftSignalByZone.get(z.id)?.demandLevel,
+          estimatedWaitMin: lyftSignalByZone.get(z.id)?.estimatedWaitMin,
+          surgeActive: lyftSignalByZone.get(z.id)?.surgeActive,
+        }).score;
         return {
           ...z,
           distKm,
@@ -342,7 +411,7 @@ export default function TodayScreen() {
       .filter((z) => z.distKm <= 20 && z.arrivalScore >= 45)
       .sort((a, b) => b.arrivalScore - a.arrivalScore)
       .slice(0, 5);
-  }, [userLocation, modeZones, now, weather]);
+  }, [lyftSignalByZone, modeZones, now, userLocation, weather]);
 
   // Keep ref in sync for the timer callback
   useEffect(() => {
@@ -409,6 +478,7 @@ export default function TodayScreen() {
     zones: modeZones,
     scores,
     driverMode,
+    conservativePresence,
   });
 
   const mapCenter = heroZone
@@ -517,6 +587,42 @@ export default function TodayScreen() {
         </div>
       </div>
 
+      <div className="px-3 mt-2">
+        <button
+          onClick={() => {
+            const nextValue = !conservativePresence;
+            setConservativePresence(nextValue);
+            setConservativePresencePreference(nextValue);
+          }}
+          className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
+            conservativePresence
+              ? 'border-primary/40 bg-primary/10'
+              : 'border-border bg-card'
+          }`}
+        >
+          <div className="flex items-center justify-between gap-3">
+            <div>
+              <p className="text-[14px] font-display font-bold">
+                Mode Conservative Presence
+              </p>
+              <p className="text-[12px] text-muted-foreground font-body mt-1">
+                Ne suggère jamais de couper Lyft. Oriente plutôt vers un filtre
+                destination et une présence patiente en zone froide.
+              </p>
+            </div>
+            <span
+              className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
+                conservativePresence
+                  ? 'bg-primary text-primary-foreground'
+                  : 'bg-muted text-muted-foreground'
+              }`}
+            >
+              {conservativePresence ? 'ACTIF' : 'OFF'}
+            </span>
+          </div>
+        </button>
+      </div>
+
       {/* Statut chauffeur : Occupé / Libre */}
       <div className="px-3 mt-2">
         <button
@@ -527,15 +633,18 @@ export default function TodayScreen() {
               setAutoSelectedZone(picked?.zone ?? null);
               setAutoNavReason(picked?.reason ?? null);
               if (picked) {
-                window.open(
-                  getGoogleMapsNavUrl(
-                    picked.zone.name,
-                    picked.zone.latitude,
-                    picked.zone.longitude
-                  ),
-                  '_blank',
-                  'noopener,noreferrer'
-                );
+                rememberUserPreference(picked.zone, 'libre-auto-pick');
+                if (!conservativePresence) {
+                  window.open(
+                    getGoogleMapsNavUrl(
+                      picked.zone.name,
+                      picked.zone.latitude,
+                      picked.zone.longitude
+                    ),
+                    '_blank',
+                    'noopener,noreferrer'
+                  );
+                }
               }
             } else {
               setAutoSelectedZone(null);
@@ -553,7 +662,9 @@ export default function TodayScreen() {
         >
           <Timer className="w-4 h-4" />
           {libreMode
-            ? '🟢 Je suis libre – Où aller ?'
+            ? conservativePresence
+              ? '🟢 Je suis libre – Où rester visible ?'
+              : '🟢 Je suis libre – Où aller ?'
             : '🔴 Occupé (course en cours)'}
         </button>
       </div>
@@ -639,6 +750,15 @@ export default function TodayScreen() {
             </span>
           </div>
         )}
+        {conservativePresence && (
+          <div className="flex items-center gap-2 bg-blue-500/10 border border-blue-500/30 rounded-lg px-3 py-2">
+            <span className="text-lg flex-shrink-0">🎯</span>
+            <span className="text-[13px] font-body text-blue-500">
+              Présence conservatrice active: privilégie les filtres destination
+              Lyft aux déplacements agressifs.
+            </span>
+          </div>
+        )}
         {holiday?.isHoliday && holiday.name && (
           <div className="flex items-center gap-2 bg-primary/10 border border-primary/30 rounded-lg px-3 py-2">
             <PartyPopper className="w-5 h-5 text-primary flex-shrink-0" />
@@ -698,7 +818,8 @@ export default function TodayScreen() {
               className="flex items-center gap-2 bg-destructive/20 border border-destructive/40 rounded-lg px-3 py-2"
             >
               <span className="text-[14px] font-body font-bold text-destructive">
-                🔴 {ev.name} se termine dans {minsLeft} min – Demande maximale prévue !
+                🔴 {ev.name} se termine dans {minsLeft} min – Demande maximale
+                prévue !
               </span>
             </div>
           );
@@ -735,6 +856,16 @@ export default function TodayScreen() {
                     {`IA contextuelle +${heroFactors?.learningBoostPoints} pts · similarité ${Math.round((heroFactors?.learningSimilarity ?? 0) * 100)}% · historique ${formatMoney(heroFactors?.learningAvgEarningsPerHour ?? 0)}/h`}
                   </span>
                 )}
+                {Number(heroFactors?.habitBoostPercent ?? 0) > 0 && (
+                  <span className="text-[13px] text-blue-500 font-body block mt-1">
+                    {`Habitude perso +${heroFactors?.habitBoostPercent}% · similarité ${Math.round((heroFactors?.habitSimilarity ?? 0) * 100)}%`}
+                  </span>
+                )}
+                {heroFactors?.successProbability != null && (
+                  <span className="text-[13px] text-muted-foreground font-body block mt-1">
+                    {`Probabilité de succès ${Math.round(heroFactors.successProbability * 100)}% · offre chauffeurs ${heroFactors.driverSupplyEstimate?.toFixed(1) ?? '0.0'} · proximité ${Math.round((heroFactors.proximityFactor ?? 0) * 100)}%`}
+                  </span>
+                )}
                 {heroDistance !== null && (
                   <span className="text-[20px] font-display font-semibold text-muted-foreground mt-1 block">
                     📍 {heroDistance.toFixed(1)} km
@@ -764,7 +895,8 @@ export default function TodayScreen() {
                   target="_blank"
                   rel="noopener noreferrer"
                 >
-                  <GoogleMapsIcon className="w-6 h-6 flex-shrink-0" /> Google Maps
+                  <GoogleMapsIcon className="w-6 h-6 flex-shrink-0" /> Google
+                  Maps
                 </a>
               </Button>
               <Button
@@ -826,23 +958,31 @@ export default function TodayScreen() {
           />
           <div className="flex-1 min-w-0">
             <p className="text-[13px] font-semibold text-foreground">
-              Zone creuse — repositionne-toi
+              {deadheadSuggestion.strategy === 'destination_filter'
+                ? 'Zone creuse — garde ta présence Lyft'
+                : 'Zone creuse — repositionne-toi'}
             </p>
             <p className="text-[12px] text-muted-foreground leading-snug">
               {deadheadSuggestion.reason}
             </p>
           </div>
           <button
-            onClick={() =>
+            onClick={() => {
+              rememberUserPreference(
+                deadheadSuggestion.zone,
+                'deadhead-suggestion'
+              );
               setNavZone({
                 name: deadheadSuggestion.zone.name,
                 lat: deadheadSuggestion.zone.latitude,
                 lng: deadheadSuggestion.zone.longitude,
-              })
-            }
+              });
+            }}
             className="text-[12px] font-bold text-primary bg-primary/10 rounded-lg px-2.5 py-1.5 flex-shrink-0 active:scale-95 transition-transform"
           >
-            GO
+            {deadheadSuggestion.strategy === 'destination_filter'
+              ? 'Cibler'
+              : 'GO'}
           </button>
         </div>
       )}
@@ -890,7 +1030,9 @@ export default function TodayScreen() {
       {libreMode ? (
         <div className="px-3 mt-3 pb-4 space-y-2">
           <h3 className="text-[16px] font-display font-bold text-muted-foreground uppercase tracking-wide">
-            🧭 Où aller maintenant ?
+            {conservativePresence
+              ? '🎯 Où garder une présence utile ?'
+              : '🧭 Où aller maintenant ?'}
           </h3>
           {!userLocation ? (
             <p className="text-[14px] text-muted-foreground font-body px-1">
@@ -951,6 +1093,11 @@ export default function TodayScreen() {
                           %)
                         </span>
                       )}
+                      {Number(zoneFactors?.habitBoostPercent ?? 0) > 0 && (
+                        <span className="text-[12px] text-blue-500 font-body block mt-0.5">
+                          Habitude perso +{zoneFactors?.habitBoostPercent}%
+                        </span>
+                      )}
                     </div>
                     <div className="flex flex-col items-end gap-1">
                       <DemandBadge score={zone.arrivalScore} size="lg" />
@@ -982,10 +1129,17 @@ export default function TodayScreen() {
                         )}
                         target="_blank"
                         rel="noopener noreferrer"
-                      onClick={() => startWaitAt(zone)}
+                        onClick={() => {
+                          startWaitAt(zone);
+                          rememberUserPreference(
+                            zone,
+                            'smart-zone-google-maps'
+                          );
+                        }}
                         className="flex-1 flex items-center justify-center gap-2 bg-primary text-primary-foreground font-display font-bold text-[14px] rounded-lg h-10 hover:bg-primary/90 transition-colors"
                       >
-                        <GoogleMapsIcon className="w-4 h-4 flex-shrink-0" /> Maps
+                        <GoogleMapsIcon className="w-4 h-4 flex-shrink-0" />{' '}
+                        {conservativePresence ? 'Cibler' : 'Maps'}
                       </a>
                       <a
                         href={getWazeNavUrl(

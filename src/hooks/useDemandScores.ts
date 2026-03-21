@@ -20,7 +20,15 @@ import { useWeather } from '@/hooks/useWeather';
 import { useZoneScores } from '@/hooks/useZoneScores';
 import { supabase } from '@/integrations/supabase/client';
 import { type ZoneHistory } from '@/lib/aiAgents';
-import { findSimilarContextsForZoneContext } from '@/lib/learningSync';
+import { getDriverFingerprint } from '@/lib/driverPreferences';
+import {
+  findSimilarContextsForZoneContext,
+  findSimilarUserPings,
+} from '@/lib/learningSync';
+import {
+  applyHabitBoost,
+  computeSuccessProbabilityScore,
+} from '@/lib/lyftStrategy';
 import {
   scoreAllZonesWithLearning,
   type ActiveEventBoost,
@@ -43,6 +51,19 @@ export interface ScoreFactors {
   learningBoostPoints?: number;
   learningSimilarity?: number;
   learningAvgEarningsPerHour?: number;
+  driverSupplyEstimate?: number;
+  proximityFactor?: number;
+  successProbability?: number;
+  lyftDemandLevel?: number;
+  habitBoostPercent?: number;
+  habitSimilarity?: number;
+  habitSuccessRate?: number;
+}
+
+interface UseDemandScoresOptions {
+  currentLat?: number | null;
+  currentLng?: number | null;
+  conservativePresence?: boolean;
 }
 
 function logScoreCalculatorIssue(...args: unknown[]) {
@@ -99,7 +120,10 @@ export function buildTripHistory(
  * Primary source: DB scores (calculated by edge function every 30min).
  * Fallback: client-side calculation using weather + events.
  */
-export function useDemandScores(cityId: string) {
+export function useDemandScores(
+  cityId: string,
+  options: UseDemandScoresOptions = {}
+) {
   const queryClient = useQueryClient();
   const { data: zones = [] } = useZones(cityId);
   const { data: weather } = useWeather(cityId);
@@ -242,6 +266,62 @@ export function useDemandScores(cityId: string) {
     () => getAverageTrafficCongestion(trafficSnapshots),
     [trafficSnapshots]
   );
+  const driverFingerprint = useMemo(() => getDriverFingerprint(), []);
+
+  const { data: lyftSignals = [] } = useQuery({
+    queryKey: [
+      'lyft-platform-signals',
+      cityId,
+      zones.map((zone) => zone.id).join('|'),
+    ],
+    queryFn: async () => {
+      if (!cityId || zones.length === 0) return [];
+
+      const lookbackStart = new Date(
+        now.getTime() - 30 * 60 * 1000
+      ).toISOString();
+      const { data, error } = await supabase
+        .from('platform_signals')
+        .select(
+          'zone_id, demand_level, surge_active, estimated_wait_min, captured_at'
+        )
+        .eq('platform', 'lyft')
+        .in(
+          'zone_id',
+          zones.map((zone) => zone.id)
+        )
+        .gte('captured_at', lookbackStart)
+        .order('captured_at', { ascending: false });
+      if (error) throw error;
+
+      const latestByZone = new Map<string, (typeof data)[number]>();
+      for (const row of data ?? []) {
+        if (!latestByZone.has(row.zone_id)) {
+          latestByZone.set(row.zone_id, row);
+        }
+      }
+
+      return [...latestByZone.values()];
+    },
+    enabled: !!cityId && zones.length > 0,
+    staleTime: 60_000,
+  });
+
+  const lyftSignalByZone = useMemo(() => {
+    return new Map(
+      lyftSignals.map((signal) => [
+        signal.zone_id,
+        {
+          demandLevel: Number(signal.demand_level ?? 0),
+          estimatedWaitMin:
+            signal.estimated_wait_min == null
+              ? null
+              : Number(signal.estimated_wait_min),
+          surgeActive: signal.surge_active,
+        },
+      ])
+    );
+  }, [lyftSignals]);
 
   const candidateZonesForSimilarity = useMemo(() => {
     return [...zones]
@@ -289,10 +369,67 @@ export function useDemandScores(cityId: string) {
 
       return results;
     },
-    enabled:
-      !!cityId &&
-      candidateZonesForSimilarity.length > 0 &&
-      dbScores.length === 0,
+    enabled: !!cityId && candidateZonesForSimilarity.length > 0,
+    staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+
+  const { data: userPingSignals = [] } = useQuery({
+    queryKey: [
+      'user-ping-signals',
+      cityId,
+      driverFingerprint,
+      now.getDay(),
+      now.getHours(),
+      options.conservativePresence ? 'conservative' : 'standard',
+      candidateZonesForSimilarity.map((zone) => zone.id).join('|'),
+      options.currentLat == null ? 'na' : options.currentLat.toFixed(3),
+      options.currentLng == null ? 'na' : options.currentLng.toFixed(3),
+    ],
+    queryFn: async () => {
+      if (candidateZonesForSimilarity.length === 0) return [];
+
+      const results = await Promise.all(
+        candidateZonesForSimilarity.map(async (zone) => {
+          const distanceKm =
+            options.currentLat == null || options.currentLng == null
+              ? null
+              : haversineKm(
+                  options.currentLat,
+                  options.currentLng,
+                  zone.latitude,
+                  zone.longitude
+                );
+
+          const result = await findSimilarUserPings(
+            driverFingerprint,
+            {
+              zoneId: zone.id,
+              zoneType: zone.type,
+              currentScore: Number(zone.current_score ?? 50),
+              now,
+              trafficCongestion:
+                trafficByZone.get(zone.id) ?? averageTrafficCongestion,
+              weatherDemandBoostPoints: weatherCondition?.demandBoostPoints,
+              distanceKm,
+              lyftDemandLevel: lyftSignalByZone.get(zone.id)?.demandLevel,
+              estimatedWaitMin:
+                lyftSignalByZone.get(zone.id)?.estimatedWaitMin ?? null,
+              conservativePresence: options.conservativePresence,
+            },
+            5
+          );
+
+          return {
+            zoneId: zone.id,
+            result,
+          };
+        })
+      );
+
+      return results;
+    },
+    enabled: !!cityId && candidateZonesForSimilarity.length > 0,
     staleTime: 5 * 60 * 1000,
     retry: false,
   });
@@ -336,13 +473,44 @@ export function useDemandScores(cityId: string) {
     return byZone;
   }, [similarContextSignals]);
 
+  const userPingSignalByZone = useMemo(() => {
+    const byZone = new Map<
+      string,
+      {
+        averageSimilarity: number;
+        averageSuccessScore: number;
+        successfulMatches: number;
+      }
+    >();
+
+    for (const signal of userPingSignals) {
+      if (!signal.result.ok || signal.result.matches.length === 0) continue;
+
+      const successfulMatches = signal.result.matches.filter(
+        (match) => match.successScore >= 0.7
+      ).length;
+
+      if (successfulMatches === 0) continue;
+
+      byZone.set(signal.zoneId, {
+        averageSimilarity: signal.result.averageSimilarity,
+        averageSuccessScore: signal.result.averageSuccessScore,
+        successfulMatches,
+      });
+    }
+
+    return byZone;
+  }, [userPingSignals]);
+
   // Build score maps: prefer DB scores, fallback to client-side
   const { scores, factors } = useMemo(() => {
     // DB scores indexed by zone_id
     const dbScoreMap = new Map(dbScores.map((s) => [s.zone_id, s]));
 
+    let baseScores = new Map<string, number>();
+    let baseFactors = new Map<string, ScoreFactors>();
+
     if (dbScoreMap.size > 0) {
-      // Use DB scores as primary
       const scores = new Map<string, number>();
       const factors = new Map<string, ScoreFactors>();
 
@@ -370,30 +538,28 @@ export function useDemandScores(cityId: string) {
           });
         }
       }
+      baseScores = scores;
+      baseFactors = factors;
+    } else {
+      const fallback = scoreAllZonesWithLearning(
+        zones,
+        now,
+        weatherCondition,
+        eventBoosts,
+        tripHistory,
+        (zone) => ({
+          trafficCongestion:
+            trafficByZone.get(zone.id) ?? averageTrafficCongestion,
+          transitDisruption: stmStatus?.disruptionScore ?? 0,
+        })
+      );
 
-      return { scores, factors };
+      baseScores = new Map(fallback.scores);
+      baseFactors = new Map(fallback.factors);
     }
 
-    // Fallback: client-side calculated with learning agents from trip history
-    const fallback = scoreAllZonesWithLearning(
-      zones,
-      now,
-      weatherCondition,
-      eventBoosts,
-      tripHistory,
-      (zone) => ({
-        trafficCongestion:
-          trafficByZone.get(zone.id) ?? averageTrafficCongestion,
-        transitDisruption: stmStatus?.disruptionScore ?? 0,
-      })
-    );
-
-    if (learningSignalByZone.size === 0) {
-      return fallback;
-    }
-
-    const boostedScores = new Map(fallback.scores);
-    const boostedFactors = new Map(fallback.factors);
+    const boostedScores = new Map(baseScores);
+    const boostedFactors = new Map(baseFactors);
 
     for (const [zoneId, signal] of learningSignalByZone) {
       const currentScore = boostedScores.get(zoneId);
@@ -415,6 +581,50 @@ export function useDemandScores(cityId: string) {
       }
     }
 
+    for (const zone of zones) {
+      const demandContextScore = boostedScores.get(zone.id) ?? 50;
+      const lyftSignal = lyftSignalByZone.get(zone.id);
+      const distanceKm =
+        options.currentLat == null || options.currentLng == null
+          ? null
+          : haversineKm(
+              options.currentLat,
+              options.currentLng,
+              zone.latitude,
+              zone.longitude
+            );
+      const successScore = computeSuccessProbabilityScore({
+        demandContextScore,
+        distanceKm,
+        demandLevel: lyftSignal?.demandLevel,
+        estimatedWaitMin: lyftSignal?.estimatedWaitMin,
+        surgeActive: lyftSignal?.surgeActive,
+      });
+      const habitSignal = userPingSignalByZone.get(zone.id);
+      const habitBoost = applyHabitBoost({
+        score: successScore.score,
+        similarity: habitSignal?.averageSimilarity,
+        successfulMatches: habitSignal?.successfulMatches,
+      });
+
+      boostedScores.set(zone.id, habitBoost.score);
+      boostedFactors.set(zone.id, {
+        ...(boostedFactors.get(zone.id) ?? {
+          hasWeatherBoost: false,
+          hasEventBoost: false,
+          weatherBoostPoints: 0,
+          eventBoostPoints: 0,
+        }),
+        driverSupplyEstimate: successScore.driverSupply,
+        proximityFactor: successScore.proximityFactor,
+        successProbability: successScore.successProbability,
+        lyftDemandLevel: lyftSignal?.demandLevel,
+        habitBoostPercent: habitBoost.boostPercent,
+        habitSimilarity: habitSignal?.averageSimilarity,
+        habitSuccessRate: habitSignal?.averageSuccessScore,
+      });
+    }
+
     return { scores: boostedScores, factors: boostedFactors };
   }, [
     zones,
@@ -426,6 +636,10 @@ export function useDemandScores(cityId: string) {
     trafficByZone,
     averageTrafficCongestion,
     learningSignalByZone,
+    lyftSignalByZone,
+    userPingSignalByZone,
+    options.currentLat,
+    options.currentLng,
     stmStatus,
   ]);
 
@@ -507,6 +721,7 @@ export function useDemandScores(cityId: string) {
     trafficSnapshots,
     averageTrafficCongestion,
     similarContextSignals,
+    lyftSignalByZone,
     stmStatus,
     surgeMap,
   };

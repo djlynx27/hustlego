@@ -15,6 +15,7 @@ export interface AntiDeadheadSuggestion {
   currentScore: number;
   reason: string;
   urgency: 'low' | 'medium' | 'high';
+  strategy: 'reposition' | 'destination_filter';
 }
 
 interface AntiDeadheadInput {
@@ -25,6 +26,7 @@ interface AntiDeadheadInput {
   zones: AntiDeadheadZone[];
   scores: Map<string, number>;
   driverMode: 'rideshare' | 'delivery' | 'all';
+  conservativePresence?: boolean;
 }
 
 const LOW_SCORE_THRESHOLD = 40; // below this → suggest repositioning
@@ -50,6 +52,7 @@ export function useAntiDeadhead({
   zones,
   scores,
   driverMode,
+  conservativePresence = false,
 }: AntiDeadheadInput): AntiDeadheadSuggestion | null {
   const currentScore = currentZoneId ? (scores.get(currentZoneId) ?? 0) : null;
 
@@ -90,13 +93,18 @@ export function useAntiDeadhead({
           ? 'livraisons'
           : 'activité';
 
-    const reason = `Zone faible (${currentScore}/100). ${best.name} est à ${best.distKm.toFixed(1)} km avec ${best.score}/100 pour ${modeLabel}.`;
+    const strategy = conservativePresence ? 'destination_filter' : 'reposition';
+
+    const reason = conservativePresence
+      ? `Zone faible (${currentScore}/100). Reste connecté sur Lyft et prépare un filtre destination vers ${best.name} à ${best.distKm.toFixed(1)} km (${best.score}/100) pour ${modeLabel}.`
+      : `Zone faible (${currentScore}/100). ${best.name} est à ${best.distKm.toFixed(1)} km avec ${best.score}/100 pour ${modeLabel}.`;
 
     return {
       zone: best,
       currentScore,
       reason,
       urgency,
+      strategy,
     };
   }, [
     currentLat,
@@ -106,5 +114,6 @@ export function useAntiDeadhead({
     scores,
     currentScore,
     driverMode,
+    conservativePresence,
   ]);
 }
