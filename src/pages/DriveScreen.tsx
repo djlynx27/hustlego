@@ -272,7 +272,7 @@ export default function DriveScreen() {
         </div>
       </div>
 
-      {/* Je suis libre toggle */}
+      {/* Statut chauffeur : Occupé / Libre */}
       <div className="px-4 mt-2">
         <button
           onClick={() => setLibreMode((l) => !l)}
@@ -286,8 +286,8 @@ export default function DriveScreen() {
             <Car className="w-4 h-4" />
           </span>
           {libreMode
-            ? '🟢 Mode libre – Où aller ?'
-            : '🕐 Je suis libre (sans client)'}
+            ? '🟢 Je suis libre – Où aller ?'
+            : '🔴 Occupé (course en cours)'}
         </button>
       </div>
       {/* ── NHTSA Driving HUD overlay ── */}
