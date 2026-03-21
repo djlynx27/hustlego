@@ -143,7 +143,7 @@ serve(async (req: Request) => {
     const peakZones: string[] = [];
 
     for (const zone of zones as Zone[]) {
-      if (!zone.current_score) continue;
+      if (zone.current_score == null) continue;
 
       // 2. Get 4-week rolling baseline for this zone/slot
       const hour = now.getHours();
