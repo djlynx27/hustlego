@@ -84,6 +84,13 @@ function clamp(v: number, lo: number, hi: number) {
   return Math.max(lo, Math.min(hi, v));
 }
 
+function toPositiveInteger(value: unknown, fallback: number) {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return fallback;
+  const rounded = Math.floor(parsed);
+  return rounded > 0 ? rounded : fallback;
+}
+
 function normalizeWeights(w: WeightConfig): WeightConfig {
   // Sum only the calibratable subset (5 main factors)
   // transit, traffic, winter kept stable — only tuned via manual override
@@ -280,8 +287,8 @@ serve(async (req: Request) => {
       days?: number;
       min_trips?: number;
     };
-    const days = body.days ?? 14;
-    const minTrips = body.min_trips ?? 10;
+    const days = toPositiveInteger(body.days, 14);
+    const minTrips = toPositiveInteger(body.min_trips, 10);
 
     const since = new Date(
       Date.now() - days * 24 * 60 * 60 * 1000
@@ -333,6 +340,17 @@ serve(async (req: Request) => {
 
     // 3. Compute MAE + accuracy
     const rows = predictions as TripPredictionRow[];
+    if (rows.length === 0) {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          reason: 'Not enough data: 0 predictions after filtering.',
+          current_weights: currentWeights,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const mae = rows.reduce((s, p) => s + (p.abs_error ?? 0), 0) / rows.length;
 
     const accurate = rows.filter((p) => (p.abs_error ?? 999) <= 15).length;
