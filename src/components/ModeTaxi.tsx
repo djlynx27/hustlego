@@ -1,5 +1,6 @@
 import { Switch } from '@/components/ui/switch';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
+import { summarizeTaxiEntries } from '@/lib/taxiAnalytics';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -159,6 +160,7 @@ export function ModeTaxi() {
     date: new Date().toISOString().split('T')[0],
     amount: '',
     km: '',
+    durationMin: '',
     note: '',
   });
   const [period, setPeriod] = useState<'day' | 'week' | 'month'>('day');
@@ -225,32 +227,31 @@ export function ModeTaxi() {
 
   // Totals
   const totals = useMemo(() => {
-    const totalAmount = earnings.reduce((s, e) => s + Number(e.amount), 0);
-    const totalKm = earnings.reduce((s, e) => s + Number(e.km), 0);
-    const totalMin = earnings.reduce((s, e) => s + (e.duration_min ?? 0), 0);
-    return {
-      amount: totalAmount,
-      km: totalKm,
-      perKm: totalKm > 0 ? totalAmount / totalKm : 0,
-      perHour: totalMin > 0 ? (totalAmount / totalMin) * 60 : 0,
-      entries: earnings.length,
-    };
+    return summarizeTaxiEntries(earnings);
   }, [earnings]);
 
   const handleAddEntry = async () => {
     if (!form.amount) return;
+
+    const durationMin = Number.parseInt(form.durationMin, 10);
+    if (!Number.isFinite(durationMin) || durationMin <= 0) {
+      toast.error('Ajoute une durée active en minutes pour calculer le $/heure');
+      return;
+    }
+
     try {
       await addEarning.mutateAsync({
         date: form.date,
         amount: parseFloat(form.amount) || 0,
         km: parseFloat(form.km) || 0,
-        duration_min: 0,
+        duration_min: durationMin,
         note: form.note,
       });
       setForm({
         date: new Date().toISOString().split('T')[0],
         amount: '',
         km: '',
+        durationMin: '',
         note: '',
       });
       toast.success('Entrée ajoutée');
@@ -456,6 +457,19 @@ export function ModeTaxi() {
               onChange={(e) => setForm((f) => ({ ...f, km: e.target.value }))}
               className="bg-background border-border text-[14px]"
             />
+            <Input
+              type="number"
+              min="1"
+              step="1"
+              placeholder="Durée active (min)"
+              value={form.durationMin}
+              onChange={(e) =>
+                setForm((f) => ({ ...f, durationMin: e.target.value }))
+              }
+              className="bg-background border-border text-[14px]"
+            />
+          </div>
+          <div className="grid grid-cols-1 gap-2">
             <Input
               placeholder="Note"
               value={form.note}
