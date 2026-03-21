@@ -3,7 +3,12 @@ import { NearestHotspot } from '@/components/NearestHotspot';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { I18nProvider } from '@/contexts/I18nContext';
+import AdminImportsScreen from '@/pages/AdminImportsScreen';
+import AdminLearningScreen from '@/pages/AdminLearningScreen';
+import AdminOperationsScreen from '@/pages/AdminOperationsScreen';
+import AdminReportsScreen from '@/pages/AdminReportsScreen';
 import AdminScreen from '@/pages/AdminScreen';
+import AdminToolsScreen from '@/pages/AdminToolsScreen';
 import DriveScreen from '@/pages/DriveScreen';
 import EventsScreen from '@/pages/EventsScreen';
 import PlanningScreen from '@/pages/PlanningScreen';
@@ -64,7 +69,9 @@ function AppContent() {
   const location = useLocation();
   // Hide NearestHotspot on Today screen since hero card already shows best zone + distance
   const showNearestHotspot =
-    location.pathname !== '/today' && location.pathname !== '/';
+    location.pathname !== '/today' &&
+    location.pathname !== '/' &&
+    !location.pathname.startsWith('/admin');
 
   return (
     <div className="min-h-screen bg-background text-foreground">
@@ -76,6 +83,11 @@ function AppContent() {
         <Route path="/zones" element={<ZonesScreen />} />
         <Route path="/events" element={<EventsScreen />} />
         <Route path="/admin" element={<AdminScreen />} />
+        <Route path="/admin/operations" element={<AdminOperationsScreen />} />
+        <Route path="/admin/reports" element={<AdminReportsScreen />} />
+        <Route path="/admin/learning" element={<AdminLearningScreen />} />
+        <Route path="/admin/imports" element={<AdminImportsScreen />} />
+        <Route path="/admin/tools" element={<AdminToolsScreen />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
       {showNearestHotspot && <NearestHotspot />}
