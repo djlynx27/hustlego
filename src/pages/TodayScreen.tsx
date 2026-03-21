@@ -48,7 +48,11 @@ import { recordUserPing } from '@/lib/learningSync';
 import { computeSuccessProbabilityScore } from '@/lib/lyftStrategy';
 import { computeDemandScore, type WeatherCondition } from '@/lib/scoringEngine';
 import { getActiveTimeBoosts } from '@/lib/timeBoosts';
-import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
+import {
+  getGoogleMapsNavUrl,
+  getWazeNavUrl,
+  launchGoogleMapsNavigation,
+} from '@/lib/venueCoordinates';
 import {
   ArrowRight,
   Bell,
@@ -634,14 +638,10 @@ export default function TodayScreen() {
               setAutoNavReason(picked?.reason ?? null);
               if (picked) {
                 rememberUserPreference(picked.zone, 'libre-auto-pick');
-                window.open(
-                  getGoogleMapsNavUrl(
-                    picked.zone.name,
-                    picked.zone.latitude,
-                    picked.zone.longitude
-                  ),
-                  '_blank',
-                  'noopener,noreferrer'
+                launchGoogleMapsNavigation(
+                  picked.zone.name,
+                  picked.zone.latitude,
+                  picked.zone.longitude
                 );
               }
             } else {

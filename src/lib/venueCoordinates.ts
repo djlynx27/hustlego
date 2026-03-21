@@ -62,3 +62,15 @@ export function getWazeNavUrl(zoneName: string, lat: number, lng: number): strin
   const c = getDropoffCoords(zoneName, lat, lng);
   return `https://waze.com/ul?ll=${c.lat},${c.lng}&navigate=yes`;
 }
+
+export function launchExternalNavigation(url: string) {
+  window.location.assign(url);
+}
+
+export function launchGoogleMapsNavigation(
+  zoneName: string,
+  lat: number,
+  lng: number
+) {
+  launchExternalNavigation(getGoogleMapsNavUrl(zoneName, lat, lng));
+}

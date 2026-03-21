@@ -24,7 +24,11 @@ import {
   setConservativePresencePreference,
   setStoredDriverMode,
 } from '@/lib/driverPreferences';
-import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
+import {
+  getGoogleMapsNavUrl,
+  getWazeNavUrl,
+  launchGoogleMapsNavigation,
+} from '@/lib/venueCoordinates';
 import { Car, Crosshair, Maximize2, Minimize2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 
@@ -317,14 +321,10 @@ export default function DriveScreen() {
             const nextLibreMode = !libreMode;
 
             if (nextLibreMode && heroZone) {
-              window.open(
-                getGoogleMapsNavUrl(
-                  heroZone.name,
-                  heroZone.latitude,
-                  heroZone.longitude
-                ),
-                '_blank',
-                'noopener,noreferrer'
+              launchGoogleMapsNavigation(
+                heroZone.name,
+                heroZone.latitude,
+                heroZone.longitude
               );
             }
 

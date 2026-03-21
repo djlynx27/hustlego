@@ -1,5 +1,5 @@
 import { useHaptics } from '@/hooks/useHaptics';
-import { getGoogleMapsNavUrl } from '@/lib/venueCoordinates';
+import { launchGoogleMapsNavigation } from '@/lib/venueCoordinates';
 import { Car, X } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -67,9 +67,10 @@ export function DrivingHUD({
   function handleNavClick() {
     if (!heroZone) return;
     vibrate('navigation');
-    window.open(
-      getGoogleMapsNavUrl(heroZone.name, heroZone.latitude, heroZone.longitude),
-      '_blank'
+    launchGoogleMapsNavigation(
+      heroZone.name,
+      heroZone.latitude,
+      heroZone.longitude
     );
   }
 
