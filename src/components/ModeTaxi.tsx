@@ -235,7 +235,9 @@ export function ModeTaxi() {
 
     const durationMin = Number.parseInt(form.durationMin, 10);
     if (!Number.isFinite(durationMin) || durationMin <= 0) {
-      toast.error('Ajoute une durée active en minutes pour calculer le $/heure');
+      toast.error(
+        'Ajoute une durée active en minutes pour calculer le $/heure'
+      );
       return;
     }
 

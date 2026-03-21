@@ -88,7 +88,8 @@ export function ExperimentalShiftComparison() {
     <Card className="bg-card border-border">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-display flex items-center gap-2">
-          <FlaskConical className="w-4 h-4 text-primary" /> Comparaison expérimentale
+          <FlaskConical className="w-4 h-4 text-primary" /> Comparaison
+          expérimentale
         </CardTitle>
       </CardHeader>
       <CardContent>

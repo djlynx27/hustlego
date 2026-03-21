@@ -1,6 +1,10 @@
 /** Brand-accurate navigation app icons used in GO buttons. */
 
-export function GoogleMapsIcon({ className = 'w-5 h-5' }: { className?: string }) {
+export function GoogleMapsIcon({
+  className = 'w-5 h-5',
+}: {
+  className?: string;
+}) {
   return (
     <svg
       className={className}
@@ -15,20 +19,11 @@ export function GoogleMapsIcon({ className = 'w-5 h-5' }: { className?: string }
         fill="#EA4335"
       />
       {/* Top-left blue quadrant accent */}
-      <path
-        d="M12 2C9.24 2 6.83 3.37 5.41 5.5L12 9V2z"
-        fill="#4285F4"
-      />
+      <path d="M12 2C9.24 2 6.83 3.37 5.41 5.5L12 9V2z" fill="#4285F4" />
       {/* Top-right green quadrant accent */}
-      <path
-        d="M12 2v7l5.8-4.05A7 7 0 0 0 12 2z"
-        fill="#34A853"
-      />
+      <path d="M12 2v7l5.8-4.05A7 7 0 0 0 12 2z" fill="#34A853" />
       {/* Bottom-left yellow quadrant accent */}
-      <path
-        d="M5 9c0 .9.14 1.77.41 2.59L12 9H5z"
-        fill="#FBBC05"
-      />
+      <path d="M5 9c0 .9.14 1.77.41 2.59L12 9H5z" fill="#FBBC05" />
       {/* White circle center */}
       <circle cx="12" cy="9" r="3.2" fill="white" />
     </svg>
