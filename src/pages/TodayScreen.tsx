@@ -483,7 +483,7 @@ export default function TodayScreen() {
         </div>
       </div>
 
-      {/* Je suis libre toggle */}
+      {/* Statut chauffeur : Occupé / Libre */}
       <div className="px-3 mt-2">
         <button
           onClick={() => {
@@ -499,8 +499,8 @@ export default function TodayScreen() {
         >
           <Timer className="w-4 h-4" />
           {libreMode
-            ? '🟢 Mode libre – Où aller ?'
-            : '🕐 Je suis libre (sans client)'}
+            ? '🟢 Je suis libre – Où aller ?'
+            : '🔴 Occupé (course en cours)'}
         </button>
       </div>
 
