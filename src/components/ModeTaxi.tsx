@@ -1,6 +1,7 @@
 import { Switch } from '@/components/ui/switch';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { summarizeTaxiEntries } from '@/lib/taxiAnalytics';
+import { validateTaxiEntryForm } from '@/lib/taxiEntryValidation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 
@@ -231,21 +232,19 @@ export function ModeTaxi() {
   }, [earnings]);
 
   const handleAddEntry = async () => {
-    if (!form.amount) return;
-
-    const durationMin = Number.parseInt(form.durationMin, 10);
-    if (!Number.isFinite(durationMin) || durationMin <= 0) {
-      toast.error(
-        'Ajoute une durée active en minutes pour calculer le $/heure'
-      );
+    const validation = validateTaxiEntryForm(form);
+    if (!validation.ok) {
+      toast.error(validation.message);
       return;
     }
+
+    const { amount, km, durationMin } = validation.values;
 
     try {
       await addEarning.mutateAsync({
         date: form.date,
-        amount: parseFloat(form.amount) || 0,
-        km: parseFloat(form.km) || 0,
+        amount,
+        km,
         duration_min: durationMin,
         note: form.note,
       });

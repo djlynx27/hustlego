@@ -1,8 +1,8 @@
+import { describe, expect, it } from 'vitest';
 import {
   getTrackedSessionHours,
   sumTrackedSessionHours,
 } from '../../supabase/functions/generate-daily-report/reportMetrics';
-import { describe, expect, it } from 'vitest';
 
 describe('generate daily report tracked session hours', () => {
   it('keeps the derived duration when it exceeds the explicit session hours', () => {

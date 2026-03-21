@@ -29,5 +29,8 @@ export function getTrackedSessionHours(session: DailyReportSessionInput) {
 }
 
 export function sumTrackedSessionHours(sessions: DailyReportSessionInput[]) {
-  return sessions.reduce((sum, session) => sum + getTrackedSessionHours(session), 0);
+  return sessions.reduce(
+    (sum, session) => sum + getTrackedSessionHours(session),
+    0
+  );
 }
