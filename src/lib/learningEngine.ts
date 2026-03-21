@@ -149,17 +149,9 @@ export function deriveLearningInsights(
     if (hours <= 0) continue;
     const earningsPerHour = getTripRevenue(trip) / hours;
     const actualScore = normalizeScoreFromEarnings(earningsPerHour);
-    const predictedScore = clamp(
-      Math.round(
-        Number(
-          (trip as { zone_score?: number | null }).zone_score ??
-            trip.zones?.current_score ??
-            50
-        )
-      ),
-      0,
-      100
-    );
+    const predictedScoreSource =
+      (trip as { zone_score?: number | null }).zone_score ??
+      trip.zones?.current_score;
     const zoneId = trip.zone_id ?? 'unknown';
     const zoneName = trip.zones?.name ?? 'Zone inconnue';
     const dayOfWeek = startedAt.getDay();
@@ -197,16 +189,24 @@ export function deriveLearningInsights(
       observationCount: (previousBelief?.observationCount ?? 0) + 1,
     });
 
-    predictions.push({
-      tripId: trip.id,
-      zoneId,
-      zoneName,
-      predictedScore,
-      actualScore,
-      actualEarningsPerHour: round(earningsPerHour),
-      error: round(actualScore - predictedScore),
-      startedAt: trip.started_at,
-    });
+    if (predictedScoreSource !== null && predictedScoreSource !== undefined) {
+      const predictedScore = clamp(
+        Math.round(Number(predictedScoreSource)),
+        0,
+        100
+      );
+
+      predictions.push({
+        tripId: trip.id,
+        zoneId,
+        zoneName,
+        predictedScore,
+        actualScore,
+        actualEarningsPerHour: round(earningsPerHour),
+        error: round(actualScore - predictedScore),
+        startedAt: trip.started_at,
+      });
+    }
   }
 
   const meanAbsoluteError =

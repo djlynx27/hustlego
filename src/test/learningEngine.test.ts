@@ -104,4 +104,24 @@ describe('learning engine', () => {
       insights.predictions.find((prediction) => prediction.tripId === '4')
     ).toBeUndefined();
   });
+
+  it('skips predictions when no zone score baseline exists', () => {
+    const insights = deriveLearningInsights(
+      [
+        ...trips,
+        {
+          ...trips[0],
+          id: '5',
+          zone_score: null,
+          zones: { name: 'Centre Bell', current_score: null },
+        },
+      ],
+      DEFAULT_WEIGHTS
+    );
+
+    expect(
+      insights.predictions.find((prediction) => prediction.tripId === '5')
+    ).toBeUndefined();
+    expect(insights.emaPatterns.length).toBeGreaterThan(0);
+  });
 });
