@@ -82,4 +82,26 @@ describe('learning engine', () => {
     expect(summary.revenue).toBe(74);
     expect(summary.accuracyPercent).toBeGreaterThan(0);
   });
+
+  it('ignores incomplete trips in learning predictions', () => {
+    const insights = deriveLearningInsights(
+      [
+        ...trips,
+        {
+          ...trips[0],
+          id: '4',
+          started_at: '2026-03-18T10:00:00.000Z',
+          ended_at: null,
+          earnings: 90,
+          tips: 10,
+        },
+      ],
+      DEFAULT_WEIGHTS
+    );
+
+    expect(insights.predictions).toHaveLength(3);
+    expect(
+      insights.predictions.find((prediction) => prediction.tripId === '4')
+    ).toBeUndefined();
+  });
 });

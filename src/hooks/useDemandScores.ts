@@ -5,6 +5,7 @@ import {
   useEvents,
 } from '@/hooks/useEvents';
 import { useStmTransit } from '@/hooks/useStmTransit';
+import type { Zone } from '@/hooks/useSupabase';
 import { useZones } from '@/hooks/useSupabase';
 import {
   getRelevantTmEvents,
@@ -30,6 +31,7 @@ import {
   computeSurge,
   type SurgeResult,
 } from '@/lib/surgeEngine';
+import { getTripHours } from '@/lib/tripAnalytics';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
@@ -49,6 +51,49 @@ function logScoreCalculatorIssue(...args: unknown[]) {
   }
 }
 
+export function buildTripHistory(
+  tripLogs: TripWithZone[],
+  zones: Zone[]
+): ZoneHistory[] {
+  if (tripLogs.length === 0 || zones.length === 0) return [];
+
+  const zonesById = new Map(zones.map((zone) => [zone.id, zone]));
+
+  return tripLogs
+    .flatMap((trip) => {
+      if (!trip.zone_id || !trip.started_at) return [];
+
+      const zone = zonesById.get(trip.zone_id);
+      if (!zone) return [];
+
+      const startedAtMs = new Date(trip.started_at).getTime();
+      if (!Number.isFinite(startedAtMs)) return [];
+
+      const durationHours = getTripHours(trip);
+      if (durationHours <= 0) return [];
+
+      const avgHourly =
+        (Number(trip.earnings || 0) + Number(trip.tips || 0)) / durationHours;
+      const observedScore = Math.min(
+        100,
+        Math.max(0, Math.round((avgHourly / 60) * 100))
+      );
+      const expectedScore = Number(
+        trip.zone_score ?? (zone.current_score || 50)
+      );
+
+      return [
+        {
+          zoneId: zone.id,
+          observedScore,
+          expectedScore,
+          timestamp: trip.started_at,
+        },
+      ];
+    })
+    .filter((entry): entry is ZoneHistory => entry !== null);
+}
+
 /**
  * Hook that provides demand scores for all zones in a city.
  * Primary source: DB scores (calculated by edge function every 30min).
@@ -66,9 +111,12 @@ export function useDemandScores(cityId: string) {
   const { data: tripLogs = [] } = useQuery({
     queryKey: ['trip-history', cityId],
     queryFn: async (): Promise<TripWithZone[]> => {
+      if (!cityId) return [];
+
       const { data, error } = await supabase
         .from('trips')
-        .select('*, zones(*)')
+        .select('*, zones!inner(name, type, current_score, city_id)')
+        .eq('zones.city_id', cityId)
         .order('started_at', { ascending: false })
         .limit(200);
       if (error) throw error;
@@ -85,21 +133,34 @@ export function useDemandScores(cityId: string) {
 
   // Trigger Edge Function when DB scores are absent or older than 35 minutes.
   // The SQL cron refreshes every 30 min; the Edge Function adds weather + AI.
-  const refreshedRef = useRef(false);
+  const refreshedRef = useRef<Record<string, string>>({});
   useEffect(() => {
-    if (refreshedRef.current) return;
     if (!cityId) return;
+
+    const latestCalculatedAt = dbScores.reduce((latest, score) => {
+      const calculatedAt = new Date(score.calculated_at).getTime();
+      return Number.isFinite(calculatedAt) && calculatedAt > latest
+        ? calculatedAt
+        : latest;
+    }, 0);
+    const refreshKey = `${dbScores.length}:${latestCalculatedAt}`;
 
     const scoresAreStale =
       dbScores.length === 0 ||
       dbScores.some((s) => {
-        const ageMs = Date.now() - new Date(s.calculated_at).getTime();
+        const ageMs = now.getTime() - new Date(s.calculated_at).getTime();
         return ageMs > 35 * 60 * 1000;
       });
 
-    if (!scoresAreStale) return;
+    if (!scoresAreStale) {
+      delete refreshedRef.current[cityId];
+      return;
+    }
 
-    refreshedRef.current = true;
+    if (refreshedRef.current[cityId] === refreshKey) return;
+
+    const refreshCityId = cityId;
+    refreshedRef.current[cityId] = refreshKey;
     supabase.functions
       .invoke('score-calculator')
       .then(({ error }) => {
@@ -111,13 +172,15 @@ export function useDemandScores(cityId: string) {
           return;
         }
         // Invalidate zone-scores cache so the map re-renders with fresh data
-        queryClient.invalidateQueries({ queryKey: ['zone-scores', cityId] });
-        queryClient.invalidateQueries({ queryKey: ['zones', cityId] });
+        queryClient.invalidateQueries({
+          queryKey: ['zone-scores', refreshCityId],
+        });
+        queryClient.invalidateQueries({ queryKey: ['zones', refreshCityId] });
       })
       .catch((err) => {
         logScoreCalculatorIssue('score-calculator invocation failed:', err);
       });
-  }, [cityId, dbScores, queryClient]);
+  }, [cityId, dbScores, now, queryClient]);
 
   const weatherCondition: WeatherCondition | null = useMemo(() => {
     if (!weather) return null;
@@ -129,33 +192,7 @@ export function useDemandScores(cityId: string) {
   }, [weather]);
 
   const tripHistory: ZoneHistory[] = useMemo(() => {
-    if (!tripLogs || tripLogs.length === 0 || zones.length === 0) return [];
-    return tripLogs
-      .map((trip) => {
-        const zone = zones.find((z) => z.id === trip.zone_id);
-        if (!zone) return null;
-        const started = new Date(trip.started_at);
-        const avgHourly =
-          (Number(trip.earnings || 0) + Number(trip.tips || 0)) /
-          Math.max(
-            1,
-            (new Date(trip.ended_at).getTime() - started.getTime()) / 3600000
-          );
-        const observedScore = Math.min(
-          100,
-          Math.max(0, Math.round((avgHourly / 60) * 100))
-        );
-        const expectedScore = Number(
-          trip.zone_score ?? (zone.current_score || 50)
-        );
-        return {
-          zoneId: zone.id,
-          observedScore,
-          expectedScore,
-          timestamp: trip.started_at,
-        };
-      })
-      .filter((entry): entry is ZoneHistory => entry !== null);
+    return buildTripHistory(tripLogs, zones);
   }, [tripLogs, zones]);
 
   const activeEvents = useMemo(
@@ -409,7 +446,13 @@ export function useDemandScores(cityId: string) {
         now,
         currentScore,
         baselineScore: baselineScore > 0 ? baselineScore : 50,
-        weatherScore: weatherCondition?.demandBoostPoints ?? 0,
+        // demandBoostPoints is 0–30 (capped by calcWeatherBoost in useWeather);
+        // surgeEngine expects weatherScore on a 0–100 scale and only activates
+        // its weather boost when weatherScore > 50. Mapping 0–30 → 0–100 ensures
+        // blizzard (30) → 100 and heavy rain (25) → 83, crossing the threshold.
+        weatherScore: Math.round(
+          ((weatherCondition?.demandBoostPoints ?? 0) / 30) * 100
+        ),
         eventProximity: factors.get(zone.id)?.eventBoostPoints ?? 0,
         trafficIndex: trafficByZone.get(zone.id) ?? 0,
         deadheadKm: 5, // conservative default; TodayScreen overrides with GPS

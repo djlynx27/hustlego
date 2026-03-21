@@ -1,0 +1,85 @@
+import { buildTripHistory } from '@/hooks/useDemandScores';
+import type { Zone } from '@/hooks/useSupabase';
+import type { TripWithZone } from '@/hooks/useTrips';
+import { describe, expect, it } from 'vitest';
+
+const zones: Zone[] = [
+  {
+    id: 'zone-1',
+    city_id: 'city-1',
+    name: 'Centre Bell',
+    polygon: null,
+    created_at: '2026-03-20T00:00:00.000Z',
+    type: 'événements',
+    current_score: 64,
+    center_lat: null,
+    center_lng: null,
+    base_score: 52,
+    priority_rank: null,
+  },
+];
+
+const completeTrip: TripWithZone = {
+  id: 'trip-1',
+  created_at: '2026-03-20T00:00:00.000Z',
+  distance_km: 12,
+  earnings: 30,
+  ended_at: '2026-03-20T12:30:00.000Z',
+  experiment: false,
+  notes: null,
+  started_at: '2026-03-20T12:00:00.000Z',
+  tips: 6,
+  zone_id: 'zone-1',
+  zone_score: 58,
+  platform: 'lyft',
+  zones: {
+    name: 'Centre Bell',
+    type: 'événements',
+    current_score: 64,
+  },
+};
+
+describe('buildTripHistory', () => {
+  it('skips incomplete trips without ended_at', () => {
+    const history = buildTripHistory(
+      [
+        completeTrip,
+        {
+          ...completeTrip,
+          id: 'trip-2',
+          ended_at: null,
+          earnings: 48,
+          tips: 4,
+        },
+      ],
+      zones
+    );
+
+    expect(history).toHaveLength(1);
+    expect(history[0]).toMatchObject({
+      zoneId: 'zone-1',
+      expectedScore: 58,
+      observedScore: 100,
+    });
+  });
+
+  it('skips trips whose zone is not present in the active city', () => {
+    const history = buildTripHistory(
+      [
+        {
+          ...completeTrip,
+          id: 'trip-3',
+          zone_id: 'zone-other-city',
+          zones: {
+            name: 'Old Port',
+            type: 'tourisme',
+            current_score: 71,
+          },
+        },
+      ],
+      zones
+    );
+
+    expect(history).toEqual([]);
+  });
+});

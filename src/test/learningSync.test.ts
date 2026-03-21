@@ -157,4 +157,26 @@ describe('learning sync payloads', () => {
     expect(payload.predictions).toHaveLength(2);
     expect(payload.demandPatterns).toHaveLength(2);
   });
+
+  it('skips incomplete trips when building prediction payloads', () => {
+    const payload = buildShiftPersistencePayload(
+      [
+        ...trips,
+        {
+          ...trips[0],
+          id: '3',
+          ended_at: null,
+          earnings: 80,
+          tips: 20,
+        },
+      ],
+      '2026-03-15T00:00:00.000Z',
+      '2026-03-16T23:59:59.000Z',
+      DEFAULT_WEIGHTS
+    );
+
+    expect(payload.session.total_rides).toBe(3);
+    expect(payload.predictions).toHaveLength(2);
+    expect(payload.demandPatterns).toHaveLength(2);
+  });
 });

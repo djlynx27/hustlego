@@ -56,7 +56,7 @@ export function useUserLocation(intervalMs = 30000): UserLocationResult {
         setStatus('error');
         setError(err.message || 'Unable to get current location');
       },
-      { enableHighAccuracy: false, timeout: 10000 }
+      { enableHighAccuracy: true, timeout: 10000 }
     );
   }, []);
 

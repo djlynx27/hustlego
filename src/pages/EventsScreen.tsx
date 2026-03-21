@@ -3,9 +3,12 @@ import { Button } from '@/components/ui/button';
 import { useI18n } from '@/contexts/I18nContext';
 import { useCityId } from '@/hooks/useCityId';
 import { useEvents, type AppEvent } from '@/hooks/useEvents';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useCities } from '@/hooks/useSupabase';
 import { Calendar, Clock, Navigation, Star, Users } from 'lucide-react';
 import { useMemo } from 'react';
+// Pull-to-refresh (PWA Android/iOS)
+usePullToRefresh(() => window.location.reload());
 
 function formatDate(dateStr: string, locale: string): string {
   return new Date(dateStr).toLocaleDateString(locale, {

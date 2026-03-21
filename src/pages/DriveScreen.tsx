@@ -13,12 +13,15 @@ import { useActivityDetection } from '@/hooks/useActivityDetection';
 import { useCityId } from '@/hooks/useCityId';
 import { useDemandScores } from '@/hooks/useDemandScores';
 import { useHaptics } from '@/hooks/useHaptics';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useCities } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { getDemandClass } from '@/lib/demandUtils';
 import { getGoogleMapsNavUrl, getWazeNavUrl } from '@/lib/venueCoordinates';
 import { Car, Crosshair, Maximize2, Minimize2, Navigation } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+// Pull-to-refresh (PWA Android/iOS)
+usePullToRefresh(() => window.location.reload());
 
 interface WakeLockNavigator extends Navigator {
   wakeLock?: {
@@ -28,7 +31,30 @@ interface WakeLockNavigator extends Navigator {
 
 type WakeLockStatus = 'active' | 'inactive' | 'unsupported';
 
+// Driver mode and libre mode keys (shared with TodayScreen)
+const DRIVER_MODE_KEY = 'geohustle_driver_mode';
+
 export default function DriveScreen() {
+  // Driver mode (rideshare/delivery/all) — shared with TodayScreen
+  const [driverMode, setDriverModeState] = useState<
+    'rideshare' | 'delivery' | 'all'
+  >(() => {
+    try {
+      const saved = localStorage.getItem(DRIVER_MODE_KEY);
+      if (saved === 'rideshare' || saved === 'delivery' || saved === 'all')
+        return saved;
+    } catch {}
+    return 'all';
+  });
+  const setDriverMode = (mode: 'rideshare' | 'delivery' | 'all') => {
+    setDriverModeState(mode);
+    try {
+      localStorage.setItem(DRIVER_MODE_KEY, mode);
+    } catch {}
+  };
+
+  // "Je suis libre" mode — shared with TodayScreen
+  const [libreMode, setLibreMode] = useState(false);
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
   const { data: cities = [] } = useCities();
@@ -128,14 +154,51 @@ export default function DriveScreen() {
             label: t('screenInactive'),
           };
 
+  // Mode filter logic (mirrors TodayScreen)
+  const RIDESHARE_BOOST: Record<string, number> = {
+    aéroport: 1.2,
+    université: 1.15,
+    transport: 1.1,
+    commercial: 1.05,
+    médical: 1.05,
+    métro: 1.05,
+    résidentiel: 0.75,
+  };
+  const DELIVERY_BOOST: Record<string, number> = {
+    commercial: 1.3,
+    résidentiel: 1.2,
+    métro: 0.95,
+    transport: 0.85,
+    université: 0.8,
+    médical: 0.75,
+    tourisme: 0.75,
+    nightlife: 0.7,
+    événements: 0.7,
+    aéroport: 0.65,
+  };
+
+  // Ranked zones by score descending
   const rankedZones = useMemo(() => {
     return zones
       .map((z) => ({ ...z, score: scores.get(z.id) ?? 0 }))
       .sort((a, b) => b.score - a.score);
   }, [zones, scores]);
 
-  const heroZone = rankedZones[0] ?? null;
-  const nextZones = rankedZones.slice(1, 6);
+  // Reweight scores based on driver objective
+  const modeZones = useMemo(() => {
+    if (driverMode === 'all') return rankedZones;
+    const boostMap =
+      driverMode === 'rideshare' ? RIDESHARE_BOOST : DELIVERY_BOOST;
+    return [...rankedZones]
+      .map((z) => ({
+        ...z,
+        score: Math.min(Math.round(z.score * (boostMap[z.type] ?? 1.0)), 100),
+      }))
+      .sort((a, b) => b.score - a.score);
+  }, [rankedZones, driverMode]);
+
+  const heroZone = modeZones[0] ?? null;
+  const nextZones = modeZones.slice(1, 6);
 
   const getDistance = (
     zone: { latitude: number; longitude: number } | null
@@ -166,7 +229,68 @@ export default function DriveScreen() {
       : '';
 
   return (
-    <div className="flex flex-col h-full pb-36 bg-background text-foreground overflow-y-auto">
+    <div
+      className="flex flex-col h-full pb-36 bg-background text-foreground overflow-y-auto"
+      data-mode={driverMode}
+    >
+      {/* Mode filter tabs — colour-coded per compass doc (blue=rideshare, amber=delivery) */}
+      <div className="px-4 mt-2">
+        <div className="flex rounded-xl border border-border bg-muted/30 p-1 gap-1">
+          {(
+            [
+              {
+                key: 'all',
+                label: '🌐 Les deux',
+                activeClass: 'bg-primary text-primary-foreground',
+              },
+              {
+                key: 'rideshare',
+                label: '🚗 Personnes',
+                activeClass: 'bg-rideshare text-white',
+              },
+              {
+                key: 'delivery',
+                label: '📦 Livraison',
+                activeClass: 'bg-delivery text-white',
+              },
+            ] as const
+          ).map(({ key, label, activeClass }) => (
+            <button
+              key={key}
+              onClick={() => {
+                setDriverMode(key);
+                vibrate('navigation');
+              }}
+              className={`flex-1 text-[13px] font-display font-semibold py-2 rounded-lg transition-colors ${
+                driverMode === key
+                  ? `${activeClass} shadow-sm`
+                  : 'text-muted-foreground hover:text-foreground'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Je suis libre toggle */}
+      <div className="px-4 mt-2">
+        <button
+          onClick={() => setLibreMode((l) => !l)}
+          className={`w-full h-11 rounded-xl text-[14px] font-display font-bold border transition-colors flex items-center justify-center gap-2 ${
+            libreMode
+              ? 'bg-primary text-primary-foreground border-primary'
+              : 'bg-card border-border text-muted-foreground hover:text-foreground'
+          }`}
+        >
+          <span className="inline-block">
+            <Car className="w-4 h-4" />
+          </span>
+          {libreMode
+            ? '🟢 Mode libre – Où aller ?'
+            : '🕐 Je suis libre (sans client)'}
+        </button>
+      </div>
       {/* ── NHTSA Driving HUD overlay ── */}
       {hudActive && (
         <DrivingHUD

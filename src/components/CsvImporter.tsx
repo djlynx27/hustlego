@@ -10,11 +10,14 @@ import {
 import { Progress } from '@/components/ui/progress';
 import { useZones, type Zone } from '@/hooks/useSupabase';
 import { supabase } from '@/integrations/supabase/client';
+import { parseCsvRecords } from '@/lib/csv';
+import { useQueryClient } from '@tanstack/react-query';
 import { CheckCircle2, FileSpreadsheet, Loader2, Upload } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
 interface ParsedTrip {
+  source_row: number;
   date: string;
   start_time: string;
   end_time: string;
@@ -73,31 +76,6 @@ function guessZoneByTime(
   return null;
 }
 
-function parseCSV(text: string): Record<string, string>[] {
-  const lines = text.trim().split(/\r?\n/);
-  if (lines.length < 2) return [];
-
-  // Normalize headers
-  const headers = lines[0].split(',').map((h) =>
-    h
-      .trim()
-      .toLowerCase()
-      .replace(/[^a-z0-9_]/g, '_')
-  );
-  const rows: Record<string, string>[] = [];
-
-  for (let i = 1; i < lines.length; i++) {
-    const vals = lines[i].split(',').map((v) => v.trim().replace(/^"|"$/g, ''));
-    if (vals.length < 2) continue;
-    const row: Record<string, string> = {};
-    headers.forEach((h, idx) => {
-      row[h] = vals[idx] || '';
-    });
-    rows.push(row);
-  }
-  return rows;
-}
-
 function findColumn(row: Record<string, string>, candidates: string[]): string {
   for (const c of candidates) {
     const key = Object.keys(row).find((k) => k.includes(c));
@@ -115,7 +93,51 @@ function parseMilesToKm(val: string): number {
   return Math.round(miles * 1.60934 * 10) / 10;
 }
 
+function normalizeTimeString(value: string): string {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+
+  const match = trimmed.match(
+    /^(\d{1,2})(?::(\d{2}))?(?::(\d{2}))?\s*(am|pm)?$/i
+  );
+  if (!match) return '';
+
+  let hour = Number.parseInt(match[1], 10);
+  const minute = Number.parseInt(match[2] ?? '0', 10);
+  const second = Number.parseInt(match[3] ?? '0', 10);
+  const meridiem = match[4]?.toLowerCase();
+
+  if (
+    Number.isNaN(hour) ||
+    Number.isNaN(minute) ||
+    Number.isNaN(second) ||
+    minute > 59 ||
+    second > 59
+  ) {
+    return '';
+  }
+
+  if (meridiem) {
+    if (hour < 1 || hour > 12) return '';
+    if (meridiem === 'pm' && hour < 12) hour += 12;
+    if (meridiem === 'am' && hour === 12) hour = 0;
+  } else if (hour > 23) {
+    return '';
+  }
+
+  return [hour, minute, second]
+    .map((part) => String(part).padStart(2, '0'))
+    .join(':');
+}
+
+function formatRowList(rows: number[], limit = 6): string {
+  if (rows.length === 0) return '';
+  const visibleRows = rows.slice(0, limit).join(', ');
+  return rows.length > limit ? `${visibleRows}, ...` : visibleRows;
+}
+
 export function CsvImporter() {
+  const queryClient = useQueryClient();
   const { data: mtlZones = [] } = useZones('mtl');
   const { data: lavalZones = [] } = useZones('laval');
   const { data: longueuilZones = [] } = useZones('longueuil');
@@ -141,21 +163,27 @@ export function CsvImporter() {
       const reader = new FileReader();
       reader.onload = () => {
         const text = reader.result as string;
-        const rows = parseCSV(text);
+        const rows = parseCsvRecords(text);
         if (rows.length === 0) {
           toast.error('Fichier CSV vide ou invalide');
           return;
         }
 
-        const trips: ParsedTrip[] = rows.map((row) => {
+        const trips: ParsedTrip[] = rows.map((row, index) => {
           const dateStr = findColumn(row, ['date', 'trip_date', 'day']);
-          const startTime = findColumn(row, [
+          const rawStartTime = findColumn(row, [
             'start',
             'time',
             'pickup_time',
             'start_time',
           ]);
-          const endTime = findColumn(row, ['end', 'dropoff_time', 'end_time']);
+          const rawEndTime = findColumn(row, [
+            'end',
+            'dropoff_time',
+            'end_time',
+          ]);
+          const startTime = normalizeTimeString(rawStartTime);
+          const endTime = normalizeTimeString(rawEndTime);
           const earnings = parseEarnings(
             findColumn(row, ['earnings', 'total', 'fare', 'amount', 'pay'])
           );
@@ -171,13 +199,8 @@ export function CsvImporter() {
           let dayOfWeek = 3;
           try {
             if (startTime) {
-              const timeParts = startTime.match(/(\d{1,2}):(\d{2})/);
-              if (timeParts) hour = parseInt(timeParts[1]);
-              const isPM = startTime.toLowerCase().includes('pm') && hour < 12;
-              const isAM12 =
-                startTime.toLowerCase().includes('am') && hour === 12;
-              if (isPM) hour += 12;
-              if (isAM12) hour = 0;
+              const timeParts = startTime.match(/(\d{2}):(\d{2})/);
+              if (timeParts) hour = Number.parseInt(timeParts[1], 10);
             }
             if (dateStr) {
               const d = new Date(dateStr);
@@ -190,6 +213,7 @@ export function CsvImporter() {
           const zone = guessZoneByTime(hour, dayOfWeek, allZones);
 
           return {
+            source_row: index + 2,
             date: dateStr,
             start_time: startTime,
             end_time: endTime,
@@ -216,26 +240,83 @@ export function CsvImporter() {
     setImporting(true);
     setProgress(0);
     let success = 0;
+    let failed = 0;
+    let firstErrorMessage = '';
+    const failedRows: number[] = [];
+
+    const skippedMissingZoneRows = parsed
+      .filter((trip) => !trip.zone_id)
+      .map((trip) => trip.source_row);
+    const skippedMissingDateRows = parsed
+      .filter((trip) => !trip.date)
+      .map((trip) => trip.source_row);
+    const skippedMissingEndTimeRows = parsed
+      .filter((trip) => !trip.end_time)
+      .map((trip) => trip.source_row);
+
+    const skippedRows = new Set<number>([
+      ...skippedMissingZoneRows,
+      ...skippedMissingDateRows,
+      ...skippedMissingEndTimeRows,
+    ]);
+
+    const skippedReasons = [
+      skippedMissingZoneRows.length > 0
+        ? `sans zone auto (${formatRowList(skippedMissingZoneRows)})`
+        : null,
+      skippedMissingDateRows.length > 0
+        ? `sans date (${formatRowList(skippedMissingDateRows)})`
+        : null,
+      skippedMissingEndTimeRows.length > 0
+        ? `sans heure de fin (${formatRowList(skippedMissingEndTimeRows)})`
+        : null,
+    ].filter((reason): reason is string => reason !== null);
 
     const batch = parsed
-      .filter((t) => t.zone_id)
+      .filter(
+        (trip) =>
+          trip.zone_id &&
+          trip.date &&
+          trip.end_time &&
+          !skippedRows.has(trip.source_row)
+      )
       .map((t) => ({
-        zone_id: t.zone_id!,
-        started_at: `${t.date}T${t.start_time || '12:00'}`,
-        ended_at: t.end_time ? `${t.date}T${t.end_time}` : null,
-        earnings: t.earnings,
-        tips: t.tips,
-        distance_km: t.distance_km,
-        notes: `Import CSV ${t.platform}`,
+        sourceRow: t.source_row,
+        trip: {
+          zone_id: t.zone_id!,
+          started_at: `${t.date}T${t.start_time || '12:00:00'}`,
+          ended_at: `${t.date}T${t.end_time}`,
+          earnings: t.earnings,
+          tips: t.tips,
+          distance_km: t.distance_km,
+          notes: `Import CSV ${t.platform}`,
+        },
       }));
+
+    if (batch.length === 0) {
+      setImporting(false);
+      toast.error(
+        skippedReasons.length > 0
+          ? `Aucune course importable: ${skippedReasons.join(' ; ')}`
+          : 'Aucune course importable dans ce fichier'
+      );
+      return;
+    }
 
     // Insert in chunks of 20
     const chunkSize = 20;
     for (let i = 0; i < batch.length; i += chunkSize) {
       const chunk = batch.slice(i, i + chunkSize);
-      const { error } = await supabase.from('trips').insert(chunk);
+      const { error } = await supabase
+        .from('trips')
+        .insert(chunk.map((entry) => entry.trip));
       if (error) {
         console.error('Import error:', error);
+        failed += chunk.length;
+        failedRows.push(...chunk.map((entry) => entry.sourceRow));
+        if (!firstErrorMessage) {
+          firstErrorMessage = error.message;
+        }
       } else {
         success += chunk.length;
       }
@@ -244,7 +325,34 @@ export function CsvImporter() {
 
     setImported(success);
     setImporting(false);
-    toast.success(`${success} courses importées sur ${batch.length}`);
+    if (success > 0) {
+      queryClient.invalidateQueries({ queryKey: ['trips-feed'] });
+      queryClient.invalidateQueries({ queryKey: ['recent-trips'] });
+    }
+
+    const skippedCount = skippedRows.size;
+    const skippedSuffix =
+      skippedCount > 0
+        ? `; ${skippedCount} ignorée${skippedCount > 1 ? 's' : ''}${skippedReasons.length > 0 ? ` (${skippedReasons.join(' ; ')})` : ''}`
+        : '';
+
+    if (failed === 0) {
+      toast.success(
+        `${success} courses importées sur ${batch.length}${skippedSuffix}`
+      );
+      return;
+    }
+
+    if (success > 0) {
+      toast.warning(
+        `${success} courses importées, ${failed} ont échoué${failedRows.length > 0 ? ` (lignes ${formatRowList(failedRows)})` : ''}${firstErrorMessage ? ` (${firstErrorMessage})` : ''}${skippedSuffix}`
+      );
+      return;
+    }
+
+    toast.error(
+      `Import échoué pour ${failed} courses${failedRows.length > 0 ? ` (lignes ${formatRowList(failedRows)})` : ''}${firstErrorMessage ? ` (${firstErrorMessage})` : ''}${skippedSuffix}`
+    );
   }
 
   return (

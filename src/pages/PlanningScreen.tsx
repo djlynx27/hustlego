@@ -13,6 +13,7 @@ import {
 import { useI18n } from '@/contexts/I18nContext';
 import { useAutoCity } from '@/hooks/useAutoCity';
 import { useCityId } from '@/hooks/useCityId';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { useCities, useZones } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
 import { useWeather } from '@/hooks/useWeather';
@@ -32,6 +33,8 @@ import {
   useState,
   type FormEvent,
 } from 'react';
+// Pull-to-refresh (PWA Android/iOS)
+usePullToRefresh(() => window.location.reload());
 
 const TIME_LABELS = generate96TimeLabels();
 

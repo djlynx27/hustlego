@@ -149,11 +149,20 @@ serve(async (req: Request) => {
       const hour = now.getHours();
       const dow = now.getDay();
 
-      const { data: baselineData } = await supabase.rpc('get_surge_baseline', {
-        p_zone_id: zone.id,
-        p_hour: hour,
-        p_dow: dow,
-      });
+      const { data: baselineData, error: baselineError } = await supabase.rpc(
+        'get_surge_baseline',
+        {
+          p_zone_id: zone.id,
+          p_hour: hour,
+          p_dow: dow,
+        }
+      );
+
+      if (baselineError) {
+        throw new Error(
+          `Surge baseline lookup failed for zone ${zone.id}: ${baselineError.message}`
+        );
+      }
 
       const baselineScore: number =
         (baselineData as BaselineRow[] | null)?.[0]?.baseline_score ??
@@ -176,13 +185,21 @@ serve(async (req: Request) => {
         );
         const vectorStr = `[${contextVector.map((v) => v.toFixed(6)).join(',')}]`;
 
-        await supabase.from('zone_context_vectors').insert({
-          zone_id: zone.id,
-          context_vector: vectorStr,
-          surge_multiplier: surgeMultiplier,
-          surge_class: surgeClass,
-          captured_at: now.toISOString(),
-        });
+        const { error: contextInsertError } = await supabase
+          .from('zone_context_vectors')
+          .insert({
+            zone_id: zone.id,
+            context_vector: vectorStr,
+            surge_multiplier: surgeMultiplier,
+            surge_class: surgeClass,
+            captured_at: now.toISOString(),
+          });
+
+        if (contextInsertError) {
+          throw new Error(
+            `Surge context insert failed for zone ${zone.id}: ${contextInsertError.message}`
+          );
+        }
       }
 
       if (surgeClass === 'peak') {
@@ -204,28 +221,45 @@ serve(async (req: Request) => {
           ? `🔴 Surge PEAK dans ${peakZones[0]} — demande maximale maintenant!`
           : `🔴 Surge PEAK dans ${peakZones.length} zones (${peakZones.slice(0, 2).join(', ')}…)`;
 
-      await supabase.from('notifications').insert({
-        type: 'surge_peak',
-        title: 'Surge Peak Détecté',
-        message,
-        metadata: { zones: peakZones, detected_at: now.toISOString() },
-        created_at: now.toISOString(),
-      });
-
-      await fetch(`${supabaseUrl}/functions/v1/push-notifier`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${serviceKey}`,
-          apikey: serviceKey,
-        },
-        body: JSON.stringify({
+      const { error: notificationInsertError } = await supabase
+        .from('notifications')
+        .insert({
+          type: 'surge_peak',
           title: 'Surge Peak Détecté',
-          body: message,
-          url: '/',
-          tag: 'surge-peak',
-        }),
-      });
+          message,
+          metadata: { zones: peakZones, detected_at: now.toISOString() },
+          created_at: now.toISOString(),
+        });
+
+      if (notificationInsertError) {
+        throw new Error(
+          `Peak notification insert failed: ${notificationInsertError.message}`
+        );
+      }
+
+      const pushResponse = await fetch(
+        `${supabaseUrl}/functions/v1/push-notifier`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${serviceKey}`,
+            apikey: serviceKey,
+          },
+          body: JSON.stringify({
+            title: 'Surge Peak Détecté',
+            body: message,
+            url: '/',
+            tag: 'surge-peak',
+          }),
+        }
+      );
+
+      if (!pushResponse.ok) {
+        throw new Error(
+          `Push notifier failed with status ${pushResponse.status}`
+        );
+      }
     }
 
     return new Response(

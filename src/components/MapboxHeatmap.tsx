@@ -36,6 +36,10 @@ interface MapboxHeatmapProps {
   onZoneClick?: (zone: HeatmapZone) => void;
   className?: string;
   driverMode?: 'rideshare' | 'delivery' | 'all';
+  driverPosition?: {
+    latitude: number;
+    longitude: number;
+  } | null;
 }
 
 class MapErrorBoundary extends Component<
@@ -100,6 +104,7 @@ export function MapboxHeatmap({
   onZoneClick,
   className = '',
   driverMode = 'all',
+  driverPosition = null,
 }: MapboxHeatmapProps) {
   const { t } = useI18n();
   const mapRef = useRef<MapRef>(null);
@@ -125,13 +130,20 @@ export function MapboxHeatmap({
     }
   }, []);
 
+  useEffect(() => {
+    if (!driverPosition) return;
+    setLocationError(null);
+    applyPos(driverPosition.latitude, driverPosition.longitude);
+  }, [applyPos, driverPosition]);
+
   // GPS: immediate fix via getCurrentPosition + continuous via watchPosition
   useEffect(() => {
+    if (driverPosition) return;
     if (!navigator.geolocation) return;
     navigator.geolocation.getCurrentPosition(
       (pos) => applyPos(pos.coords.latitude, pos.coords.longitude),
       () => {},
-      { enableHighAccuracy: false, timeout: 6000, maximumAge: 30000 }
+      { enableHighAccuracy: true, timeout: 6000, maximumAge: 30000 }
     );
     const watchId = navigator.geolocation.watchPosition(
       (pos) => applyPos(pos.coords.latitude, pos.coords.longitude),
@@ -139,10 +151,10 @@ export function MapboxHeatmap({
         logMapGeolocationIssue('Geolocation watch error:', error.message);
         setLocationError(error.message);
       },
-      { enableHighAccuracy: false, timeout: 10000, maximumAge: 10000 }
+      { enableHighAccuracy: true, timeout: 10000, maximumAge: 10000 }
     );
     return () => navigator.geolocation.clearWatch(watchId);
-  }, [applyPos]);
+  }, [applyPos, driverPosition]);
 
   // Fly to center on change
   const onLoad = useCallback(() => {

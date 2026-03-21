@@ -16,6 +16,10 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import {
+  type FeedbackContext,
+  usePostTripFeedback,
+} from '@/hooks/usePostTripFeedback';
 import { useZones } from '@/hooks/useSupabase';
 import type { TripWithZone } from '@/hooks/useTrips';
 import { supabase } from '@/integrations/supabase/client';
@@ -30,6 +34,10 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
+
+function scoreToPredictedEarningsPerHour(score: number): number {
+  return Math.max(12, 12 + score * 0.42);
+}
 
 function useRecentTrips() {
   return useQuery<TripWithZone[]>({
@@ -48,25 +56,41 @@ function useRecentTrips() {
 
 function useAddTrip() {
   const qc = useQueryClient();
+  const { submitFeedback } = usePostTripFeedback();
+
   return useMutation({
-    mutationFn: async (trip: {
-      zone_id: string;
-      started_at: string;
-      ended_at: string;
-      earnings: number;
-      tips: number;
-      distance_km: number;
-      notes: string;
-      platform: string | null;
-      experiment?: boolean;
-      zone_score?: number | null;
+    mutationFn: async ({
+      trip,
+      feedback,
+    }: {
+      trip: {
+        zone_id: string;
+        started_at: string;
+        ended_at: string;
+        earnings: number;
+        tips: number;
+        distance_km: number;
+        notes: string;
+        platform: string | null;
+        experiment?: boolean;
+        zone_score?: number | null;
+      };
+      feedback: FeedbackContext;
     }) => {
-      const { error } = await supabase.from('trips').insert(trip);
+      const { data, error } = await supabase
+        .from('trips')
+        .insert(trip)
+        .select('*, zones(name, type, current_score)')
+        .single();
       if (error) throw error;
-      return trip.zone_id;
+
+      const insertedTrip = data as TripWithZone;
+      await submitFeedback(insertedTrip, feedback);
+      return insertedTrip.zone_id;
     },
     onSuccess: async (zoneId) => {
       qc.invalidateQueries({ queryKey: ['recent-trips'] });
+      qc.invalidateQueries({ queryKey: ['trips-feed'] });
       toast.success('Course enregistrée');
 
       // Trigger partial AI rescore for this zone only
@@ -116,17 +140,27 @@ export function TripLogger() {
       toast.error('Zone, date et montant requis');
       return;
     }
+
+    const selectedZone = allZones.find((zone) => zone.id === form.zone_id);
+    const zoneScore = Math.round(Number(selectedZone?.current_score ?? 50));
     const started_at = `${form.date}T${form.start_time}:00`;
     const ended_at = `${form.date}T${form.end_time}:00`;
     await addTrip.mutateAsync({
-      zone_id: form.zone_id,
-      started_at,
-      ended_at,
-      earnings: parseFloat(form.earnings) || 0,
-      tips: parseFloat(form.tips) || 0,
-      distance_km: parseFloat(form.distance_km) || 0,
-      notes: form.notes.trim().slice(0, 500),
-      platform: form.platform || null,
+      trip: {
+        zone_id: form.zone_id,
+        started_at,
+        ended_at,
+        earnings: parseFloat(form.earnings) || 0,
+        tips: parseFloat(form.tips) || 0,
+        distance_km: parseFloat(form.distance_km) || 0,
+        notes: form.notes.trim().slice(0, 500),
+        platform: form.platform || null,
+        zone_score: zoneScore,
+      },
+      feedback: {
+        zoneScore,
+        predictedEarningsPerH: scoreToPredictedEarningsPerHour(zoneScore),
+      },
     });
     setForm((f) => ({
       ...f,

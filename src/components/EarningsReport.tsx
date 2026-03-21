@@ -150,6 +150,7 @@ export function EarningsReport({ className }: EarningsReportProps) {
   // Fetch current ML weights from weight-calibrator Edge Function
   useEffect(() => {
     const ctrl = new AbortController();
+    const timeoutId = window.setTimeout(() => ctrl.abort(), 8000);
 
     async function fetchWeights() {
       try {
@@ -170,11 +171,16 @@ export function EarningsReport({ className }: EarningsReportProps) {
         }
       } catch {
         // Not critical — display without weights
+      } finally {
+        window.clearTimeout(timeoutId);
       }
     }
 
     void fetchWeights();
-    return () => ctrl.abort();
+    return () => {
+      window.clearTimeout(timeoutId);
+      ctrl.abort();
+    };
   }, []);
 
   const analytics = useMemo(() => aggregateTripAnalytics(trips), [trips]);

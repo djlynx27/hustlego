@@ -63,7 +63,8 @@ export function usePostTripFeedback() {
     ): Promise<FeedbackResult | null> => {
       if (!trip.id || !trip.zone_id) return null;
 
-      const hours = Math.max(getTripHours(trip), 1 / 60); // at least 1 min
+      const hours = getTripHours(trip);
+      if (hours <= 0) return null;
       const revenue = getTripRevenue(trip);
       const actualEarningsPerH = revenue / hours;
       const error = actualEarningsPerH - ctx.predictedEarningsPerH;
@@ -76,19 +77,27 @@ export function usePostTripFeedback() {
       setIsSubmitting(true);
       try {
         // ── 1. Write to trip_predictions ────────────────────────────────────
-        await anySupabase.from('trip_predictions').insert({
-          trip_id: trip.id,
-          zone_id: trip.zone_id,
-          zone_score_at_start: ctx.zoneScore,
-          predicted_earnings_per_h: ctx.predictedEarningsPerH,
-          actual_earnings_per_h: actualEarningsPerH,
-          error: Math.round(error * 1000) / 1000,
-          abs_error: Math.round(absError * 1000) / 1000,
-          context_vector_id: ctx.contextVectorId ?? null,
-          shift_date: startedAt.toISOString().split('T')[0],
-          hour_of_day: startedAt.getHours(),
-          day_of_week: startedAt.getDay(),
-        });
+        const { error: predictionInsertError } = await anySupabase
+          .from('trip_predictions')
+          .insert({
+            trip_id: trip.id,
+            zone_id: trip.zone_id,
+            zone_score_at_start: ctx.zoneScore,
+            predicted_earnings_per_h: ctx.predictedEarningsPerH,
+            actual_earnings_per_h: actualEarningsPerH,
+            error: Math.round(error * 1000) / 1000,
+            abs_error: Math.round(absError * 1000) / 1000,
+            context_vector_id: ctx.contextVectorId ?? null,
+            shift_date: startedAt.toISOString().split('T')[0],
+            hour_of_day: startedAt.getHours(),
+            day_of_week: startedAt.getDay(),
+          });
+
+        if (predictionInsertError) {
+          throw new Error(
+            `trip_predictions insert failed: ${predictionInsertError.message}`
+          );
+        }
 
         // ── 2. Update context_embeddings outcome (fire-and-forget) ──────────
         if (ctx.contextVectorId) {
@@ -150,14 +159,25 @@ export async function backfillTripPredictions(
   // Check which ones already have predictions
   type ExistingRow = { trip_id: string };
   const anySc = supabaseClient as unknown as AnyFrom;
-  const existingResult = await new Promise<ExistingRow[]>((resolve) => {
-    anySc
-      .from('trip_predictions')
-      .select('trip_id')
-      .then((result) => {
-        resolve((result.data ?? []) as ExistingRow[]);
-      });
-  });
+  let existingResult: ExistingRow[];
+
+  try {
+    existingResult = await new Promise<ExistingRow[]>((resolve, reject) => {
+      anySc
+        .from('trip_predictions')
+        .select('trip_id')
+        .then((result) => {
+          if (result.error) {
+            reject(result.error);
+            return;
+          }
+
+          resolve((result.data ?? []) as ExistingRow[]);
+        });
+    });
+  } catch {
+    return { inserted: 0, skipped: 0 };
+  }
 
   const existingIds = new Set(existingResult.map((r) => r.trip_id));
 
@@ -168,10 +188,8 @@ export async function backfillTripPredictions(
     const startedAt = trip.started_at ? new Date(trip.started_at) : null;
     if (!startedAt) continue;
 
-    const endedAt = trip.ended_at ? new Date(trip.ended_at) : null;
-    const hours = endedAt
-      ? Math.max((endedAt.getTime() - startedAt.getTime()) / 3_600_000, 1 / 60)
-      : 1;
+    const hours = getTripHours(trip);
+    if (hours <= 0) continue;
     const revenue = Number(trip.earnings ?? 0) + Number(trip.tips ?? 0);
     const actualEarningsPerH = revenue / hours;
     const error = actualEarningsPerH - defaultPredictedEarningsPerH;

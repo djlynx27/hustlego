@@ -1,6 +1,15 @@
 name: Build Android APK (TWA)
 
 on:
+  workflow_call:
+    secrets:
+      ANDROID_KEYSTORE_BASE64:
+        required: false
+      ANDROID_KEYSTORE_PASSWORD:
+        required: false
+      ANDROID_KEY_ALIAS_PASSWORD:
+        required: false
+
   # Déclenché manuellement depuis l'onglet Actions de GitHub
   workflow_dispatch:
     inputs:
@@ -46,7 +55,7 @@ jobs:
       # Restaurer le keystore depuis le secret base64
       - name: Restore keystore
         run: |
-          echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 -d > android.keystore
+          echo "${{ secrets['ANDROID_KEYSTORE_BASE64'] }}" | base64 -d > android.keystore
           echo "Keystore restored ($(wc -c < android.keystore) bytes)"
 
       # Optionnel : patcher la version dans twa-manifest.json
@@ -77,8 +86,8 @@ jobs:
             --skipPwaValidation \
             --keystorePath android.keystore \
             --keystoreKeyAlias hustlego \
-            --keystorePassword "${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" \
-            --keyPassword "${{ secrets.ANDROID_KEY_ALIAS_PASSWORD }}"
+            --keystorePassword "${{ secrets['ANDROID_KEYSTORE_PASSWORD'] }}" \
+            --keyPassword "${{ secrets['ANDROID_KEY_ALIAS_PASSWORD'] }}"
 
       # Upload APK comme artifact GitHub
       - name: Upload APK artifact

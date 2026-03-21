@@ -2,6 +2,7 @@ import type { TripWithZone } from '@/hooks/useTrips';
 import {
   aggregateTripAnalytics,
   buildShiftSnapshot,
+  getTripHours,
   summarizeTrips,
 } from '@/lib/tripAnalytics';
 import { describe, expect, it } from 'vitest';
@@ -86,5 +87,28 @@ describe('trip analytics', () => {
     expect(snapshot.metrics.rides).toBe(2);
     expect(snapshot.metrics.revenue).toBe(45);
     expect(snapshot.topZone).toBe('Plateau');
+  });
+
+  it('does not treat missing ended_at as an hours-long active trip', () => {
+    const incompleteTrip: TripWithZone = {
+      ...trips[0],
+      id: '4',
+      started_at: '2026-03-16T10:00:00.000Z',
+      ended_at: null,
+      earnings: 40,
+      tips: 5,
+    };
+
+    expect(getTripHours(incompleteTrip)).toBe(0);
+
+    const summary = summarizeTrips(
+      [incompleteTrip],
+      new Date('2026-03-16T00:00:00.000Z'),
+      new Date('2026-03-20T00:00:00.000Z')
+    );
+
+    expect(summary.rides).toBe(1);
+    expect(summary.hours).toBe(0);
+    expect(summary.revenuePerHour).toBe(0);
   });
 });

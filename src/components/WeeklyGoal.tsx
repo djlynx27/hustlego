@@ -2,9 +2,31 @@ import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
 import { useQuery } from '@tanstack/react-query';
 import { Target } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 const LS_KEY = 'geohustle_weekly_goal';
+const WEEKLY_GOAL_EVENT = 'geohustle:weekly-goal-updated';
+
+function parseWeeklyGoal(value: string | null): number {
+  const parsed = Number(value?.trim() ?? '');
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
+function readWeeklyGoal(): number {
+  return parseWeeklyGoal(localStorage.getItem(LS_KEY));
+}
+
+function writeWeeklyGoal(value: string) {
+  const parsedGoal = parseWeeklyGoal(value);
+
+  if (parsedGoal > 0) {
+    localStorage.setItem(LS_KEY, String(parsedGoal));
+  } else {
+    localStorage.removeItem(LS_KEY);
+  }
+
+  window.dispatchEvent(new CustomEvent(WEEKLY_GOAL_EVENT));
+}
 
 function getWeekRange() {
   const now = new Date();
@@ -43,12 +65,29 @@ function useWeekTripsEarnings() {
 }
 
 export function WeeklyGoalDisplay() {
-  const [goal] = useState(() => {
-    const saved = localStorage.getItem(LS_KEY);
-    return saved ? Number(saved) : 0;
-  });
+  const [goal, setGoal] = useState(() => readWeeklyGoal());
   const { data: weekEarnings = 0 } = useWeekTripsEarnings();
   const { dayOfWeek } = getWeekRange();
+
+  useEffect(() => {
+    const syncGoal = () => {
+      setGoal(readWeeklyGoal());
+    };
+
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === LS_KEY) {
+        syncGoal();
+      }
+    };
+
+    window.addEventListener(WEEKLY_GOAL_EVENT, syncGoal);
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      window.removeEventListener(WEEKLY_GOAL_EVENT, syncGoal);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
 
   if (goal <= 0) return null;
 
@@ -90,13 +129,13 @@ export function WeeklyGoalDisplay() {
 
 export function WeeklyGoalSetting() {
   const [goal, setGoal] = useState(() => {
-    const saved = localStorage.getItem(LS_KEY);
-    return saved || '';
+    const saved = readWeeklyGoal();
+    return saved > 0 ? String(saved) : '';
   });
 
   function save(val: string) {
     setGoal(val);
-    localStorage.setItem(LS_KEY, val);
+    writeWeeklyGoal(val);
   }
 
   return (

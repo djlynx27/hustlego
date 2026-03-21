@@ -227,7 +227,18 @@ function timeInRange(hour: number, min: number, rule: TimeRule): boolean {
 
 function dayMatches(dayOfWeek: number, rule: TimeRule): boolean {
   if (rule.days.length === 0) return true;
-  return rule.days.includes(dayOfWeek);
+  if (rule.days.includes(dayOfWeek)) return true;
+  // Midnight-crossing rules (e.g. Fri/Sat 22:00–03:00) logically belong to the
+  // night that started on the earlier day. When it is 01:00 Sunday the rule's
+  // "days" should still match Saturday (6). Check whether the previous calendar
+  // day satisfies the rule whenever the time window wraps past midnight.
+  const s = rule.startHour * 60 + rule.startMin;
+  const e = rule.endHour * 60 + rule.endMin;
+  if (s > e) {
+    const previousDay = (dayOfWeek + 6) % 7;
+    return rule.days.includes(previousDay);
+  }
+  return false;
 }
 
 // ── City-specific zone profiles ───────────────────────────────────────

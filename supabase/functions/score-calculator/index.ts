@@ -388,15 +388,21 @@ serve(async (req) => {
 
     // 7. Update zone.current_score for fast reads
     await Promise.all(
-      scoreRows.map(({ zone_id, final_score }) =>
-        supabase
+      scoreRows.map(async ({ zone_id, final_score }) => {
+        const { error: zoneUpdateError } = await supabase
           .from('zones')
           .update({
             current_score: Math.round(final_score),
             updated_at: now.toISOString(),
           })
-          .eq('id', zone_id)
-      )
+          .eq('id', zone_id);
+
+        if (zoneUpdateError) {
+          throw new Error(
+            `Zone score update failed for ${zone_id}: ${zoneUpdateError.message}`
+          );
+        }
+      })
     );
 
     // 8. Purge history older than 24h

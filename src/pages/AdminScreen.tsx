@@ -22,6 +22,7 @@ import { Progress } from '@/components/ui/progress';
 import { UniversalFileAnalyzer } from '@/components/UniversalFileAnalyzer';
 import { WeightCalibratorPanel } from '@/components/WeightCalibratorPanel';
 import { useI18n } from '@/contexts/I18nContext';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import {
   useAddCity,
   useBulkInsertTimeSlots,
@@ -45,6 +46,7 @@ import {
   type ZoneHistory,
 } from '@/lib/aiAgents';
 import { generateAISimulatedSlots } from '@/lib/aiSimulation';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Brain,
   Car,
@@ -60,6 +62,8 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
+// Pull-to-refresh (PWA Android/iOS)
+usePullToRefresh(() => window.location.reload());
 
 interface AIRecommendation {
   zone_id: string;
@@ -104,6 +108,12 @@ function storeAiAnalysisTimestamp(value: string) {
   }
 }
 
+function logAdminDataIssue(...args: unknown[]) {
+  if (import.meta.env.DEV) {
+    console.warn(...args);
+  }
+}
+
 function logAdminGeolocationIssue(...args: unknown[]) {
   if (import.meta.env.DEV) {
     console.warn(...args);
@@ -121,6 +131,7 @@ export default function AdminScreen() {
   );
   const { data: zones = [] } = useZones(simCityId);
   const bulkInsert = useBulkInsertTimeSlots();
+  const queryClient = useQueryClient();
 
   const [simProgress, setSimProgress] = useState<{
     current: number;
@@ -158,12 +169,24 @@ export default function AdminScreen() {
 
   // Fetch recent trips for drift / learning state.
   useEffect(() => {
-    supabase
+    let isCancelled = false;
+
+    void supabase
       .from('trips')
       .select('*, zones(name, type, current_score)')
       .order('started_at', { ascending: false })
       .limit(100)
-      .then(({ data }) => {
+      .then(({ data, error }) => {
+        if (isCancelled) return;
+        if (error) {
+          logAdminDataIssue(
+            '[AdminScreen] Failed to fetch recent trips:',
+            error
+          );
+          setRecentTrips([]);
+          return;
+        }
+
         if (data) {
           setRecentTrips(data);
         }
@@ -186,6 +209,10 @@ export default function AdminScreen() {
         }
       );
     }
+
+    return () => {
+      isCancelled = true;
+    };
   }, [t]);
 
   async function handleAddCity() {
@@ -296,6 +323,8 @@ export default function AdminScreen() {
       const payload = (data ?? {}) as AIAnalysisResponse;
       if (payload.error) throw new Error(payload.error);
       setAiResults(payload.recommendations ?? []);
+      queryClient.invalidateQueries({ queryKey: ['zone-scores'] });
+      queryClient.invalidateQueries({ queryKey: ['zones'] });
       const analysisTimestamp = new Date().toISOString();
       setLastAnalyzed(analysisTimestamp);
       storeAiAnalysisTimestamp(analysisTimestamp);

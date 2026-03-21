@@ -63,12 +63,14 @@ class AppErrorBoundary extends Component<
 function AppContent() {
   const location = useLocation();
   // Hide NearestHotspot on Today screen since hero card already shows best zone + distance
-  const showNearestHotspot = location.pathname !== '/';
+  const showNearestHotspot =
+    location.pathname !== '/today' && location.pathname !== '/';
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <Routes>
-        <Route path="/" element={<TodayScreen />} />
+        <Route path="/" element={<DriveScreen />} />
+        <Route path="/today" element={<TodayScreen />} />
         <Route path="/drive" element={<DriveScreen />} />
         <Route path="/planning" element={<PlanningScreen />} />
         <Route path="/zones" element={<ZonesScreen />} />

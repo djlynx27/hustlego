@@ -94,12 +94,16 @@ serve(async (req) => {
     // 2. Fetch recent trip history (last 30 days) for context
     const since = new Date(Date.now() - 30 * 86400000).toISOString();
     const zoneIdFilter = zoneId ? [zoneId] : (zones as Zone[]).map((z) => z.id);
-    const { data: trips } = await supabase
+    const { data: trips, error: tripsError } = await supabase
       .from('trips')
       .select('zone_id, started_at, earnings, tips, distance_km, platform')
       .in('zone_id', zoneIdFilter)
       .gte('started_at', since)
       .order('started_at', { ascending: false });
+
+    if (tripsError) {
+      throw new Error(`AI score trips lookup failed: ${tripsError.message}`);
+    }
 
     // 3. Compute per-zone trip stats
     const statsMap = new Map<
@@ -233,19 +237,25 @@ Réponds UNIQUEMENT avec un JSON valide sans markdown:
 
     // 5. Update zone scores in DB (partial or full)
     await Promise.all(
-      recommendations.map(({ zone_id, new_score }) =>
-        supabase
+      recommendations.map(async ({ zone_id, new_score }) => {
+        const { error: zoneUpdateError } = await supabase
           .from('zones')
           .update({
             current_score: new_score,
             updated_at: new Date().toISOString(),
           })
-          .eq('id', zone_id)
-      )
+          .eq('id', zone_id);
+
+        if (zoneUpdateError) {
+          throw new Error(
+            `AI score zone update failed for ${zone_id}: ${zoneUpdateError.message}`
+          );
+        }
+      })
     );
 
     // Also insert into scores table for history
-    await supabase.from('scores').insert(
+    const { error: scoreInsertError } = await supabase.from('scores').insert(
       recommendations.map(({ zone_id, new_score }) => ({
         zone_id,
         score: new_score,
@@ -255,6 +265,12 @@ Réponds UNIQUEMENT avec un JSON valide sans markdown:
         calculated_at: new Date().toISOString(),
       }))
     );
+
+    if (scoreInsertError) {
+      throw new Error(
+        `AI score history insert failed: ${scoreInsertError.message}`
+      );
+    }
 
     return new Response(
       JSON.stringify({ recommendations, scored: recommendations.length }),

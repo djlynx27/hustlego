@@ -18,6 +18,7 @@ import {
 import { ZonePerformanceHeatmap } from '@/components/ZonePerformanceHeatmap';
 import { useI18n } from '@/contexts/I18nContext';
 import { useCityId } from '@/hooks/useCityId';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import {
   useAddZone,
   useCities,
@@ -30,6 +31,8 @@ import { Constants } from '@/integrations/supabase/types';
 import { Pencil, Plus, Trash2 } from 'lucide-react';
 import { lazy, Suspense, useState } from 'react';
 import { toast } from 'sonner';
+// Pull-to-refresh (PWA Android/iOS)
+usePullToRefresh(() => window.location.reload());
 const MapboxHeatmap = lazy(() => import('@/components/MapboxHeatmap'));
 
 const ZONE_TYPES = Constants.public.Enums.zone_type;

@@ -65,7 +65,7 @@ const translations: Record<string, Record<Lang, string>> = {
   eventCategoryEvent: { en: 'Event', fr: 'Événement' },
 
   offline: { en: 'Offline', fr: 'Hors ligne' },
-  installApp: { en: 'Install Geo-Hustle', fr: 'Installer Geo-Hustle' },
+  installApp: { en: 'Install HustleGo', fr: 'Installer HustleGo' },
   enableNotifications: {
     en: 'Enable notifications',
     fr: 'Activer les notifications',

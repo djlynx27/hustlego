@@ -61,12 +61,13 @@ export function getTripRevenue(trip: Pick<TripWithZone, 'earnings' | 'tips'>) {
 
 export function getTripHours(
   trip: Pick<TripWithZone, 'started_at' | 'ended_at'>,
-  fallbackEnd = new Date()
+  fallbackEnd?: Date
 ) {
   const startedAt = toDate(trip.started_at);
   if (!startedAt) return 0;
 
   const endedAt = toDate(trip.ended_at) ?? fallbackEnd;
+  if (!endedAt) return 0;
   return Math.max(0, (endedAt.getTime() - startedAt.getTime()) / 3_600_000);
 }
 
@@ -85,10 +86,7 @@ export function summarizeTrips(
     0
   );
   const rides = windowTrips.length;
-  const hours = windowTrips.reduce(
-    (sum, trip) => sum + getTripHours(trip, end),
-    0
-  );
+  const hours = windowTrips.reduce((sum, trip) => sum + getTripHours(trip), 0);
   const distanceKm = windowTrips.reduce(
     (sum, trip) => sum + Number(trip.distance_km ?? 0),
     0

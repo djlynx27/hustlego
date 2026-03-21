@@ -25,6 +25,7 @@ import { useHaptics } from '@/hooks/useHaptics';
 import { useHoliday } from '@/hooks/useHoliday';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useOnlineStatus } from '@/hooks/useOnlineStatus';
+import { usePullToRefresh } from '@/hooks/usePullToRefresh';
 import { usePwaInstall } from '@/hooks/usePwaInstall';
 import { useCities } from '@/hooks/useSupabase';
 import { haversineKm, useUserLocation } from '@/hooks/useUserLocation';
@@ -60,6 +61,8 @@ import {
   useState,
 } from 'react';
 import { useNavigate } from 'react-router-dom';
+// Pull-to-refresh (PWA Android/iOS)
+usePullToRefresh(() => window.location.reload());
 const MapboxHeatmap = lazy(() => import('@/components/MapboxHeatmap'));
 
 const CITY_CENTERS: Record<string, [number, number]> = {
@@ -838,6 +841,14 @@ export default function TodayScreen() {
               setNavZone({ name: z.name, lat: z.latitude, lng: z.longitude })
             }
             driverMode={driverMode}
+            driverPosition={
+              userLocation
+                ? {
+                    latitude: userLocation.latitude,
+                    longitude: userLocation.longitude,
+                  }
+                : null
+            }
           />
         </Suspense>
       </div>

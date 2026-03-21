@@ -153,8 +153,8 @@ export function encodeContextVector(trip: TripWithZone): number[] {
   const dayOfWeek = startedAt.getDay();
   const month = startedAt.getMonth() + 1;
   const revenue = getTripRevenue(trip);
-  const hours = Math.max(getTripHours(trip), 1 / 12);
-  const earningsPerHour = revenue / hours;
+  const hours = getTripHours(trip);
+  const earningsPerHour = hours > 0 ? revenue / hours : 0;
   const isWeekend = dayOfWeek === 0 || dayOfWeek === 6 ? 1 : 0;
   const isWinter = month <= 3 || month === 12 ? 1 : 0;
 
@@ -287,8 +287,9 @@ export function buildShiftPersistencePayload(
     (trip): trip is TripWithZone & { zone_id: string } => Boolean(trip.zone_id)
   );
 
-  const predictions = tripsWithZone.map<PredictionInsert>((trip) => {
-    const hours = Math.max(getTripHours(trip), 1 / 12);
+  const predictions = tripsWithZone.flatMap<PredictionInsert>((trip) => {
+    const hours = getTripHours(trip);
+    if (hours <= 0) return [];
     const earningsPerHour = getTripRevenue(trip) / hours;
     const predictedScore = clamp(
       Math.round(
@@ -303,26 +304,33 @@ export function buildShiftPersistencePayload(
     );
     const actualScore = normalizeScoreFromEarnings(earningsPerHour);
 
-    return {
-      zone_id: trip.zone_id,
-      predicted_at: trip.started_at,
-      predicted_score: predictedScore,
-      factors_snapshot: {
-        source_trip_id: trip.id,
-        platform: trip.platform ?? null,
+    return [
+      {
+        zone_id: trip.zone_id,
+        predicted_at: trip.started_at,
+        predicted_score: predictedScore,
+        factors_snapshot: {
+          source_trip_id: trip.id,
+          platform: trip.platform ?? null,
+        },
+        actual_earnings_per_hour: round(earningsPerHour),
+        prediction_error: round(actualScore - predictedScore, 4),
       },
-      actual_earnings_per_hour: round(earningsPerHour),
-      prediction_error: round(actualScore - predictedScore, 4),
-    };
+    ];
   });
 
-  const demandPatterns = tripsWithZone.map<DemandPatternInsert>((trip) => ({
-    zone_id: trip.zone_id,
-    context_vector: serializeContextVector(encodeContextVector(trip)),
-    actual_earnings_per_hour: round(
-      getTripRevenue(trip) / Math.max(getTripHours(trip), 1 / 12)
-    ),
-  }));
+  const demandPatterns = tripsWithZone.flatMap<DemandPatternInsert>((trip) => {
+    const hours = getTripHours(trip);
+    if (hours <= 0) return [];
+
+    return [
+      {
+        zone_id: trip.zone_id,
+        context_vector: serializeContextVector(encodeContextVector(trip)),
+        actual_earnings_per_hour: round(getTripRevenue(trip) / hours),
+      },
+    ];
+  });
 
   return {
     session: {
@@ -416,12 +424,17 @@ export async function syncShiftLearning(
   weights: WeightConfig = DEFAULT_WEIGHTS
 ): Promise<LearningSyncResult> {
   const aggregateResult = await syncLearningAggregates(trips, weights);
+  if (!aggregateResult.ok) {
+    return aggregateResult;
+  }
+
   const payload = buildShiftPersistencePayload(
     trips,
     startedAtIso,
     endedAtIso,
     weights
   );
+  let sessionId: number | null = null;
 
   try {
     const { data: sessionRow, error: sessionError } = await supabase
@@ -431,7 +444,7 @@ export async function syncShiftLearning(
       .single();
     if (sessionError) throw sessionError;
 
-    const sessionId = Number(sessionRow?.id);
+    sessionId = Number(sessionRow?.id);
     const sessionZones = payload.sessionZones.map((zone) => ({
       ...zone,
       session_id: sessionId,
@@ -471,6 +484,32 @@ export async function syncShiftLearning(
       message: 'Shift, prédictions et patterns synchronisés vers Supabase.',
     };
   } catch (error: unknown) {
+    if (sessionId !== null) {
+      const { error: cleanupZonesError } = await supabase
+        .from('session_zones')
+        .delete()
+        .eq('session_id', sessionId);
+
+      if (cleanupZonesError) {
+        console.warn(
+          '[syncShiftLearning] Failed to cleanup session_zones after error:',
+          cleanupZonesError
+        );
+      }
+
+      const { error: cleanupSessionError } = await supabase
+        .from('sessions')
+        .delete()
+        .eq('id', sessionId);
+
+      if (cleanupSessionError) {
+        console.warn(
+          '[syncShiftLearning] Failed to cleanup session after error:',
+          cleanupSessionError
+        );
+      }
+    }
+
     return {
       ok: false,
       syncedCounts: aggregateResult.syncedCounts,

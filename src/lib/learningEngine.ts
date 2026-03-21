@@ -132,7 +132,7 @@ export function deriveLearningInsights(
   weights: WeightConfig = DEFAULT_WEIGHTS
 ): LearningInsights {
   const sortedTrips = [...trips]
-    .filter((trip) => trip.started_at)
+    .filter((trip) => trip.started_at && getTripHours(trip) > 0)
     .sort(
       (left, right) =>
         new Date(left.started_at).getTime() -
@@ -145,7 +145,8 @@ export function deriveLearningInsights(
 
   for (const trip of sortedTrips) {
     const startedAt = new Date(trip.started_at);
-    const hours = Math.max(getTripHours(trip), 1 / 12);
+    const hours = getTripHours(trip);
+    if (hours <= 0) continue;
     const earningsPerHour = getTripRevenue(trip) / hours;
     const actualScore = normalizeScoreFromEarnings(earningsPerHour);
     const predictedScore = clamp(
@@ -221,11 +222,11 @@ export function deriveLearningInsights(
 
   const baseSuggestions: WeightConfig = { ...weights };
   const sampleCount = predictions.length;
-  const bias = predictions.reduce(
-    (sum, prediction) => sum + prediction.error,
-    0
-  );
   const recentPredictions = predictions.slice(-20);
+  // Use the bounded recent-window sum (last 20 trips) for all bias-driven
+  // adjustments. The raw cumulative `bias` over ALL trips grows linearly with
+  // trip count and makes the threshold (25 / -25) permanently exceeded after
+  // ~50 trips with even a tiny systematic error, producing stale suggestions.
   const recentBias = recentPredictions.reduce(
     (sum, prediction) => sum + prediction.error,
     0
@@ -237,14 +238,14 @@ export function deriveLearningInsights(
     baseSuggestions.dayOfWeek -= 0.02;
   }
 
-  if (bias > 25 || recentBias > 12) {
+  if (recentBias > 12) {
     baseSuggestions.events += 0.02;
     baseSuggestions.weather += 0.01;
     baseSuggestions.timeOfDay -= 0.015;
     baseSuggestions.dayOfWeek -= 0.015;
   }
 
-  if (bias < -25 || recentBias < -12) {
+  if (recentBias < -12) {
     baseSuggestions.historicalEarnings += 0.02;
     baseSuggestions.events -= 0.01;
     baseSuggestions.weather -= 0.01;
@@ -262,7 +263,7 @@ export function deriveLearningInsights(
       let reason = 'Ajustement neutre basé sur l’erreur moyenne récente.';
       if (key === 'historicalEarnings' && sampleCount >= 8) {
         reason = 'L’historique réel devient fiable et mérite plus de poids.';
-      } else if ((key === 'events' || key === 'weather') && bias > 25) {
+      } else if ((key === 'events' || key === 'weather') && recentBias > 25) {
         reason =
           'Les prédictions sous-estiment des contextes dynamiques récents.';
       } else if (

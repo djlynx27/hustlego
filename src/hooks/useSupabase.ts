@@ -138,21 +138,82 @@ export function useBulkInsertTimeSlots() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: async (slots: TablesInsert<'time_slots'>[]) => {
+      if (slots.length === 0) {
+        return;
+      }
+
+      const cityId = slots[0].city_id;
+      const date = slots[0].date;
+      const { data: existingSlots, error: fetchExistingError } = await supabase
+        .from('time_slots')
+        .select(
+          'city_id, comment, date, demand_score, end_time, start_time, zone_id'
+        )
+        .eq('city_id', cityId)
+        .eq('date', date)
+        .order('start_time');
+
+      if (fetchExistingError) throw fetchExistingError;
+
+      const rollbackSlots = (existingSlots ?? []).map(
+        ({
+          city_id,
+          comment,
+          date: slotDate,
+          demand_score,
+          end_time,
+          start_time,
+          zone_id,
+        }) =>
+          ({
+            city_id,
+            comment,
+            date: slotDate,
+            demand_score,
+            end_time,
+            start_time,
+            zone_id,
+          }) satisfies TablesInsert<'time_slots'>
+      );
+
       // Delete existing slots for that city+date first
-      if (slots.length > 0) {
+      const { error: deleteError } = await supabase
+        .from('time_slots')
+        .delete()
+        .eq('city_id', cityId)
+        .eq('date', date);
+
+      if (deleteError) throw deleteError;
+
+      try {
+        // Insert in batches of 500
+        for (let i = 0; i < slots.length; i += 500) {
+          const batch = slots.slice(i, i + 500);
+          const { error } = await supabase.from('time_slots').insert(batch);
+          if (error) throw error;
+        }
+      } catch (insertError) {
         await supabase
           .from('time_slots')
           .delete()
-          .eq('city_id', slots[0].city_id)
-          .eq('date', slots[0].date);
-      }
-      // Insert in batches of 500
-      for (let i = 0; i < slots.length; i += 500) {
-        const batch = slots.slice(i, i + 500);
-        const { error } = await supabase.from('time_slots').insert(batch);
-        if (error) throw error;
+          .eq('city_id', cityId)
+          .eq('date', date);
+
+        if (rollbackSlots.length > 0) {
+          const { error: rollbackError } = await supabase
+            .from('time_slots')
+            .insert(rollbackSlots);
+
+          if (rollbackError) {
+            throw new Error(
+              `time_slots restore failed after partial insert: ${rollbackError.message}`
+            );
+          }
+        }
+
+        throw insertError;
       }
     },
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['time_slots'] }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['time_slots'] }),
   });
 }

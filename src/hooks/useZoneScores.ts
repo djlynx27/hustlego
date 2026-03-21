@@ -29,7 +29,7 @@ export function useZoneScores(cityId: string) {
       .channel(`scores-${cityId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'scores' },
+        { event: '*', schema: 'public', table: 'scores' },
         () => {
           queryClient.invalidateQueries({ queryKey: ['zone-scores', cityId] });
         }
@@ -48,12 +48,12 @@ export function useZoneScores(cityId: string) {
         .from('scores')
         .select('*, zones!inner(city_id)')
         .eq('zones.city_id', cityId)
-        .order('calculated_at', { ascending: false })
-        .limit(200);
+        .order('calculated_at', { ascending: false });
 
       if (error) throw error;
 
-      // Deduplicate: keep only the latest score per zone
+      // Deduplicate after fetching the full city slice; limiting rows here can
+      // hide some zones if a few zones have many recent historical scores.
       const latest = new Map<string, ZoneScore>();
       for (const row of data ?? []) {
         if (!latest.has(row.zone_id)) {

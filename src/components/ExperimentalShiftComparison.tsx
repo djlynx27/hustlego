@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/integrations/supabase/client';
+import { getTripHours } from '@/lib/tripAnalytics';
 import { useQuery } from '@tanstack/react-query';
 import { FlaskConical } from 'lucide-react';
 
@@ -54,12 +55,7 @@ function useShiftComparison() {
         for (const t of trips) {
           totalEarnings += Number(t.earnings || 0) + Number(t.tips || 0);
           totalKm += Number(t.distance_km || 0);
-          if (t.started_at && t.ended_at) {
-            totalHours +=
-              (new Date(t.ended_at).getTime() -
-                new Date(t.started_at).getTime()) /
-              3_600_000;
-          }
+          totalHours += getTripHours(t);
           const zn = t.zones?.name || 'Inconnu';
           zoneCounts[zn] = (zoneCounts[zn] || 0) + 1;
         }

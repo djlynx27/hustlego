@@ -257,13 +257,15 @@ serve(async (req: Request) => {
           };
 
       // Fetch calibration history (last 5)
-      const { data: histData } = await supabase
+      const { data: histData, error: historyError } = await supabase
         .from('weight_history')
         .select(
           'w_time, w_day, w_weather, w_events, w_historical, mae, accuracy_pct, trip_count, source, created_at'
         )
         .order('created_at', { ascending: false })
         .limit(5);
+
+      if (historyError) throw historyError;
 
       return new Response(
         JSON.stringify({ ...flat, history: histData ?? [] }),
@@ -309,8 +311,11 @@ serve(async (req: Request) => {
     }
 
     // 2. Fetch current weights
-    const { data: currentWeightRows } =
+    const { data: currentWeightRows, error: currentWeightsError } =
       await supabase.rpc('get_latest_weights');
+
+    if (currentWeightsError) throw currentWeightsError;
+
     const currentRow = (currentWeightRows as WeightHistoryRow[] | null)?.[0];
 
     const currentWeights: WeightConfig = currentRow

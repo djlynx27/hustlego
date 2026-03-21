@@ -17,6 +17,7 @@ import {
 } from '@/components/ui/select';
 import { useZones } from '@/hooks/useSupabase';
 import { supabase } from '@/integrations/supabase/client';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   Camera,
   Flame,
@@ -57,6 +58,7 @@ function getErrorMessage(error: unknown, fallback: string) {
 }
 
 export function UniversalFileAnalyzer() {
+  const queryClient = useQueryClient();
   const { data: mtlZones = [] } = useZones('mtl');
   const { data: lavalZones = [] } = useZones('lvl');
   const { data: longueuilZones = [] } = useZones('lng');
@@ -252,6 +254,8 @@ export function UniversalFileAnalyzer() {
           body: { zone_id: selectedZone.id },
         });
         if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ['zone-scores'] });
+        queryClient.invalidateQueries({ queryKey: ['zones'] });
         toast.success('Recalibrage de la demande déclenché pour la zone');
       } else if (target === 'shift' || target === 'mileage') {
         const ed = result.extracted_data || {};
@@ -273,17 +277,32 @@ export function UniversalFileAnalyzer() {
           });
           if (error) throw error;
           toast.success('Course/mileage auto-ajoutée correctement');
+          queryClient.invalidateQueries({ queryKey: ['trips-feed'] });
+          queryClient.invalidateQueries({ queryKey: ['recent-trips'] });
 
           // optional score refresh
-          await supabase.functions.invoke('ai-score-analysis', {
-            body: { zone_id: selectedZone.id },
-          });
+          const { error: refreshError } = await supabase.functions.invoke(
+            'ai-score-analysis',
+            {
+              body: { zone_id: selectedZone.id },
+            }
+          );
+
+          if (refreshError) {
+            toast.warning(
+              'Course ajoutée, mais le recalibrage de la zone a échoué'
+            );
+          } else {
+            queryClient.invalidateQueries({ queryKey: ['zone-scores'] });
+            queryClient.invalidateQueries({ queryKey: ['zones'] });
+          }
         }
       } else if (target === 'daily') {
         const { error } = await supabase.functions.invoke(
           'generate-daily-report'
         );
         if (error) throw error;
+        queryClient.invalidateQueries({ queryKey: ['daily-reports'] });
         toast.success('Rapport quotidien généré');
       } else if (target === 'profit') {
         const ed = result.extracted_data || {};
@@ -302,16 +321,18 @@ export function UniversalFileAnalyzer() {
 
           const baseUpdate = {
             report_date: today,
-            total_earnings: Number(ed.earnings) || 0,
+            total_earnings:
+              (existingReport?.total_earnings || 0) +
+              (Number(ed.earnings) || 0),
             total_trips:
               (existingReport?.total_trips || 0) +
               (Number(ed.trips_count) || 0),
             total_distance_km:
-              Number(ed.distance_km || 0) ||
-              (existingReport?.total_distance_km ?? 0),
+              (existingReport?.total_distance_km || 0) +
+              (Number(ed.distance_km) || 0),
             hours_worked:
-              Number(ed.hours_worked || 0) ||
-              (existingReport?.hours_worked ?? 0),
+              (existingReport?.hours_worked || 0) +
+              (Number(ed.hours_worked) || 0),
             ai_recommendation: result.notes || undefined,
           };
 
@@ -327,6 +348,7 @@ export function UniversalFileAnalyzer() {
               .insert(baseUpdate);
             if (insErr) throw insErr;
           }
+          queryClient.invalidateQueries({ queryKey: ['daily-reports'] });
           toast.success('Rapport de profit/quotidien mis à jour');
         }
       } else {
