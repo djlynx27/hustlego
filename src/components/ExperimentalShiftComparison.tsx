@@ -88,10 +88,14 @@ export function ExperimentalShiftComparison() {
     <Card className="bg-card border-border">
       <CardHeader className="pb-2">
         <CardTitle className="text-base font-display flex items-center gap-2">
-          <FlaskConical className="w-4 h-4 text-primary" /> Comparaison shifts
+          <FlaskConical className="w-4 h-4 text-primary" /> Comparaison expérimentale
         </CardTitle>
       </CardHeader>
       <CardContent>
+        <div className="mb-3 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
+          Cette comparaison reste basée sur le temps en course des trips marqués
+          expérimentaux, pas sur des heures totales de shift trackées.
+        </div>
         <div className="grid grid-cols-2 gap-3">
           {[
             { label: 'Normal', stats: normal },
@@ -110,7 +114,7 @@ export function ExperimentalShiftComparison() {
                     {stats.count} courses
                   </div>
                   <div className="text-[16px] font-display font-bold text-primary">
-                    ${stats.earningsPerHour.toFixed(2)}/h
+                    ${stats.earningsPerHour.toFixed(2)}/h en course
                   </div>
                   <div className="text-[11px] text-muted-foreground">
                     🏆 {stats.bestZone}

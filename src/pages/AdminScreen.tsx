@@ -29,7 +29,7 @@ export default function AdminScreen() {
     {
       title: 'Rapports & revenus',
       description:
-        'Consulter les dashboards, rapports quotidiens et comparaisons, avec un rappel sur les biais actuels des $/h.',
+        'Consulter les dashboards, rapports quotidiens et comparaisons, avec séparation entre $/h en course et shifts trackés.',
       to: '/admin/reports',
       icon: LineChart,
     },
@@ -81,8 +81,8 @@ export default function AdminScreen() {
             </p>
             <p>
               Les rapports de revenus lisent le backend réel, mais les $/h
-              restent optimistes tant que le temps total de shift n’est pas
-              mesuré séparément.
+              doivent encore être lus en distinguant le temps en course des
+              shifts réellement terminés et synchronisés.
             </p>
             <p>
               Le bouton admin sert désormais de hub, pas d’entrepôt de toutes

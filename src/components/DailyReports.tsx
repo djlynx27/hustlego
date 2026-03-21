@@ -1,8 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { useSessions } from '@/hooks/useSupabase';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
 import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { Clock, FileText, MapPin, Sparkles } from 'lucide-react';
 
 type DailyReportRow = Tables<'daily_reports'>;
@@ -24,6 +26,28 @@ function useReports() {
 
 export function DailyReports() {
   const { data: reports = [] } = useReports();
+  const sessionsSince = useMemo(() => {
+    const start = new Date();
+    start.setDate(start.getDate() - 13);
+    start.setHours(0, 0, 0, 0);
+    return start.toISOString();
+  }, []);
+  const { data: sessions = [] } = useSessions(sessionsSince, 200);
+
+  const trackedByDate = useMemo(() => {
+    return sessions.reduce<Record<string, { hours: number; revenue: number }>>(
+      (acc, session) => {
+        const dateKey = session.started_at.split('T')[0];
+        if (!dateKey) return acc;
+        const current = acc[dateKey] ?? { hours: 0, revenue: 0 };
+        current.hours += Number(session.total_hours ?? 0);
+        current.revenue += Number(session.total_earnings ?? 0);
+        acc[dateKey] = current;
+        return acc;
+      },
+      {}
+    );
+  }, [sessions]);
 
   if (reports.length === 0) {
     return (
@@ -56,6 +80,10 @@ export function DailyReports() {
             key={r.id}
             className="bg-background rounded-lg border border-border p-3 space-y-2"
           >
+            {(() => {
+              const tracked = trackedByDate[r.report_date] ?? null;
+              return (
+                <>
             <div className="flex items-center justify-between">
               <span className="text-sm font-display font-bold">
                 {new Date(r.report_date + 'T12:00:00').toLocaleDateString(
@@ -86,13 +114,18 @@ export function DailyReports() {
               </div>
               <div>
                 <span className="text-[11px] text-muted-foreground block">
-                  Heures
+                  Heures rapport
                 </span>
                 <span className="text-[16px] font-display font-bold">
                   {Number(r.hours_worked || 0).toFixed(1)}h
                 </span>
               </div>
             </div>
+            {tracked && tracked.hours > 0 && (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-2 py-1.5 text-[12px] text-amber-100">
+                Shift tracké: {tracked.hours.toFixed(1)} h · ${tracked.revenue.toFixed(0)} de revenu synchronisé
+              </div>
+            )}
             <div className="flex gap-3 text-[12px] text-muted-foreground">
               {r.best_zone_name && (
                 <span className="flex items-center gap-1">
@@ -117,6 +150,9 @@ export function DailyReports() {
                 {r.ai_recommendation}
               </div>
             )}
+                </>
+              );
+            })()}
           </div>
         ))}
       </CardContent>

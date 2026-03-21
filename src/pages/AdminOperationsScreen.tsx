@@ -22,8 +22,8 @@ export default function AdminOperationsScreen() {
             plus propre.
           </p>
           <p>
-            Shift Tracker lit tes courses existantes, mais son $/h reste
-            optimiste car il ne compte pas le temps mort entre les trajets.
+            Shift Tracker sépare maintenant le $/h en course du rythme réel du
+            shift quand tu termines et synchronises une session.
           </p>
           <p>
             Mode Taxi reste local au navigateur et n’alimente pas encore le
