@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useSessions } from '@/hooks/useSupabase';
 import { supabase } from '@/integrations/supabase/client';
 import type { Tables } from '@/integrations/supabase/types';
+import { getDailyReportDisplayMetrics } from '@/lib/dailyReportDisplay';
 import { useQuery } from '@tanstack/react-query';
 import { Clock, FileText, MapPin, Sparkles } from 'lucide-react';
 import { useMemo } from 'react';
@@ -116,18 +117,7 @@ export function DailyReports() {
           >
             {(() => {
               const tracked = trackedByDate[r.report_date] ?? null;
-              const displayTrips =
-                tracked?.rides && tracked.rides > 0
-                  ? tracked.rides
-                  : Number(r.total_trips || 0);
-              const displayEarnings =
-                tracked?.revenue && tracked.revenue > 0
-                  ? tracked.revenue
-                  : Number(r.total_earnings || 0);
-              const displayHours =
-                tracked?.hours && tracked.hours > 0
-                  ? tracked.hours
-                  : Number(r.hours_worked || 0);
+              const displayMetrics = getDailyReportDisplayMetrics(r, tracked);
               return (
                 <>
                   <div className="flex items-center justify-between">
@@ -138,7 +128,7 @@ export function DailyReports() {
                       )}
                     </span>
                     <Badge variant="secondary" className="text-xs">
-                      {displayTrips.toFixed(0)} courses
+                      {displayMetrics.trips.toFixed(0)} courses
                     </Badge>
                   </div>
                   <div className="grid grid-cols-3 gap-2 text-center">
@@ -147,7 +137,7 @@ export function DailyReports() {
                         Gains
                       </span>
                       <span className="text-[16px] font-display font-bold text-primary">
-                        ${displayEarnings.toFixed(0)}
+                        ${displayMetrics.earnings.toFixed(0)}
                       </span>
                     </div>
                     <div>
@@ -165,7 +155,7 @@ export function DailyReports() {
                           : 'Heures rapport'}
                       </span>
                       <span className="text-[16px] font-display font-bold">
-                        {displayHours.toFixed(1)}h
+                        {displayMetrics.hours.toFixed(1)}h
                       </span>
                     </div>
                   </div>
