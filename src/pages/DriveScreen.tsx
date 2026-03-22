@@ -1,3 +1,4 @@
+import { ArrivalCountdown } from '@/components/ArrivalCountdown';
 import { CitySelect } from '@/components/CitySelect';
 import { DeadTimeTimer } from '@/components/DeadTimeTimer';
 import { DemandBadge } from '@/components/DemandBadge';
@@ -11,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { WeeklyGoalDisplay } from '@/components/WeeklyGoal';
 import { useI18n } from '@/contexts/I18nContext';
 import { useActivityDetection } from '@/hooks/useActivityDetection';
+import { useArrivalCountdown } from '@/hooks/useArrivalCountdown';
 import { useAutoCity } from '@/hooks/useAutoCity';
 import { useCityId } from '@/hooks/useCityId';
 import { useDemandScores } from '@/hooks/useDemandScores';
@@ -208,6 +210,16 @@ export default function DriveScreen() {
 
   const heroZone = modeZones[0] ?? null;
   const nextZones = modeZones.slice(1, 6);
+
+  // 15-minute auto-routing: when driver arrives at heroZone, countdown then
+  // auto-navigate to nextZones[0] in Google Maps.
+  const { isCountingDown, arrivedZoneName, secondsRemaining, cancel, launchNow } =
+    useArrivalCountdown(heroZone, location, () => {
+      const next = nextZones[0];
+      if (next) {
+        launchGoogleMapsNavigation(next.name, next.latitude, next.longitude);
+      }
+    });
 
   const getDistance = (
     zone: { latitude: number; longitude: number } | null
@@ -609,6 +621,17 @@ export default function DriveScreen() {
         latitude={navZone?.lat ?? 0}
         longitude={navZone?.lng ?? 0}
       />
+
+      {/* 15-min arrival countdown overlay */}
+      {isCountingDown && arrivedZoneName && (
+        <ArrivalCountdown
+          arrivedZoneName={arrivedZoneName}
+          nextZoneName={nextZones[0]?.name ?? null}
+          secondsRemaining={secondsRemaining}
+          onCancel={cancel}
+          onLaunchNow={launchNow}
+        />
+      )}
     </div>
   );
 }

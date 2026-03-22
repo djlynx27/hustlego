@@ -48,6 +48,12 @@ const CITY_CENTERS: Record<string, [number, number]> = {
   mtl: [45.5017, -73.5673],
   lvl: [45.5503, -73.7006],
   lng: [45.5252, -73.5205],
+  bsb: [45.6202, -73.8428],
+  sth: [45.6422, -73.8295],
+  blv: [45.675, -73.8779],
+  rsm: [45.6365, -73.7993],
+  bdf: [45.667, -73.7588],
+  trb: [45.7017, -73.6449],
 };
 
 export default function ZonesScreen() {

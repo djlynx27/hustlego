@@ -12,7 +12,7 @@ interface DeadTimeState {
 function loadState(): DeadTimeState {
   try {
     const raw = localStorage.getItem(LS_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) return JSON.parse(raw) as DeadTimeState;
   } catch {
     // localStorage unavailable; fall back to default timer state.
   }
@@ -20,7 +20,11 @@ function loadState(): DeadTimeState {
 }
 
 function saveState(s: DeadTimeState) {
-  localStorage.setItem(LS_KEY, JSON.stringify(s));
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(s));
+  } catch {
+    // ignore storage errors
+  }
 }
 
 function getTimerAppearance(paused: boolean, warning: boolean) {
@@ -57,6 +61,11 @@ interface Props {
 export function DeadTimeTimer({ nearestZoneName }: Props) {
   const [state, setState] = useState<DeadTimeState>(loadState);
   const [elapsed, setElapsed] = useState(0);
+
+  // ── Persist state to localStorage on every change (fix: survives page nav) ──
+  useEffect(() => {
+    saveState(state);
+  }, [state]);
 
   // Listen for trip start/end events
   useEffect(() => {
@@ -115,9 +124,7 @@ export function DeadTimeTimer({ nearestZoneName }: Props) {
   const appearance = getTimerAppearance(state.paused, isWarning);
 
   return (
-    <div
-      className={`rounded-xl border px-4 py-3 ${appearance.containerClass}`}
-    >
+    <div className={`rounded-xl border px-4 py-3 ${appearance.containerClass}`}>
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           {appearance.icon}
@@ -125,7 +132,9 @@ export function DeadTimeTimer({ nearestZoneName }: Props) {
             {appearance.label}
           </span>
         </div>
-        <span className={`text-[24px] font-display font-bold tabular-nums ${appearance.valueClass}`}>
+        <span
+          className={`text-[24px] font-display font-bold tabular-nums ${appearance.valueClass}`}
+        >
           {display}
         </span>
       </div>

@@ -8,6 +8,12 @@ const CITY_LATLONG: Record<string, string> = {
   ott: '45.4215,-75.6972',
   lvl: '45.5559,-73.7217',
   lng: '45.5249,-73.5219',
+  bsb: '45.6202,-73.8428',
+  sth: '45.6422,-73.8295',
+  blv: '45.6750,-73.8779',
+  rsm: '45.6365,-73.7993',
+  bdf: '45.6670,-73.7588',
+  trb: '45.7017,-73.6449',
 };
 
 /** Known venue capacities for boost calculation */

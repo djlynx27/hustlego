@@ -8,7 +8,13 @@
 INSERT INTO cities (id, name) VALUES
   ('mtl', 'Montréal'),
   ('lvl', 'Laval'),
-  ('lng', 'Longueuil')
+  ('lng', 'Longueuil'),
+  ('bsb', 'Boisbriand'),
+  ('sth', 'Sainte-Thérèse'),
+  ('blv', 'Blainville'),
+  ('rsm', 'Rosemère'),
+  ('bdf', 'Bois-des-Filion'),
+  ('trb', 'Terrebonne')
 ON CONFLICT (id) DO UPDATE SET name = EXCLUDED.name;
 
 -- ── Zones (coordonnées GPS réelles) ─────────────────────────
@@ -52,7 +58,35 @@ INSERT INTO zones (id, city_id, name, type, latitude, longitude) VALUES
   ('lng-em', 'lng', 'Cégep Édouard-Montpetit', 'université', 45.4991, -73.5053),
   ('lng-us2', 'lng', 'Université de Sherbrooke Longueuil', 'université', 45.4998, -73.5045),
   ('lng-psb', 'lng', 'Promenades Saint-Bruno', 'commercial', 45.5311, -73.3581),
-  ('lng-rem', 'lng', 'Gare Brossard REM', 'transport', 45.4582, -73.4718)
+  ('lng-rem', 'lng', 'Gare Brossard REM', 'transport', 45.4582, -73.4718),
+  -- Boisbriand
+  ('bsb-gb', 'bsb', 'Gare Boisbriand exo', 'transport', 45.6202, -73.8428),
+  ('bsb-cn', 'bsb', 'Carrefour du Nord', 'commercial', 45.6234, -73.8396),
+  ('bsb-pb', 'bsb', 'Promenades de Boisbriand', 'commercial', 45.6281, -73.8494),
+  -- Sainte-Thérèse
+  ('sth-gs', 'sth', 'Gare Sainte-Thérèse exo', 'transport', 45.6435, -73.8284),
+  ('sth-cv', 'sth', 'Centre-ville Sainte-Thérèse', 'résidentiel', 45.6422, -73.8295),
+  ('sth-cl', 'sth', 'Cégep Lionel-Groulx', 'université', 45.6462, -73.8408),
+  ('sth-gal', 'sth', 'Galeries Sainte-Thérèse', 'commercial', 45.6380, -73.8248),
+  -- Blainville
+  ('blv-gb', 'blv', 'Gare Blainville exo', 'transport', 45.6784, -73.8648),
+  ('blv-cs', 'blv', 'Complexe sportif de Blainville', 'événements', 45.6715, -73.8878),
+  ('blv-cc', 'blv', 'Centre commercial Blainville', 'commercial', 45.6750, -73.8779),
+  ('blv-cv', 'blv', 'Centre-ville Blainville', 'résidentiel', 45.6700, -73.8649),
+  -- Rosemère
+  ('rsm-pr', 'rsm', 'Place Rosemère', 'commercial', 45.6365, -73.7993),
+  ('rsm-cv', 'rsm', 'Centre-ville Rosemère', 'résidentiel', 45.6390, -73.7950),
+  ('rsm-gr', 'rsm', 'Gare Rosemère (Ste-Rose)', 'transport', 45.6250, -73.7643),
+  -- Bois-des-Filion
+  ('bdf-cl', 'bdf', 'Secteur Curé-Labelle', 'commercial', 45.6691, -73.7563),
+  ('bdf-ar', 'bdf', 'Aréna Bois-des-Filion', 'événements', 45.6658, -73.7603),
+  ('bdf-rp', 'bdf', 'Rue Principale Bois-des-Filion', 'résidentiel', 45.6670, -73.7588),
+  -- Terrebonne
+  ('trb-cl', 'trb', 'Carrefour des Laurentides', 'commercial', 45.7040, -73.6420),
+  ('trb-vt', 'trb', 'Vieux-Terrebonne', 'tourisme', 45.7017, -73.6449),
+  ('trb-gt', 'trb', 'Gare Terrebonne exo', 'transport', 45.7033, -73.6367),
+  ('trb-ct', 'trb', 'Cégep de Terrebonne', 'université', 45.6942, -73.6449),
+  ('trb-hp', 'trb', 'Hôpital Pierre-Le Gardeur', 'médical', 45.7248, -73.4800)
 ON CONFLICT (id) DO UPDATE SET
   name = EXCLUDED.name, type = EXCLUDED.type,
   latitude = EXCLUDED.latitude, longitude = EXCLUDED.longitude;

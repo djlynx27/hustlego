@@ -69,10 +69,12 @@ function getStartedLabel(startedAt: string | null) {
   });
 }
 
-function getShiftRevenuePerHour(summary: {
-  elapsedHours: number;
-  metrics: { revenue: number };
-} | null) {
+function getShiftRevenuePerHour(
+  summary: {
+    elapsedHours: number;
+    metrics: { revenue: number };
+  } | null
+) {
   if (!summary || summary.elapsedHours <= 0) {
     return 0;
   }
@@ -80,7 +82,9 @@ function getShiftRevenuePerHour(summary: {
   return summary.metrics.revenue / summary.elapsedHours;
 }
 
-function buildShiftStats(snapshot: NonNullable<ReturnType<typeof buildShiftSnapshot>>) {
+function buildShiftStats(
+  snapshot: NonNullable<ReturnType<typeof buildShiftSnapshot>>
+) {
   return [
     {
       label: 'Revenu',
@@ -125,7 +129,9 @@ function ShiftSnapshotContent({
       <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-xs text-muted-foreground">Démarré à {startedLabel}</p>
+            <p className="text-xs text-muted-foreground">
+              Démarré à {startedLabel}
+            </p>
             <p className="text-lg font-display font-semibold">
               {snapshot.elapsedHours.toFixed(1)} h en cours
             </p>
@@ -151,7 +157,9 @@ function ShiftSnapshotContent({
               <stat.icon className="h-3.5 w-3.5" />
               {stat.label}
             </div>
-            <p className="mt-1 text-lg font-semibold font-display">{stat.value}</p>
+            <p className="mt-1 text-lg font-semibold font-display">
+              {stat.value}
+            </p>
           </div>
         ))}
       </div>
@@ -191,8 +199,8 @@ function EmptyShiftContent({ onStartShift }: { onStartShift: () => void }) {
   return (
     <div className="rounded-xl border border-dashed border-border bg-background/50 p-4">
       <p className="text-sm text-muted-foreground">
-        Lance un shift avant de rouler pour suivre automatiquement le revenu,
-        le rythme et la meilleure zone pendant la session.
+        Lance un shift avant de rouler pour suivre automatiquement le revenu, le
+        rythme et la meilleure zone pendant la session.
       </p>
       <Button className="mt-3 w-full gap-2" onClick={onStartShift}>
         <Play className="w-4 h-4" /> Démarrer un shift
@@ -256,7 +264,8 @@ export function ShiftTracker() {
     if (syncResult.ok) {
       toast.info(syncResult.message);
     } else {
-      toast.error(syncResult.message);
+      // Shift ended locally — only the ML cloud sync failed (hors-ligne ou non authentifié)
+      toast.warning('Données synchronisées localement. Sync cloud indisponible.');
     }
   };
 

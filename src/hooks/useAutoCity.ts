@@ -14,6 +14,12 @@ const CITY_CENTROIDS: { id: string; lat: number; lng: number }[] = [
   { id: 'mtl', lat: 45.508, lng: -73.587 },
   { id: 'lvl', lat: 45.608, lng: -73.747 },
   { id: 'lng', lat: 45.531, lng: -73.518 },
+  { id: 'bsb', lat: 45.62, lng: -73.843 },
+  { id: 'sth', lat: 45.642, lng: -73.829 },
+  { id: 'blv', lat: 45.675, lng: -73.878 },
+  { id: 'rsm', lat: 45.638, lng: -73.799 },
+  { id: 'bdf', lat: 45.667, lng: -73.76 },
+  { id: 'trb', lat: 45.702, lng: -73.645 },
 ];
 
 export function nearestCityId(lat: number, lng: number): string {

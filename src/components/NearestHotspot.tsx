@@ -13,11 +13,16 @@ function getBorderClass(level: ReturnType<typeof getDemandLevel>) {
   return 'border-l-[hsl(var(--demand-low))]';
 }
 
-function buildWeatherCondition(weatherMtl: {
-  weatherId: number;
-  temp: number;
-  demandBoostPoints: number;
-} | null | undefined): WeatherCondition | null {
+function buildWeatherCondition(
+  weatherMtl:
+    | {
+        weatherId: number;
+        temp: number;
+        demandBoostPoints: number;
+      }
+    | null
+    | undefined
+): WeatherCondition | null {
   if (!weatherMtl) return null;
 
   return {
@@ -36,16 +41,23 @@ function findNearestHotspot(
     longitude: number;
     score?: number | null;
   }>,
-  weatherMtl: {
-    weatherId: number;
-    temp: number;
-    demandBoostPoints: number;
-  } | null | undefined
+  weatherMtl:
+    | {
+        weatherId: number;
+        temp: number;
+        demandBoostPoints: number;
+      }
+    | null
+    | undefined
 ) {
   if (!userLocation || allZones.length === 0) return null;
 
   const now = new Date();
-  const { scores } = scoreAllZones(allZones, now, buildWeatherCondition(weatherMtl));
+  const { scores } = scoreAllZones(
+    allZones,
+    now,
+    buildWeatherCondition(weatherMtl)
+  );
 
   const ranked = allZones
     .map((zone) => ({
@@ -60,7 +72,11 @@ function findNearestHotspot(
     }))
     .sort((left, right) => left.distance - right.distance);
 
-  return ranked.find((zone) => zone.score >= 60 && zone.distance <= 10) ?? ranked[0] ?? null;
+  return (
+    ranked.find((zone) => zone.score >= 60 && zone.distance <= 10) ??
+    ranked[0] ??
+    null
+  );
 }
 
 export function NearestHotspot() {
@@ -74,6 +90,7 @@ export function NearestHotspot() {
   const { data: zonesSth = [] } = useZones('sth');
   const { data: zonesBsb = [] } = useZones('bsb');
   const { data: zonesTrb = [] } = useZones('trb');
+  const { data: zonesBdf = [] } = useZones('bdf');
   const { data: weatherMtl } = useWeather('mtl');
 
   const allZones = useMemo(
@@ -86,6 +103,7 @@ export function NearestHotspot() {
       ...zonesSth,
       ...zonesBsb,
       ...zonesTrb,
+      ...zonesBdf,
     ],
     [
       zonesMtl,
@@ -96,6 +114,7 @@ export function NearestHotspot() {
       zonesSth,
       zonesBsb,
       zonesTrb,
+      zonesBdf,
     ]
   );
 
