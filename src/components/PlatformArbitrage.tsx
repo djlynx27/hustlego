@@ -115,6 +115,141 @@ function CompactBestPlatform({ signal }: { signal: PlatformSignal }) {
   );
 }
 
+function resolveSignals({
+  recommendation,
+  zoneScore,
+  hour,
+}: {
+  recommendation: Awaited<ReturnType<typeof usePlatformSignals>>['data'];
+  zoneScore: number;
+  hour: number;
+}) {
+  const signals =
+    recommendation && recommendation.all.length > 0
+      ? recommendation.all
+      : inferPlatformSignalsClientSide(zoneScore, hour);
+
+  return {
+    signals,
+    best: signals[0],
+    second: signals[1],
+    isInferred: !recommendation || recommendation.all.length === 0,
+    arbitrageGap: recommendation?.arbitrageGap ?? 0,
+  };
+}
+
+function CompactPlatformArbitrage({
+  isLoading,
+  best,
+  isInferred,
+  className,
+}: {
+  isLoading: boolean;
+  best: PlatformSignal;
+  isInferred: boolean;
+  className?: string;
+}) {
+  if (isLoading) {
+    return (
+      <div
+        className={cn(
+          'h-5 w-20 rounded-full bg-muted animate-pulse',
+          className
+        )}
+      />
+    );
+  }
+
+  return (
+    <div className={cn('flex flex-col gap-0.5', className)}>
+      <CompactBestPlatform signal={best} />
+      {isInferred && (
+        <span className="text-[10px] text-muted-foreground/60 pl-1">
+          estimé
+        </span>
+      )}
+    </div>
+  );
+}
+
+function ActiveSignalLabel({ signal }: { signal: PlatformSignal }) {
+  return (
+    <span className="text-[11px] font-bold text-red-400 block leading-tight">
+      SURGE{' '}
+      {signal.latest_multiplier
+        ? `${signal.latest_multiplier.toFixed(2)}×`
+        : ''}
+    </span>
+  );
+}
+
+function PlatformArbitrageHeader({ isInferred }: { isInferred: boolean }) {
+  return (
+    <div className="flex items-center justify-between">
+      <span className="text-[13px] font-display font-bold text-muted-foreground uppercase tracking-wide">
+        Meilleure plateforme
+      </span>
+      {isInferred ? (
+        <span className="text-[10px] text-muted-foreground/50 font-body">
+          estimé
+        </span>
+      ) : (
+        <span className="text-[10px] text-emerald-500 font-body font-semibold">
+          ● live
+        </span>
+      )}
+    </div>
+  );
+}
+
+function BestPlatformHighlight({ best }: { best: PlatformSignal }) {
+  const meta = getPlatformMeta(best.platform as Platform);
+
+  return (
+    <div className="flex items-center gap-2">
+      <span className="text-[24px] leading-none">{meta.emoji}</span>
+      <div className="flex-1 min-w-0">
+        <span className="text-[16px] font-display font-bold leading-tight block">
+          {meta.label}
+        </span>
+        <DemandBar demand={best.avg_demand} surge={best.latest_surge} />
+      </div>
+      <div className="text-right flex-shrink-0">
+        <span className="text-[20px] font-mono font-bold leading-tight block">
+          {best.avg_demand.toFixed(1)}
+          <span className="text-[12px] text-muted-foreground font-body font-normal">
+            /10
+          </span>
+        </span>
+        {best.latest_surge && <ActiveSignalLabel signal={best} />}
+      </div>
+    </div>
+  );
+}
+
+function ArbitrageGapNotice({
+  second,
+  arbitrageGap,
+}: {
+  second: PlatformSignal | undefined;
+  arbitrageGap: number;
+}) {
+  if (!second || arbitrageGap < 0.5) {
+    return null;
+  }
+
+  return (
+    <div className="text-[12px] text-muted-foreground font-body px-1">
+      {arbitrageGap >= 1.5 ? '⚡ ' : '↑ '}
+      {arbitrageGap.toFixed(1)} pts d'avance sur{' '}
+      {getPlatformMeta(second.platform as Platform).label}
+      {arbitrageGap >= 1.5 && (
+        <span className="ml-1 text-primary font-semibold">— Basculer!</span>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ─────────────────────────────────────────────────────────────
 
 /**
@@ -138,44 +273,24 @@ export function PlatformArbitrage({
   const hour = nowHour ?? new Date().getHours();
   const { data: recommendation, isLoading } = usePlatformSignals(zoneId);
 
-  // Resolve signals: prefer DB data, fall back to client-side inference
-  const signals =
-    recommendation && recommendation.all.length > 0
-      ? recommendation.all
-      : inferPlatformSignalsClientSide(zoneScore, hour);
-
-  const best = signals[0];
-  const isInferred = !recommendation || recommendation.all.length === 0;
+  const { signals, best, second, isInferred, arbitrageGap } = resolveSignals({
+    recommendation,
+    zoneScore,
+    hour,
+  });
 
   if (!best) return null;
 
-  // ── Compact mode ───────────────────────────────────────────────────────────
   if (compact) {
-    if (isLoading) {
-      return (
-        <div
-          className={cn(
-            'h-5 w-20 rounded-full bg-muted animate-pulse',
-            className
-          )}
-        />
-      );
-    }
     return (
-      <div className={cn('flex flex-col gap-0.5', className)}>
-        <CompactBestPlatform signal={best} />
-        {isInferred && (
-          <span className="text-[10px] text-muted-foreground/60 pl-1">
-            estimé
-          </span>
-        )}
-      </div>
+      <CompactPlatformArbitrage
+        isLoading={isLoading}
+        best={best}
+        isInferred={isInferred}
+        className={className}
+      />
     );
   }
-
-  // ── Full mode ──────────────────────────────────────────────────────────────
-  const arbitrageGap = recommendation?.arbitrageGap ?? 0;
-  const second = signals[1];
 
   return (
     <div
@@ -184,73 +299,14 @@ export function PlatformArbitrage({
         className
       )}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <span className="text-[13px] font-display font-bold text-muted-foreground uppercase tracking-wide">
-          Meilleure plateforme
-        </span>
-        {isInferred ? (
-          <span className="text-[10px] text-muted-foreground/50 font-body">
-            estimé
-          </span>
-        ) : (
-          <span className="text-[10px] text-emerald-500 font-body font-semibold">
-            ● live
-          </span>
-        )}
-      </div>
-
-      {/* Best platform highlight */}
-      <div className="flex items-center gap-2">
-        <span className="text-[24px] leading-none">
-          {getPlatformMeta(best.platform as Platform).emoji}
-        </span>
-        <div className="flex-1 min-w-0">
-          <span className="text-[16px] font-display font-bold leading-tight block">
-            {getPlatformMeta(best.platform as Platform).label}
-          </span>
-          <DemandBar demand={best.avg_demand} surge={best.latest_surge} />
-        </div>
-        <div className="text-right flex-shrink-0">
-          <span className="text-[20px] font-mono font-bold leading-tight block">
-            {best.avg_demand.toFixed(1)}
-            <span className="text-[12px] text-muted-foreground font-body font-normal">
-              /10
-            </span>
-          </span>
-          {best.latest_surge && signal_active_label(best)}
-        </div>
-      </div>
-
-      {/* Arbitrage gap indicator */}
-      {second && arbitrageGap >= 0.5 && (
-        <div className="text-[12px] text-muted-foreground font-body px-1">
-          {arbitrageGap >= 1.5 ? '⚡ ' : '↑ '}
-          {arbitrageGap.toFixed(1)} pts d'avance sur{' '}
-          {getPlatformMeta(second.platform as Platform).label}
-          {arbitrageGap >= 1.5 && (
-            <span className="ml-1 text-primary font-semibold">— Basculer!</span>
-          )}
-        </div>
-      )}
-
-      {/* All platforms breakdown */}
+      <PlatformArbitrageHeader isInferred={isInferred} />
+      <BestPlatformHighlight best={best} />
+      <ArbitrageGapNotice second={second} arbitrageGap={arbitrageGap} />
       <div className="space-y-0.5 pt-1 border-t border-border/50">
         {signals.map((sig, i) => (
           <PlatformRow key={sig.platform} signal={sig} isBest={i === 0} />
         ))}
       </div>
     </div>
-  );
-}
-
-function signal_active_label(signal: PlatformSignal) {
-  return (
-    <span className="text-[11px] font-bold text-red-400 block leading-tight">
-      SURGE{' '}
-      {signal.latest_multiplier
-        ? `${signal.latest_multiplier.toFixed(2)}×`
-        : ''}
-    </span>
   );
 }
