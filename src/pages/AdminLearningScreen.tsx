@@ -1,6 +1,7 @@
 import { LearningInsightsPanel } from '@/components/LearningInsightsPanel';
 import { WeightCalibratorPanel } from '@/components/WeightCalibratorPanel';
 import { AdminPageShell } from '@/components/admin/AdminPageShell';
+import { AgentObservabilityPanel } from '@/components/admin/AgentObservabilityPanel';
 import {
   AdminAiAnalysisCard,
   AdminLearningAgentsCard,
@@ -13,6 +14,8 @@ export default function AdminLearningScreen() {
       title="Admin · Apprentissage IA"
       description="Modules qui apprennent à partir de tes trajets et recalculent les poids ou les scores. À utiliser seulement après ingestion de données propres."
     >
+      <AgentObservabilityPanel />
+
       <Card className="bg-card border-border">
         <CardHeader className="pb-2">
           <CardTitle className="text-base font-display">

@@ -357,7 +357,12 @@ serve(async (req) => {
       });
     }
 
-    // 5. Optional Gemini enhancement (replaces final_score if available)
+    // 5. Optional Gemini enhancement with Hallucination Firewall validation
+    // WHY: Gemini sometimes hallucinates extreme scores. The firewall caps any
+    // suggestion that deviates more than FIREWALL_MAX_DRIFT from the computed
+    // baseline, preserving the AI's direction while bounding its magnitude.
+    const FIREWALL_MAX_DRIFT = 35; // max score units of deviation allowed
+
     const geminiScores = await geminiEnhanceScores(
       zones as Zone[],
       weather,
@@ -365,14 +370,54 @@ serve(async (req) => {
       computedScores
     );
 
+    let firewallAccepted = 0;
+    let firewallClamped = 0;
+    let firewallInvalid = 0;
+    let totalDrift = 0;
+
     if (geminiScores) {
       for (const row of scoreRows) {
         const geminiVal = geminiScores.get(row.zone_id);
-        if (geminiVal !== undefined) {
+        if (geminiVal === undefined) continue;
+
+        // Constraint 1: must be a finite number in [0, 100]
+        if (!isFinite(geminiVal) || geminiVal < 0 || geminiVal > 100) {
+          firewallInvalid++;
+          continue; // keep baseline final_score
+        }
+
+        const drift = Math.abs(geminiVal - row.score);
+        totalDrift += drift;
+
+        // Constraint 2: drift must not exceed firewall threshold
+        if (drift > FIREWALL_MAX_DRIFT) {
+          // Cap: preserve direction but bound magnitude
+          const cappedScore =
+            geminiVal > row.score
+              ? Math.min(geminiVal, row.score + FIREWALL_MAX_DRIFT)
+              : Math.max(geminiVal, row.score - FIREWALL_MAX_DRIFT);
+          row.final_score = Math.round(cappedScore * 100) / 100;
+          firewallClamped++;
+        } else {
           row.final_score = geminiVal;
+          firewallAccepted++;
         }
       }
     }
+
+    const firewallStats = geminiScores
+      ? {
+          accepted: firewallAccepted,
+          clamped: firewallClamped,
+          invalid: firewallInvalid,
+          avgDrift:
+            firewallAccepted + firewallClamped > 0
+              ? Math.round(
+                  (totalDrift / (firewallAccepted + firewallClamped)) * 10
+                ) / 10
+              : 0,
+        }
+      : null;
 
     // 6. Upsert scores into public.scores (insert new rows for history)
     const insertRows = scoreRows.map((r) => ({
@@ -418,6 +463,7 @@ serve(async (req) => {
         success: true,
         scored: scoreRows.length,
         aiEnhanced: geminiScores !== null,
+        firewall: firewallStats,
         weather: {
           temp: weather.temp,
           precip: weather.precip,
