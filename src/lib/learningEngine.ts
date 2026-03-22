@@ -127,170 +127,227 @@ function normalizeWeights(weights: WeightConfig): WeightConfig {
   }, {} as WeightConfig);
 }
 
-export function deriveLearningInsights(
-  trips: TripWithZone[],
-  weights: WeightConfig = DEFAULT_WEIGHTS
-): LearningInsights {
-  const sortedTrips = [...trips]
+function getSortedTrips(trips: TripWithZone[]) {
+  return [...trips]
     .filter((trip) => trip.started_at && getTripHours(trip) > 0)
     .sort(
       (left, right) =>
         new Date(left.started_at).getTime() -
         new Date(right.started_at).getTime()
     );
+}
 
-  const emaMap = new Map<string, EmaPattern>();
-  const beliefMap = new Map<string, ZoneBelief>();
-  const predictions: PredictionRecord[] = [];
+function getTripLearningContext(trip: TripWithZone) {
+  const startedAt = new Date(trip.started_at);
+  const hours = getTripHours(trip);
+  const earningsPerHour = getTripRevenue(trip) / hours;
+  const predictedScoreSource =
+    (trip as { zone_score?: number | null }).zone_score ??
+    trip.zones?.current_score;
 
-  for (const trip of sortedTrips) {
-    const startedAt = new Date(trip.started_at);
-    const hours = getTripHours(trip);
-    if (hours <= 0) continue;
-    const earningsPerHour = getTripRevenue(trip) / hours;
-    const actualScore = normalizeScoreFromEarnings(earningsPerHour);
-    const predictedScoreSource =
-      (trip as { zone_score?: number | null }).zone_score ??
-      trip.zones?.current_score;
-    const zoneId = trip.zone_id ?? 'unknown';
-    const zoneName = trip.zones?.name ?? 'Zone inconnue';
-    const dayOfWeek = startedAt.getDay();
-    const slotIndex = getSlotIndex(startedAt);
-    const key = `${zoneId}:${dayOfWeek}:${slotIndex}`;
+  return {
+    startedAt,
+    hours,
+    earningsPerHour,
+    actualScore: normalizeScoreFromEarnings(earningsPerHour),
+    predictedScoreSource,
+    zoneId: trip.zone_id ?? 'unknown',
+    zoneName: trip.zones?.name ?? 'Zone inconnue',
+    dayOfWeek: startedAt.getDay(),
+    slotIndex: getSlotIndex(startedAt),
+  };
+}
 
-    const previousEma = emaMap.get(key);
-    const nextEmaValue = updateEma(
-      previousEma?.emaEarningsPerHour ?? earningsPerHour,
-      earningsPerHour
-    );
-    emaMap.set(key, {
-      zoneId,
-      zoneName,
-      dayOfWeek,
-      slotIndex,
-      emaEarningsPerHour: round(nextEmaValue),
-      emaRideCount: round(updateEma(previousEma?.emaRideCount ?? 1, 1), 2),
-      observationCount: (previousEma?.observationCount ?? 0) + 1,
-    });
+function buildEmaPattern(
+  previousEma: EmaPattern | undefined,
+  context: ReturnType<typeof getTripLearningContext>
+): EmaPattern {
+  const nextEmaValue = updateEma(
+    previousEma?.emaEarningsPerHour ?? context.earningsPerHour,
+    context.earningsPerHour
+  );
 
-    const previousBelief = beliefMap.get(key);
-    const nextBelief = updateBayesianBelief(
-      previousBelief?.posteriorMean ?? DEFAULT_PRIOR_MEAN,
-      previousBelief?.posteriorVariance ?? DEFAULT_PRIOR_VARIANCE,
-      earningsPerHour
-    );
-    beliefMap.set(key, {
-      zoneId,
-      zoneName,
-      dayOfWeek,
-      slotIndex,
-      posteriorMean: round(nextBelief.posteriorMean),
-      posteriorVariance: round(nextBelief.posteriorVariance, 4),
-      observationCount: (previousBelief?.observationCount ?? 0) + 1,
-    });
+  return {
+    zoneId: context.zoneId,
+    zoneName: context.zoneName,
+    dayOfWeek: context.dayOfWeek,
+    slotIndex: context.slotIndex,
+    emaEarningsPerHour: round(nextEmaValue),
+    emaRideCount: round(updateEma(previousEma?.emaRideCount ?? 1, 1), 2),
+    observationCount: (previousEma?.observationCount ?? 0) + 1,
+  };
+}
 
-    if (predictedScoreSource !== null && predictedScoreSource !== undefined) {
-      const predictedScore = clamp(
-        Math.round(Number(predictedScoreSource)),
-        0,
-        100
-      );
+function buildZoneBelief(
+  previousBelief: ZoneBelief | undefined,
+  context: ReturnType<typeof getTripLearningContext>
+): ZoneBelief {
+  const nextBelief = updateBayesianBelief(
+    previousBelief?.posteriorMean ?? DEFAULT_PRIOR_MEAN,
+    previousBelief?.posteriorVariance ?? DEFAULT_PRIOR_VARIANCE,
+    context.earningsPerHour
+  );
 
-      predictions.push({
-        tripId: trip.id,
-        zoneId,
-        zoneName,
-        predictedScore,
-        actualScore,
-        actualEarningsPerHour: round(earningsPerHour),
-        error: round(actualScore - predictedScore),
-        startedAt: trip.started_at,
-      });
-    }
+  return {
+    zoneId: context.zoneId,
+    zoneName: context.zoneName,
+    dayOfWeek: context.dayOfWeek,
+    slotIndex: context.slotIndex,
+    posteriorMean: round(nextBelief.posteriorMean),
+    posteriorVariance: round(nextBelief.posteriorVariance, 4),
+    observationCount: (previousBelief?.observationCount ?? 0) + 1,
+  };
+}
+
+function updateMapsWithTrip(
+  emaMap: Map<string, EmaPattern>,
+  beliefMap: Map<string, ZoneBelief>,
+  trip: TripWithZone,
+  context: ReturnType<typeof getTripLearningContext>
+) {
+  const key = `${context.zoneId}:${context.dayOfWeek}:${context.slotIndex}`;
+
+  const previousEma = emaMap.get(key);
+  emaMap.set(key, buildEmaPattern(previousEma, context));
+
+  const previousBelief = beliefMap.get(key);
+  beliefMap.set(key, buildZoneBelief(previousBelief, context));
+
+  return key;
+}
+
+function buildPredictionRecord(
+  trip: TripWithZone,
+  context: ReturnType<typeof getTripLearningContext>
+): PredictionRecord | null {
+  if (
+    context.predictedScoreSource === null ||
+    context.predictedScoreSource === undefined
+  ) {
+    return null;
   }
 
-  const meanAbsoluteError =
-    predictions.length > 0
-      ? round(
-          predictions.reduce(
-            (sum, prediction) => sum + Math.abs(prediction.error),
-            0
-          ) / predictions.length
-        )
-      : 0;
+  const predictedScore = clamp(
+    Math.round(Number(context.predictedScoreSource)),
+    0,
+    100
+  );
+
+  return {
+    tripId: trip.id,
+    zoneId: context.zoneId,
+    zoneName: context.zoneName,
+    predictedScore,
+    actualScore: context.actualScore,
+    actualEarningsPerHour: round(context.earningsPerHour),
+    error: round(context.actualScore - predictedScore),
+    startedAt: trip.started_at,
+  };
+}
+
+function getPredictionStats(predictions: PredictionRecord[]) {
+  if (predictions.length === 0) {
+    return {
+      meanAbsoluteError: 0,
+      accuracyPercent: 0,
+      sampleCount: 0,
+      recentBias: 0,
+    };
+  }
+
+  const meanAbsoluteError = round(
+    predictions.reduce((sum, prediction) => sum + Math.abs(prediction.error), 0) /
+      predictions.length
+  );
   const accuratePredictions = predictions.filter(
     (prediction) => Math.abs(prediction.error) <= 15
   ).length;
-  const accuracyPercent =
-    predictions.length > 0
-      ? round((accuratePredictions / predictions.length) * 100)
-      : 0;
-
-  const baseSuggestions: WeightConfig = { ...weights };
-  const sampleCount = predictions.length;
-  const recentPredictions = predictions.slice(-20);
-  // Use the bounded recent-window sum (last 20 trips) for all bias-driven
-  // adjustments. The raw cumulative `bias` over ALL trips grows linearly with
-  // trip count and makes the threshold (25 / -25) permanently exceeded after
-  // ~50 trips with even a tiny systematic error, producing stale suggestions.
-  const recentBias = recentPredictions.reduce(
-    (sum, prediction) => sum + prediction.error,
-    0
+  const accuracyPercent = round(
+    (accuratePredictions / predictions.length) * 100
   );
+  const recentBias = predictions
+    .slice(-20)
+    .reduce((sum, prediction) => sum + prediction.error, 0);
+
+  return {
+    meanAbsoluteError,
+    accuracyPercent,
+    sampleCount: predictions.length,
+    recentBias,
+  };
+}
+
+function applyBiasAdjustments(weights: WeightConfig, sampleCount: number, recentBias: number) {
+  const adjustedWeights: WeightConfig = { ...weights };
 
   if (sampleCount >= 8) {
-    baseSuggestions.historicalEarnings += 0.04;
-    baseSuggestions.timeOfDay -= 0.02;
-    baseSuggestions.dayOfWeek -= 0.02;
+    adjustedWeights.historicalEarnings += 0.04;
+    adjustedWeights.timeOfDay -= 0.02;
+    adjustedWeights.dayOfWeek -= 0.02;
   }
 
   if (recentBias > 12) {
-    baseSuggestions.events += 0.02;
-    baseSuggestions.weather += 0.01;
-    baseSuggestions.timeOfDay -= 0.015;
-    baseSuggestions.dayOfWeek -= 0.015;
+    adjustedWeights.events += 0.02;
+    adjustedWeights.weather += 0.01;
+    adjustedWeights.timeOfDay -= 0.015;
+    adjustedWeights.dayOfWeek -= 0.015;
   }
 
   if (recentBias < -12) {
-    baseSuggestions.historicalEarnings += 0.02;
-    baseSuggestions.events -= 0.01;
-    baseSuggestions.weather -= 0.01;
+    adjustedWeights.historicalEarnings += 0.02;
+    adjustedWeights.events -= 0.01;
+    adjustedWeights.weather -= 0.01;
   }
 
-  const suggestedWeights = normalizeWeights(baseSuggestions);
-  const suggestions: WeightAdjustmentSuggestion[] = (
-    Object.keys(suggestedWeights) as Array<keyof WeightConfig>
-  )
+  return adjustedWeights;
+}
+
+function getSuggestionReason(
+  key: keyof WeightConfig,
+  sampleCount: number,
+  recentBias: number
+) {
+  if (key === 'historicalEarnings' && sampleCount >= 8) {
+    return 'L’historique réel devient fiable et mérite plus de poids.';
+  }
+
+  if ((key === 'events' || key === 'weather') && recentBias > 25) {
+    return 'Les prédictions sous-estiment des contextes dynamiques récents.';
+  }
+
+  if ((key === 'timeOfDay' || key === 'dayOfWeek') && sampleCount >= 8) {
+    return 'Le moteur peut moins dépendre des heuristiques fixes.';
+  }
+
+  return 'Ajustement neutre basé sur l’erreur moyenne récente.';
+}
+
+function buildSuggestions(
+  weights: WeightConfig,
+  suggestedWeights: WeightConfig,
+  sampleCount: number,
+  recentBias: number
+) {
+  return (Object.keys(suggestedWeights) as Array<keyof WeightConfig>)
     .map((key) => {
       const currentWeight = round(weights[key], 3);
-      const suggestedWeight = round(suggestedWeights[key], 3);
-      const delta = round(suggestedWeight - currentWeight, 3);
-
-      let reason = 'Ajustement neutre basé sur l’erreur moyenne récente.';
-      if (key === 'historicalEarnings' && sampleCount >= 8) {
-        reason = 'L’historique réel devient fiable et mérite plus de poids.';
-      } else if ((key === 'events' || key === 'weather') && recentBias > 25) {
-        reason =
-          'Les prédictions sous-estiment des contextes dynamiques récents.';
-      } else if (
-        (key === 'timeOfDay' || key === 'dayOfWeek') &&
-        sampleCount >= 8
-      ) {
-        reason = 'Le moteur peut moins dépendre des heuristiques fixes.';
-      }
+      const nextWeight = round(suggestedWeights[key], 3);
+      const delta = round(nextWeight - currentWeight, 3);
 
       return {
         key,
         currentWeight,
-        suggestedWeight,
+        suggestedWeight: nextWeight,
         delta,
-        reason,
+        reason: getSuggestionReason(key, sampleCount, recentBias),
       };
     })
     .filter((suggestion) => Math.abs(suggestion.delta) >= 0.005)
     .sort((left, right) => Math.abs(right.delta) - Math.abs(left.delta));
+}
 
-  const topLearnedZones = [...emaMap.values()]
+function buildTopLearnedZones(emaMap: Map<string, EmaPattern>) {
+  return [...emaMap.values()]
     .sort((left, right) => right.emaEarningsPerHour - left.emaEarningsPerHour)
     .slice(0, 5)
     .map((entry) => ({
@@ -299,14 +356,61 @@ export function deriveLearningInsights(
       emaEarningsPerHour: entry.emaEarningsPerHour,
       observationCount: entry.observationCount,
     }));
+}
+
+function sortPredictionsByRecency(predictions: PredictionRecord[]) {
+  return [...predictions].sort(
+    (left, right) =>
+      new Date(right.startedAt).getTime() - new Date(left.startedAt).getTime()
+  );
+}
+
+export function deriveLearningInsights(
+  trips: TripWithZone[],
+  weights: WeightConfig = DEFAULT_WEIGHTS
+): LearningInsights {
+  const sortedTrips = getSortedTrips(trips);
+
+  const emaMap = new Map<string, EmaPattern>();
+  const beliefMap = new Map<string, ZoneBelief>();
+  const predictions: PredictionRecord[] = [];
+
+  for (const trip of sortedTrips) {
+    const context = getTripLearningContext(trip);
+    if (context.hours <= 0) {
+      continue;
+    }
+
+    updateMapsWithTrip(emaMap, beliefMap, trip, context);
+
+    const prediction = buildPredictionRecord(trip, context);
+    if (prediction) {
+      predictions.push(prediction);
+    }
+  }
+
+  const { meanAbsoluteError, accuracyPercent, sampleCount, recentBias } =
+    getPredictionStats(predictions);
+
+  // Use the bounded recent-window sum (last 20 trips) for all bias-driven
+  // adjustments. The raw cumulative `bias` over ALL trips grows linearly with
+  // trip count and makes the threshold (25 / -25) permanently exceeded after
+  // ~50 trips with even a tiny systematic error, producing stale suggestions.
+  const suggestedWeights = normalizeWeights(
+    applyBiasAdjustments(weights, sampleCount, recentBias)
+  );
+  const suggestions = buildSuggestions(
+    weights,
+    suggestedWeights,
+    sampleCount,
+    recentBias
+  );
+  const topLearnedZones = buildTopLearnedZones(emaMap);
 
   return {
     emaPatterns: [...emaMap.values()],
     beliefs: [...beliefMap.values()],
-    predictions: predictions.sort(
-      (left, right) =>
-        new Date(right.startedAt).getTime() - new Date(left.startedAt).getTime()
-    ),
+    predictions: sortPredictionsByRecency(predictions),
     meanAbsoluteError,
     accuracyPercent,
     suggestedWeights,
