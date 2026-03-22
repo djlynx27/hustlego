@@ -1,7 +1,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 // @ts-expect-error Deno edge functions require explicit local .ts extensions.
-import { sumTrackedSessionEarnings, sumTrackedSessionHours, sumTrackedSessionRides } from './reportMetrics.ts';
+import {
+  sumTrackedSessionEarnings,
+  sumTrackedSessionHours,
+  sumTrackedSessionRides,
+} from './reportMetrics.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

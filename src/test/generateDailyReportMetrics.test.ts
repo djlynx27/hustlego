@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
-  sumTrackedSessionEarnings,
   getTrackedSessionHours,
+  sumTrackedSessionEarnings,
   sumTrackedSessionHours,
   sumTrackedSessionRides,
 } from '../../supabase/functions/generate-daily-report/reportMetrics';
