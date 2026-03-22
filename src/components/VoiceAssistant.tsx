@@ -68,19 +68,43 @@ type SpeechStatus = 'idle' | 'listening' | 'speaking';
 
 const COMMANDS = [
   {
-    patterns: ['où aller', 'meilleure zone', 'quelle zone', 'zone recommandée', 'où vas'],
+    patterns: [
+      'où aller',
+      'meilleure zone',
+      'quelle zone',
+      'zone recommandée',
+      'où vas',
+    ],
     action: 'best_zone' as const,
   },
   {
-    patterns: ['démarrer shift', 'commencer shift', 'début shift', 'start shift'],
+    patterns: [
+      'démarrer shift',
+      'commencer shift',
+      'début shift',
+      'start shift',
+    ],
     action: 'start_shift' as const,
   },
   {
-    patterns: ['terminer shift', 'arrêter shift', 'fin shift', 'end shift', 'stop shift', 'finir shift'],
+    patterns: [
+      'terminer shift',
+      'arrêter shift',
+      'fin shift',
+      'end shift',
+      'stop shift',
+      'finir shift',
+    ],
     action: 'end_shift' as const,
   },
   {
-    patterns: ["combien j'ai fait", 'mes gains', 'mes revenus', "j'ai fait", 'combien gagné'],
+    patterns: [
+      "combien j'ai fait",
+      'mes gains',
+      'mes revenus',
+      "j'ai fait",
+      'combien gagné',
+    ],
     action: 'earnings' as const,
   },
   {
@@ -103,7 +127,9 @@ function stripAccents(s: string) {
 function matchCommand(transcript: string): CommandAction | null {
   const normalized = stripAccents(transcript.toLowerCase());
   for (const cmd of COMMANDS) {
-    const matched = cmd.patterns.some((p) => normalized.includes(stripAccents(p)));
+    const matched = cmd.patterns.some((p) =>
+      normalized.includes(stripAccents(p))
+    );
     if (matched) return cmd.action;
   }
   return null;
@@ -137,6 +163,103 @@ function speak(text: string, onEnd?: () => void) {
   window.speechSynthesis.speak(utterance);
 }
 
+type AssistantRuntimeProps = {
+  heroZone: VoiceAssistantProps['heroZone'];
+  smartZones: VoiceAssistantProps['smartZones'];
+  nextEvent: VoiceAssistantProps['nextEvent'];
+  onStartShift: VoiceAssistantProps['onStartShift'];
+  onEndShift: VoiceAssistantProps['onEndShift'];
+};
+
+function speakAndReset(text: string, onDone: () => void) {
+  speak(text, onDone);
+}
+
+function buildBestZoneMessage({
+  heroZone,
+  smartZones,
+}: Pick<AssistantRuntimeProps, 'heroZone' | 'smartZones'>) {
+  if (!heroZone) {
+    return 'Chargement des zones en cours, réessaie dans un instant.';
+  }
+
+  const second = smartZones.find((zone) => zone.name !== heroZone.name);
+  return (
+    `Zone recommandée : ${heroZone.name}, score ${heroZone.score} sur cent.` +
+    (second
+      ? ` Deuxième option : ${second.name}, à ${second.distKm.toFixed(1)} kilomètres.`
+      : '')
+  );
+}
+
+function buildNextEventMessage(nextEvent: VoiceAssistantProps['nextEvent']) {
+  if (!nextEvent) {
+    return 'Aucun événement majeur dans les prochaines heures.';
+  }
+
+  return `Prochain événement : ${nextEvent.name} à ${nextEvent.venueName}.`;
+}
+
+function executeVoiceAction({
+  action,
+  props,
+  onDone,
+}: {
+  action: CommandAction | null;
+  props: AssistantRuntimeProps;
+  onDone: () => void;
+}) {
+  const actionHandlers: Record<CommandAction, () => void> = {
+    best_zone: () =>
+      speakAndReset(
+        buildBestZoneMessage({
+          heroZone: props.heroZone,
+          smartZones: props.smartZones,
+        }),
+        onDone
+      ),
+    start_shift: () => {
+      props.onStartShift?.();
+      speakAndReset('Shift démarré. Bonne chance sur la route !', onDone);
+    },
+    end_shift: () => {
+      props.onEndShift?.();
+      speakAndReset('Shift terminé. Bien joué !', onDone);
+    },
+    earnings: () =>
+      speakAndReset(
+        "Ouvre l'onglet Drive pour consulter tes gains du shift en cours.",
+        onDone
+      ),
+    next_event: () =>
+      speakAndReset(buildNextEventMessage(props.nextEvent), onDone),
+    help: () =>
+      speakAndReset(
+        "Commandes disponibles : où aller, démarrer shift, terminer shift, combien j'ai fait, prochain événement.",
+        onDone
+      ),
+  };
+
+  const defaultHandler = () =>
+    speakAndReset(
+      'Commande non reconnue. Dis : où aller, ou aide pour la liste des commandes.',
+      onDone
+    );
+
+  if (!action) {
+    defaultHandler();
+    return;
+  }
+
+  const handler = actionHandlers[action];
+  if (handler) {
+    handler();
+    return;
+  }
+
+  defaultHandler();
+}
+
 // ── Composant ─────────────────────────────────────────────────────────────────
 
 /**
@@ -167,70 +290,30 @@ export function VoiceAssistant({
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // Référence stable vers les props pour le callback de reconnaissance
-  const propsRef = useRef({ heroZone, smartZones, nextEvent, onStartShift, onEndShift });
+  const propsRef = useRef({
+    heroZone,
+    smartZones,
+    nextEvent,
+    onStartShift,
+    onEndShift,
+  });
   useEffect(() => {
-    propsRef.current = { heroZone, smartZones, nextEvent, onStartShift, onEndShift };
+    propsRef.current = {
+      heroZone,
+      smartZones,
+      nextEvent,
+      onStartShift,
+      onEndShift,
+    };
   });
 
   const handleAction = useCallback((action: CommandAction | null) => {
     setStatus('speaking');
-    const { heroZone: hz, smartZones: sz, nextEvent: ne, onStartShift: oss, onEndShift: oes } =
-      propsRef.current;
-
-    switch (action) {
-      case 'best_zone': {
-        if (hz) {
-          const second = sz.find((z) => z.name !== hz.name);
-          const msg =
-            `Zone recommandée : ${hz.name}, score ${hz.score} sur cent.` +
-            (second
-              ? ` Deuxième option : ${second.name}, à ${second.distKm.toFixed(1)} kilomètres.`
-              : '');
-          speak(msg, () => setStatus('idle'));
-        } else {
-          speak('Chargement des zones en cours, réessaie dans un instant.', () => setStatus('idle'));
-        }
-        break;
-      }
-      case 'start_shift': {
-        oss?.();
-        speak('Shift démarré. Bonne chance sur la route !', () => setStatus('idle'));
-        break;
-      }
-      case 'end_shift': {
-        oes?.();
-        speak('Shift terminé. Bien joué !', () => setStatus('idle'));
-        break;
-      }
-      case 'earnings': {
-        speak(
-          "Ouvre l'onglet Drive pour consulter tes gains du shift en cours.",
-          () => setStatus('idle'),
-        );
-        break;
-      }
-      case 'next_event': {
-        if (ne) {
-          speak(`Prochain événement : ${ne.name} à ${ne.venueName}.`, () => setStatus('idle'));
-        } else {
-          speak('Aucun événement majeur dans les prochaines heures.', () => setStatus('idle'));
-        }
-        break;
-      }
-      case 'help': {
-        speak(
-          "Commandes disponibles : où aller, démarrer shift, terminer shift, combien j'ai fait, prochain événement.",
-          () => setStatus('idle'),
-        );
-        break;
-      }
-      default: {
-        speak(
-          "Commande non reconnue. Dis : où aller, ou aide pour la liste des commandes.",
-          () => setStatus('idle'),
-        );
-      }
-    }
+    executeVoiceAction({
+      action,
+      props: propsRef.current,
+      onDone: () => setStatus('idle'),
+    });
   }, []);
 
   useEffect(() => {
@@ -279,7 +362,10 @@ export function VoiceAssistant({
 
     return () => {
       if ('speechSynthesis' in window) {
-        window.speechSynthesis.removeEventListener('voiceschanged', loadFrenchVoice);
+        window.speechSynthesis.removeEventListener(
+          'voiceschanged',
+          loadFrenchVoice
+        );
       }
       recognition.abort();
     };
@@ -329,14 +415,18 @@ export function VoiceAssistant({
       {/* Indicateur d'écoute active */}
       {isListening && (
         <div className="bg-destructive/90 text-destructive-foreground rounded-xl px-3 py-1.5 shadow pointer-events-none">
-          <p className="text-[12px] font-display font-bold">🎙 J&apos;écoute…</p>
+          <p className="text-[12px] font-display font-bold">
+            🎙 J&apos;écoute…
+          </p>
         </div>
       )}
 
       {/* Bouton micro flottant */}
       <button
         onClick={isListening ? stopListening : startListening}
-        aria-label={isListening ? "Arrêter l'écoute" : "Activer l'assistant vocal"}
+        aria-label={
+          isListening ? "Arrêter l'écoute" : "Activer l'assistant vocal"
+        }
         className={`w-14 h-14 rounded-full shadow-xl flex items-center justify-center transition-all duration-200 pointer-events-auto ${
           isListening
             ? 'bg-destructive text-destructive-foreground scale-110 ring-4 ring-destructive/30 animate-pulse'
