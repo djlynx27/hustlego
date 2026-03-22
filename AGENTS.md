@@ -102,10 +102,10 @@ Cibles ISO 25010 (seuils minimum enforced dans `vitest.config.ts`) :
 
 | Métrique   | Seuil CI | Cible finale |
 | ---------- | -------- | ------------ |
-| Statements | 73%      | 80%          |
-| Branches   | 57%      | 80%          |
-| Functions  | 78%      | 80%          |
-| Lines      | 76%      | 80%          |
+| Statements | 78%      | 80%          |
+| Branches   | 65%      | 80%          |
+| Functions  | 83%      | 85%          |
+| Lines      | 80%      | 85%          |
 
 Écrire au minimum :
 

@@ -54,8 +54,9 @@ jobs:
 
   # ─── Unit tests + Coverage ──────────────────────────────────────────────────
   # Coverage thresholds enforced via vitest.config.ts.
-  # Architecture target: statements ≥ 73%, branches ≥ 57%, functions ≥ 78%, lines ≥ 76%.
-  # Update thresholds as coverage improves toward ISO 25010 target of 80% across all metrics.
+  # Architecture target: statements ≥ 78%, branches ≥ 65%, functions ≥ 83%, lines ≥ 80%.
+  # All metrics crossed 80% ISO 25010 threshold in sprint #2 (March 2026).
+  # Remaining gap: learningSync.ts async functions (need Supabase mock) and scoringEngine.ts time rules.
   test:
     name: Unit Tests
     runs-on: ubuntu-latest

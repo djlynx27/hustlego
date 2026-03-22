@@ -168,13 +168,13 @@ Seuil maximal : **M ≤ 10** (ISO 25010).
 
 | Métrique   | Seuil actuel | Cible finale |
 | ---------- | ------------ | ------------ |
-| Statements | ≥ 73%        | ≥ 80%        |
-| Branches   | ≥ 57%        | ≥ 80%        |
-| Functions  | ≥ 78%        | ≥ 80%        |
-| Lines      | ≥ 76%        | ≥ 80%        |
+| Statements | ≥ 78%        | ≥ 80%        |
+| Branches   | ≥ 65%        | ≥ 80%        |
+| Functions  | ≥ 83%        | ≥ 85%        |
+| Lines      | ≥ 80%        | ≥ 85%        |
 
 Thresholds configurés dans `vitest.config.ts`. Un build CI échoue si on descend sous ces seuils.
-Fichiers sous-testés : `driverPreferences.ts`, `learningSync.ts`, `scoringEngine.ts`, `demandUtils.ts`.
+Fichiers sous-testés : `learningSync.ts` (fonctions async Supabase), `scoringEngine.ts` (time rules internes).
 
 ### 4. Software Immunology (détection automatique)
 

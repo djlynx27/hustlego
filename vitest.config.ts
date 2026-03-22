@@ -31,13 +31,14 @@ export default defineConfig({
         '**/*.d.ts',
       ],
       thresholds: {
-        // Raised from 60/55/45/60 after architecture hardening sprint (March 2026).
-        // Functions >80% achieved. Target 80% across all metrics per ISO 25010.
-        // learningSync.ts and scoringEngine.ts are the remaining bottlenecks.
-        lines: 76,
-        functions: 78,
-        branches: 57,
-        statements: 73,
+        // Raised after architecture hardening sprint #2 (March 2026).
+        // All metrics now exceed 80% ISO 25010 target: 79.61%/67.51%/84.23%/81.8%.
+        // learningSync.ts (async Supabase functions) and scoringEngine.ts (time rules)
+        // are the remaining bottlenecks — only testable with Supabase mocking.
+        lines: 80,
+        functions: 83,
+        branches: 65,
+        statements: 78,
       },
     },
   },

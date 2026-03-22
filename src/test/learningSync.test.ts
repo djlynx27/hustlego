@@ -4,8 +4,10 @@ import {
   buildShiftPersistencePayload,
   buildSimilarContextRpcArgs,
   buildUserPingCacheKey,
+  buildUserPingMatchRpcArgs,
   buildZoneSimilarContextRpcArgs,
   encodeContextVector,
+  encodeUserPingContextVector,
   encodeZoneContextVector,
   shouldThrottleUserPing,
 } from '@/lib/learningSync';
@@ -192,5 +194,229 @@ describe('learning sync payloads', () => {
     expect(payload.session.total_rides).toBe(3);
     expect(payload.predictions).toHaveLength(2);
     expect(payload.demandPatterns).toHaveLength(2);
+  });
+});
+
+describe('encodeUserPingContextVector', () => {
+  const baseInput = {
+    zoneId: 'mtl-cb',
+    zoneType: 'événements',
+    currentScore: 70,
+    now: new Date('2026-03-22T21:00:00.000Z'),
+    trafficCongestion: 0.5,
+    weatherDemandBoostPoints: 10,
+  };
+
+  it('encodes a 16-dimensional vector', () => {
+    const vector = encodeUserPingContextVector(baseInput);
+    expect(vector).toHaveLength(16);
+  });
+
+  it('sets conservative presence flag at index 11', () => {
+    const withPresence = encodeUserPingContextVector({
+      ...baseInput,
+      conservativePresence: true,
+    });
+    const withoutPresence = encodeUserPingContextVector({
+      ...baseInput,
+      conservativePresence: false,
+    });
+    expect(withPresence[11]).toBe(1);
+    expect(withoutPresence[11]).toBe(0);
+  });
+
+  it('normalizes distance, lyft demand and wait time', () => {
+    const vector = encodeUserPingContextVector({
+      ...baseInput,
+      distanceKm: 20,
+      lyftDemandLevel: 10,
+      estimatedWaitMin: 20,
+    });
+    // normalizedDistance = 20/20 = 1.0 → index 7
+    // normalizedLyftDemand = 10/10 = 1.0 → index 8
+    // normalizedWait = 20/20 = 1.0 → index 9
+    expect(vector[7]).toBe(1);
+    expect(vector[8]).toBe(1);
+    expect(vector[9]).toBe(1);
+  });
+
+  it('clamps oversized inputs to 1', () => {
+    const vector = encodeUserPingContextVector({
+      ...baseInput,
+      distanceKm: 999,
+      lyftDemandLevel: 999,
+      estimatedWaitMin: 999,
+    });
+    expect(vector[7]).toBe(1);
+    expect(vector[8]).toBe(1);
+    expect(vector[9]).toBe(1);
+  });
+
+  it('uses zero defaults for optional fields', () => {
+    const vector = encodeUserPingContextVector(baseInput);
+    // distanceKm, lyftDemandLevel, estimatedWaitMin default to 0
+    expect(vector[7]).toBe(0);
+    expect(vector[8]).toBe(0);
+    expect(vector[9]).toBe(0);
+  });
+});
+
+describe('buildUserPingMatchRpcArgs', () => {
+  const input = {
+    zoneId: 'mtl-cb',
+    zoneType: 'événements',
+    currentScore: 70,
+    now: new Date('2026-03-22T21:00:00.000Z'),
+  };
+
+  it('builds valid rpc args for a known driver', () => {
+    const args = buildUserPingMatchRpcArgs('fp-123', input, 5);
+    expect(args).toMatchObject({
+      query_driver_fingerprint: 'fp-123',
+      query_platform: 'lyft',
+      query_zone_id: 'mtl-cb',
+      match_count: 5,
+    });
+    expect(args!.query_vector).toMatch(/^\[[^\]]+\]$/);
+  });
+
+  it('returns null when driver fingerprint is empty', () => {
+    expect(buildUserPingMatchRpcArgs('', input)).toBeNull();
+  });
+
+  it('returns null when zone id is empty', () => {
+    expect(buildUserPingMatchRpcArgs('fp-123', { ...input, zoneId: '' })).toBeNull();
+  });
+
+  it('clamps matchCount to at least 1', () => {
+    const args = buildUserPingMatchRpcArgs('fp-123', input, 0);
+    expect(args!.match_count).toBe(1);
+  });
+});
+
+describe('encodeContextVector — platform and zone type branches', () => {
+  const makeTrip = (overrides: Partial<TripWithZone>): TripWithZone => ({
+    id: 't1',
+    created_at: '2026-03-15T22:00:00.000Z',
+    distance_km: 10,
+    earnings: 30,
+    ended_at: '2026-03-15T22:45:00.000Z',
+    experiment: false,
+    notes: null,
+    started_at: '2026-03-15T22:00:00.000Z',
+    tips: 0,
+    zone_id: 'mtl-cb',
+    zone_score: 60,
+    platform: 'lyft',
+    zones: { name: 'Centre Bell', current_score: 60, type: 'événements' },
+    ...overrides,
+  });
+
+  it('sets uber one-hot at index 8', () => {
+    const vector = encodeContextVector(makeTrip({ platform: 'uber' }));
+    expect(vector[8]).toBe(1);
+    expect(vector[9]).toBe(0);
+    expect(vector[10]).toBe(0);
+  });
+
+  it('sets lyft one-hot at index 9', () => {
+    const vector = encodeContextVector(makeTrip({ platform: 'lyft' }));
+    expect(vector[8]).toBe(0);
+    expect(vector[9]).toBe(1);
+    expect(vector[10]).toBe(0);
+  });
+
+  it('sets taxi one-hot at index 10', () => {
+    const vector = encodeContextVector(makeTrip({ platform: 'taxi' }));
+    expect(vector[8]).toBe(0);
+    expect(vector[9]).toBe(0);
+    expect(vector[10]).toBe(1);
+  });
+
+  it('sets nightlife flag at index 14 for nightlife zone', () => {
+    const vector = encodeContextVector(
+      makeTrip({ zones: { name: 'Crescent', current_score: 70, type: 'nightlife' } })
+    );
+    expect(vector[14]).toBe(1);
+  });
+
+  it('clears nightlife flag for non-event zone', () => {
+    const vector = encodeContextVector(
+      makeTrip({ zones: { name: 'NDG', current_score: 55, type: 'résidentiel' } })
+    );
+    expect(vector[14]).toBe(0);
+  });
+
+  it('sets winter flag at index 13 for winter month (January)', () => {
+    const vector = encodeContextVector(
+      makeTrip({ started_at: '2026-01-10T22:00:00.000Z', ended_at: '2026-01-10T23:00:00.000Z' })
+    );
+    expect(vector[13]).toBe(1); // isWinter = 1
+  });
+
+  it('clears winter flag for summer month (July)', () => {
+    const vector = encodeContextVector(
+      makeTrip({ started_at: '2026-07-10T22:00:00.000Z', ended_at: '2026-07-10T23:00:00.000Z' })
+    );
+    expect(vector[13]).toBe(0); // isWinter = 0
+  });
+});
+
+describe('buildShiftPersistencePayload — date filtering', () => {
+  const trips: TripWithZone[] = [
+    {
+      id: '1',
+      created_at: '2026-03-15T22:00:00.000Z',
+      distance_km: 12,
+      earnings: 42,
+      ended_at: '2026-03-15T22:45:00.000Z',
+      experiment: false,
+      notes: null,
+      started_at: '2026-03-15T22:00:00.000Z',
+      tips: 6,
+      zone_id: 'mtl-cb',
+      zone_score: 62,
+      platform: 'lyft',
+      zones: { name: 'Centre Bell', current_score: 60, type: 'événements' },
+    },
+    {
+      id: '2',
+      created_at: '2026-03-18T07:00:00.000Z',
+      distance_km: 8,
+      earnings: 20,
+      ended_at: '2026-03-18T07:35:00.000Z',
+      experiment: false,
+      notes: null,
+      started_at: '2026-03-18T07:00:00.000Z',
+      tips: 2,
+      zone_id: 'mtl-bq',
+      zone_score: 50,
+      platform: 'uber',
+      zones: { name: 'Berri-UQAM', current_score: 50, type: 'métro' },
+    },
+  ];
+
+  it('only includes trips within the shift period', () => {
+    // Only trip 1 falls within this narrow window
+    const payload = buildShiftPersistencePayload(
+      trips,
+      '2026-03-15T00:00:00.000Z',
+      '2026-03-16T00:00:00.000Z',
+      DEFAULT_WEIGHTS
+    );
+    expect(payload.session.total_rides).toBe(1);
+    expect(payload.sessionZones).toHaveLength(1);
+  });
+
+  it('handles an empty trip list gracefully', () => {
+    const payload = buildShiftPersistencePayload(
+      [],
+      '2026-03-15T00:00:00.000Z',
+      '2026-03-16T00:00:00.000Z',
+      DEFAULT_WEIGHTS
+    );
+    expect(payload.session.total_rides).toBe(0);
+    expect(payload.sessionZones).toHaveLength(0);
+    expect(payload.predictions).toHaveLength(0);
   });
 });
