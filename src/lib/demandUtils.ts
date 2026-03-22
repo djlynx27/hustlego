@@ -91,48 +91,81 @@ export function getCurrentSlotTime(now: Date = new Date()): {
   return { start: formatTime24h(start), end: formatTime24h(end), date };
 }
 
+function isWeekendDay(dayOfWeek: number) {
+  return dayOfWeek === 0 || dayOfWeek === 6;
+}
+
+function isWeekdayRushHour(hour: number, isWeekend: boolean) {
+  return !isWeekend && ((hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 18));
+}
+
+function getWeekendAfternoonAdjustment(
+  hour: number,
+  zoneType: string,
+  isWeekend: boolean
+) {
+  if (!isWeekend || hour < 11 || hour > 17) return 0;
+  if (zoneType === 'commercial' || zoneType === 'tourisme') return 25;
+  if (zoneType === 'résidentiel') return 10;
+  return 0;
+}
+
+function getSundayTransportAdjustment(
+  dayOfWeek: number,
+  hour: number,
+  zoneType: string
+) {
+  if (dayOfWeek !== 0 || hour >= 10) return 0;
+  return zoneType === 'métro' || zoneType === 'transport' ? -15 : 0;
+}
+
+function getNightAdjustment(hour: number, zoneType: string) {
+  if (hour < 22 && hour > 2) return 0;
+  if (zoneType === 'nightlife') return 40;
+  if (zoneType === 'aéroport') return 20;
+  return -10;
+}
+
+function getAirportMorningAdjustment(hour: number, zoneType: string) {
+  return hour >= 4 && hour <= 7 && zoneType === 'aéroport' ? 35 : 0;
+}
+
+function getEventEveningAdjustment(hour: number, zoneType: string) {
+  return hour >= 18 && hour <= 23 && zoneType === 'événements' ? 30 : 0;
+}
+
+function getUniversityAdjustment(
+  hour: number,
+  zoneType: string,
+  isWeekend: boolean
+) {
+  if (zoneType !== 'université') return 0;
+  if (isWeekend) return -15;
+  return hour >= 8 && hour <= 17 ? 20 : 0;
+}
+
+function getMedicalAdjustment(zoneType: string) {
+  return zoneType === 'médical' ? 10 : 0;
+}
+
 function generateDemandScore(hour: number, zoneType: string): number {
   const now = new Date();
   const dayOfWeek = now.getDay(); // 0=Sun
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6;
+  const isWeekend = isWeekendDay(dayOfWeek);
 
   let base = 30 + Math.floor(Math.random() * 20);
 
-  // Rush hours (weekday only)
-  if (!isWeekend && ((hour >= 7 && hour <= 9) || (hour >= 16 && hour <= 18)))
+  if (isWeekdayRushHour(hour, isWeekend)) {
     base += 30;
-
-  // Weekend afternoon boost for commercial/tourisme
-  if (isWeekend && hour >= 11 && hour <= 17) {
-    if (zoneType === 'commercial' || zoneType === 'tourisme') base += 25;
-    if (zoneType === 'résidentiel') base += 10;
   }
 
-  // Sunday brunch / morning is quieter for transport
-  if (dayOfWeek === 0 && hour < 10) {
-    if (zoneType === 'métro' || zoneType === 'transport') base -= 15;
-  }
-
-  // Nightlife
-  if (hour >= 22 || hour <= 2) {
-    if (zoneType === 'nightlife') base += 40;
-    else if (zoneType === 'aéroport') base += 20;
-    else base -= 10;
-  }
-
-  // Airport early morning
-  if (hour >= 4 && hour <= 7 && zoneType === 'aéroport') base += 35;
-
-  // Events evening
-  if (hour >= 18 && hour <= 23 && zoneType === 'événements') base += 30;
-
-  // University weekday only
-  if (!isWeekend && hour >= 8 && hour <= 17 && zoneType === 'université')
-    base += 20;
-  if (isWeekend && zoneType === 'université') base -= 15;
-
-  // Medical always has base demand
-  if (zoneType === 'médical') base += 10;
+  base += getWeekendAfternoonAdjustment(hour, zoneType, isWeekend);
+  base += getSundayTransportAdjustment(dayOfWeek, hour, zoneType);
+  base += getNightAdjustment(hour, zoneType);
+  base += getAirportMorningAdjustment(hour, zoneType);
+  base += getEventEveningAdjustment(hour, zoneType);
+  base += getUniversityAdjustment(hour, zoneType, isWeekend);
+  base += getMedicalAdjustment(zoneType);
 
   return Math.max(0, Math.min(100, base));
 }

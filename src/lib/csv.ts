@@ -5,6 +5,24 @@ function normalizeHeader(header: string) {
     .replace(/[^a-z0-9_]/g, '_');
 }
 
+function pushNonEmptyRow(rows: string[][], row: string[]) {
+  if (row.some((value) => value.trim() !== '')) {
+    rows.push(row);
+  }
+}
+
+function isEscapedQuote(source: string, index: number, inQuotes: boolean) {
+  return inQuotes && source[index + 1] === '"';
+}
+
+function isUnquotedDelimiter(char: string, inQuotes: boolean) {
+  return char === ',' && !inQuotes;
+}
+
+function isUnquotedLineBreak(char: string, inQuotes: boolean) {
+  return (char === '\n' || char === '\r') && !inQuotes;
+}
+
 function parseCsvRows(text: string): string[][] {
   const rows: string[][] = [];
   const source = text.replace(/^\uFEFF/, '');
@@ -17,7 +35,7 @@ function parseCsvRows(text: string): string[][] {
     const char = source[index];
 
     if (char === '"') {
-      if (inQuotes && source[index + 1] === '"') {
+      if (isEscapedQuote(source, index, inQuotes)) {
         currentValue += '"';
         index += 1;
       } else {
@@ -26,21 +44,19 @@ function parseCsvRows(text: string): string[][] {
       continue;
     }
 
-    if (char === ',' && !inQuotes) {
+    if (isUnquotedDelimiter(char, inQuotes)) {
       currentRow.push(currentValue);
       currentValue = '';
       continue;
     }
 
-    if ((char === '\n' || char === '\r') && !inQuotes) {
+    if (isUnquotedLineBreak(char, inQuotes)) {
       if (char === '\r' && source[index + 1] === '\n') {
         index += 1;
       }
 
       currentRow.push(currentValue);
-      if (currentRow.some((value) => value.trim() !== '')) {
-        rows.push(currentRow);
-      }
+      pushNonEmptyRow(rows, currentRow);
       currentRow = [];
       currentValue = '';
       continue;
@@ -50,9 +66,7 @@ function parseCsvRows(text: string): string[][] {
   }
 
   currentRow.push(currentValue);
-  if (currentRow.some((value) => value.trim() !== '')) {
-    rows.push(currentRow);
-  }
+  pushNonEmptyRow(rows, currentRow);
 
   return rows;
 }
