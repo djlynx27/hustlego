@@ -1,5 +1,6 @@
 import { Progress } from '@/components/ui/progress';
 import { supabase } from '@/integrations/supabase/client';
+import { getWeekRange } from '@/lib/weeklyGoal';
 import { useQuery } from '@tanstack/react-query';
 import { Target } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -28,22 +29,6 @@ function writeWeeklyGoal(value: string) {
   window.dispatchEvent(new CustomEvent(WEEKLY_GOAL_EVENT));
 }
 
-function getWeekRange() {
-  const now = new Date();
-  const day = now.getDay(); // 0=Sun
-  const monday = new Date(now);
-  monday.setDate(now.getDate() - ((day + 6) % 7));
-  monday.setHours(0, 0, 0, 0);
-  const sunday = new Date(monday);
-  sunday.setDate(monday.getDate() + 6);
-  sunday.setHours(23, 59, 59, 999);
-  return {
-    from: monday.toISOString().split('T')[0],
-    to: sunday.toISOString().split('T')[0],
-    dayOfWeek: day === 0 ? 7 : day, // 1=Mon..7=Sun
-  };
-}
-
 function useWeekTripsEarnings() {
   const { from, to } = getWeekRange();
   return useQuery({
@@ -52,8 +37,8 @@ function useWeekTripsEarnings() {
       const { data, error } = await supabase
         .from('trips')
         .select('earnings, tips')
-        .gte('started_at', `${from}T00:00:00`)
-        .lte('started_at', `${to}T23:59:59`);
+        .gte('started_at', from)
+        .lte('started_at', to);
       if (error) throw error;
       return (data ?? []).reduce(
         (sum, t) => sum + Number(t.earnings || 0) + Number(t.tips || 0),
