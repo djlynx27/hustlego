@@ -6,6 +6,8 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import { useAutoShift } from '@/hooks/useAutoShift';
 import { useTrips } from '@/hooks/useTrips';
 import {
   derivePostShiftSummary,
@@ -15,8 +17,8 @@ import { syncShiftLearning } from '@/lib/learningSync';
 import { DEFAULT_WEIGHTS } from '@/lib/scoringEngine';
 import { buildShiftSnapshot } from '@/lib/tripAnalytics';
 import { cn } from '@/lib/utils';
-import { Clock3, Flag, Play, Route, Smartphone, Wallet } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Clock3, Flag, Play, Route, Smartphone, Wallet, Zap } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
 const ACTIVE_SHIFT_KEY = 'hustlego_active_shift';
@@ -218,6 +220,11 @@ export function ShiftTracker() {
   const [lastShiftSummary, setLastShiftSummary] =
     useState<PostShiftSummary | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
+  const { enabled: autoShiftEnabled, toggleEnabled: toggleAutoShift } =
+    useAutoShift();
+
+  // Ref stable pour les event listeners (évite les captures de closures périmées)
+  const endShiftRef = useRef<() => Promise<void>>(async () => {});
 
   useEffect(() => {
     if (!activeShift) return;
@@ -265,9 +272,37 @@ export function ShiftTracker() {
       toast.info(syncResult.message);
     } else {
       // Shift ended locally — only the ML cloud sync failed (hors-ligne ou non authentifié)
-      toast.warning('Données synchronisées localement. Sync cloud indisponible.');
+      toast.warning(
+        'Données synchronisées localement. Sync cloud indisponible.'
+      );
     }
   };
+
+  // Mettre la ref à jour à chaque render pour que les listeners aient
+  // toujours la version la plus récente de endShift
+  useEffect(() => {
+    endShiftRef.current = endShift;
+  });
+
+  // Écoute les événements du moniteur global (AutoShiftMonitor)
+  useEffect(() => {
+    const onShiftChanged = () => {
+      setActiveShift(loadActiveShift());
+      setNow(new Date());
+    };
+    window.addEventListener('hustlego:shift-changed', onShiftChanged);
+    return () =>
+      window.removeEventListener('hustlego:shift-changed', onShiftChanged);
+  }, []);
+
+  useEffect(() => {
+    const onAutoEnd = () => {
+      void endShiftRef.current();
+    };
+    window.addEventListener('hustlego:auto-end-shift', onAutoEnd);
+    return () =>
+      window.removeEventListener('hustlego:auto-end-shift', onAutoEnd);
+  }, []);
 
   const startedLabel = getStartedLabel(snapshot?.startedAt ?? null);
   const shiftRevenuePerHour = getShiftRevenuePerHour(snapshot);
@@ -276,12 +311,30 @@ export function ShiftTracker() {
   return (
     <Card className="bg-card border-border">
       <CardHeader className="pb-2">
-        <CardTitle className="text-base font-display flex items-center gap-2">
-          <Flag className="w-4 h-4 text-primary" /> Shift tracker
-        </CardTitle>
+        <div className="flex items-center justify-between gap-2">
+          <CardTitle className="text-base font-display flex items-center gap-2">
+            <Flag className="w-4 h-4 text-primary" /> Shift tracker
+          </CardTitle>
+          <div className="flex items-center gap-1.5">
+            <Zap
+              className={cn(
+                'w-3.5 h-3.5',
+                autoShiftEnabled ? 'text-primary' : 'text-muted-foreground'
+              )}
+            />
+            <Switch
+              checked={autoShiftEnabled}
+              onCheckedChange={toggleAutoShift}
+              aria-label="Démarrage automatique du shift"
+            />
+          </div>
+        </div>
         <CardDescription className="text-xs">
           Suivi live du shift en cours à partir des courses enregistrées ou
-          importées.
+          importées.{' '}
+          {autoShiftEnabled && (
+            <span className="text-primary">Auto-shift actif.</span>
+          )}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">

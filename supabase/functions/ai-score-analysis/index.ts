@@ -60,10 +60,13 @@ interface AIRecommendation {
 // eslint-disable-next-line complexity
 function buildFallbackRecommendation(
   zone: Zone,
-  stats: { count: number; totalEarnings: number; hours: Set<number> } | undefined
+  stats:
+    | { count: number; totalEarnings: number; hours: Set<number> }
+    | undefined
 ): AIRecommendation {
   const currentScore = zone.current_score ?? zone.base_score ?? 50;
-  const avgEarnings = stats && stats.count > 0 ? stats.totalEarnings / stats.count : 0;
+  const avgEarnings =
+    stats && stats.count > 0 ? stats.totalEarnings / stats.count : 0;
   const earningsFactor = Math.min(1.2, 0.8 + (avgEarnings / 30) * 0.4);
   const newScore = Math.min(
     100,

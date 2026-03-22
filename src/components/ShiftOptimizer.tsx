@@ -119,8 +119,7 @@ function getLearningAdjustedEarningsPerHour({
 
   const emaTrust = Math.min(0.85, emaPattern.observationCount * 0.1);
   return (
-    emaTrust * emaPattern.emaEarningsPerHour +
-    (1 - emaTrust) * earningsPerH
+    emaTrust * emaPattern.emaEarningsPerHour + (1 - emaTrust) * earningsPerH
   );
 }
 
@@ -449,8 +448,8 @@ function LearningCalibrationFooter({
   return (
     <div className="rounded-xl bg-muted/40 border border-border/50 p-3">
       <p className="text-[12px] text-muted-foreground font-body text-center">
-        📊 Calibré sur {learningInsights.predictions.length} courses ·
-        Précision :{' '}
+        📊 Calibré sur {learningInsights.predictions.length} courses · Précision
+        :{' '}
         <span className="text-foreground font-semibold">
           {Math.round(learningInsights.accuracyPercent)}%
         </span>{' '}

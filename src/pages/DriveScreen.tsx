@@ -213,13 +213,18 @@ export default function DriveScreen() {
 
   // 15-minute auto-routing: when driver arrives at heroZone, countdown then
   // auto-navigate to nextZones[0] in Google Maps.
-  const { isCountingDown, arrivedZoneName, secondsRemaining, cancel, launchNow } =
-    useArrivalCountdown(heroZone, location, () => {
-      const next = nextZones[0];
-      if (next) {
-        launchGoogleMapsNavigation(next.name, next.latitude, next.longitude);
-      }
-    });
+  const {
+    isCountingDown,
+    arrivedZoneName,
+    secondsRemaining,
+    cancel,
+    launchNow,
+  } = useArrivalCountdown(heroZone, location, () => {
+    const next = nextZones[0];
+    if (next) {
+      launchGoogleMapsNavigation(next.name, next.latitude, next.longitude);
+    }
+  });
 
   const getDistance = (
     zone: { latitude: number; longitude: number } | null

@@ -23,12 +23,14 @@ type ShiftComparisonStats = {
 };
 
 function getBestZone(zoneCounts: Record<string, number>) {
-  return Object.entries(zoneCounts).sort((left, right) => right[1] - left[1])[0]?.[0] || '-';
+  return (
+    Object.entries(zoneCounts).sort(
+      (left, right) => right[1] - left[1]
+    )[0]?.[0] || '-'
+  );
 }
 
-function calcStats(
-  trips: ShiftComparisonTrip[]
-): ShiftComparisonStats | null {
+function calcStats(trips: ShiftComparisonTrip[]): ShiftComparisonStats | null {
   if (trips.length === 0) return null;
 
   let totalEarnings = 0;

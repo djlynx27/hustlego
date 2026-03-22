@@ -1,3 +1,4 @@
+import type { Zone } from '@/hooks/useSupabase';
 import {
   createSimulatedSlotForTime,
   formatTime24h,
@@ -10,7 +11,6 @@ import {
   getUpcomingSlotTimes,
   normalize24hTime,
 } from '@/lib/demandUtils';
-import type { Zone } from '@/hooks/useSupabase';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 describe('normalize24hTime', () => {

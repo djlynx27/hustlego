@@ -132,7 +132,8 @@ function ExpandedSimilarityCard({
               Situations similaires
             </span>
             <span className="text-[11px] text-muted-foreground font-body">
-              {model.matches.length} correspondance{model.matches.length > 1 ? 's' : ''} · vecteur 8D pgvector
+              {model.matches.length} correspondance
+              {model.matches.length > 1 ? 's' : ''} · vecteur 8D pgvector
             </span>
           </div>
         </div>

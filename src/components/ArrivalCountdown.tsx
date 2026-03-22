@@ -62,7 +62,9 @@ export function ArrivalCountdown({
           {nextZoneName && (
             <p className="text-[13px] font-body text-muted-foreground">
               {'→ '}
-              <span className="font-semibold text-foreground">{nextZoneName}</span>
+              <span className="font-semibold text-foreground">
+                {nextZoneName}
+              </span>
             </p>
           )}
         </div>
@@ -76,7 +78,10 @@ export function ArrivalCountdown({
         </div>
 
         {/* Action button */}
-        <Button className="w-full gap-2 font-display font-bold" onClick={onLaunchNow}>
+        <Button
+          className="w-full gap-2 font-display font-bold"
+          onClick={onLaunchNow}
+        >
           <Navigation className="w-4 h-4" />
           Naviguer maintenant
         </Button>

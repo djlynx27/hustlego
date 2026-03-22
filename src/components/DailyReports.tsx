@@ -40,7 +40,8 @@ function ReportHighlights({ report }: { report: DailyReportRow }) {
       <div className="flex gap-3 text-[12px] text-muted-foreground">
         {report.best_zone_name && (
           <span className="flex items-center gap-1">
-            <MapPin className="w-3 h-3 text-green-400" /> {report.best_zone_name}
+            <MapPin className="w-3 h-3 text-green-400" />{' '}
+            {report.best_zone_name}
           </span>
         )}
         {report.best_time_slot && (
@@ -100,14 +101,18 @@ function DailyReportCard({
         </div>
         <div>
           <span className="text-[11px] text-muted-foreground block">
-            {tracked && tracked.hours > 0 ? 'Heures trackées' : 'Heures rapport'}
+            {tracked && tracked.hours > 0
+              ? 'Heures trackées'
+              : 'Heures rapport'}
           </span>
           <span className="text-[16px] font-display font-bold">
             {displayMetrics.hours.toFixed(1)}h
           </span>
         </div>
       </div>
-      {tracked && tracked.hours > 0 && <TrackedShiftSummary tracked={tracked} />}
+      {tracked && tracked.hours > 0 && (
+        <TrackedShiftSummary tracked={tracked} />
+      )}
       <ReportHighlights report={report} />
     </div>
   );
@@ -164,24 +169,25 @@ export function DailyReports() {
   const { data: sessions = [] } = useSessions(sessionsSince, 200);
 
   const trackedByDate = useMemo(() => {
-    return sessions.reduce<
-      Record<string, TrackedReportMetrics>
-    >((acc, session) => {
-      const dateKey = session.started_at.split('T')[0];
-      if (!dateKey) return acc;
-      const current = acc[dateKey] ?? {
-        hours: 0,
-        revenue: 0,
-        rides: 0,
-        shifts: 0,
-      };
-      current.hours += getTrackedSessionHours(session);
-      current.revenue += Number(session.total_earnings ?? 0);
-      current.rides += Number(session.total_rides ?? 0);
-      current.shifts += 1;
-      acc[dateKey] = current;
-      return acc;
-    }, {});
+    return sessions.reduce<Record<string, TrackedReportMetrics>>(
+      (acc, session) => {
+        const dateKey = session.started_at.split('T')[0];
+        if (!dateKey) return acc;
+        const current = acc[dateKey] ?? {
+          hours: 0,
+          revenue: 0,
+          rides: 0,
+          shifts: 0,
+        };
+        current.hours += getTrackedSessionHours(session);
+        current.revenue += Number(session.total_earnings ?? 0);
+        current.rides += Number(session.total_rides ?? 0);
+        current.shifts += 1;
+        acc[dateKey] = current;
+        return acc;
+      },
+      {}
+    );
   }, [sessions]);
 
   if (reports.length === 0) {

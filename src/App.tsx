@@ -1,3 +1,4 @@
+import { AutoShiftMonitor } from '@/components/AutoShiftMonitor';
 import { BottomNav } from '@/components/BottomNav';
 import { NearestHotspot } from '@/components/NearestHotspot';
 import { PwaInstallBanner } from '@/components/PwaInstallBanner';
@@ -107,6 +108,7 @@ function AppContent() {
         </Routes>
       </Suspense>
       {showNearestHotspot && <NearestHotspot />}
+      <AutoShiftMonitor />
       <PwaInstallBanner />
       <BottomNav />
     </div>

@@ -81,13 +81,16 @@ async function analyzeScreenshot({
   zoneName: string;
 }) {
   const publicUrl = await uploadScreenshot(file);
-  const { data, error } = await supabase.functions.invoke('analyze-screenshot', {
-    body: {
-      image_url: publicUrl,
-      zone_id: zoneId,
-      zone_name: zoneName,
-    },
-  });
+  const { data, error } = await supabase.functions.invoke(
+    'analyze-screenshot',
+    {
+      body: {
+        image_url: publicUrl,
+        zone_id: zoneId,
+        zone_name: zoneName,
+      },
+    }
+  );
   if (error) {
     throw error;
   }
@@ -118,7 +121,9 @@ function ZoneSelect({
         {zones.map((zone) => (
           <SelectItem key={zone.id} value={zone.id}>
             {zone.name} —{' '}
-            <span className="text-muted-foreground capitalize">{zone.type}</span>
+            <span className="text-muted-foreground capitalize">
+              {zone.type}
+            </span>
           </SelectItem>
         ))}
       </SelectContent>
@@ -147,7 +152,12 @@ function ScreenshotUpload({
           <span className="text-xs">Cliquez pour uploader un screenshot</span>
         </div>
       )}
-      <input type="file" accept="image/*" className="hidden" onChange={onFileChange} />
+      <input
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={onFileChange}
+      />
     </label>
   );
 }
@@ -169,7 +179,9 @@ function AnalysisResults({ result }: { result: AnalysisResult }) {
       </div>
 
       {result.time_context && (
-        <p className="text-xs text-muted-foreground">⏰ {result.time_context}</p>
+        <p className="text-xs text-muted-foreground">
+          ⏰ {result.time_context}
+        </p>
       )}
 
       {result.zones_detected?.length > 0 && (
@@ -202,7 +214,9 @@ function AnalysisResults({ result }: { result: AnalysisResult }) {
       )}
 
       {result.notes && (
-        <p className="text-xs text-muted-foreground italic">💡 {result.notes}</p>
+        <p className="text-xs text-muted-foreground italic">
+          💡 {result.notes}
+        </p>
       )}
 
       <p className="text-[10px] text-muted-foreground text-center">
@@ -216,7 +230,11 @@ export function ScreenshotAnalyzer() {
   const { data: mtlZones = [] } = useZones('mtl');
   const { data: lavalZones = [] } = useZones('laval');
   const { data: longueuilZones = [] } = useZones('longueuil');
-  const allZones: ZoneOption[] = [...mtlZones, ...lavalZones, ...longueuilZones];
+  const allZones: ZoneOption[] = [
+    ...mtlZones,
+    ...lavalZones,
+    ...longueuilZones,
+  ];
 
   const [zoneId, setZoneId] = useState('');
   const [file, setFile] = useState<File | null>(null);

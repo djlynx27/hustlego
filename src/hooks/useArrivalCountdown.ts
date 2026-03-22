@@ -105,7 +105,9 @@ export function useArrivalCountdown(
     }
 
     const tick = () => {
-      const elapsed = Math.floor((Date.now() - countdownState.arrivedAt) / 1000);
+      const elapsed = Math.floor(
+        (Date.now() - countdownState.arrivedAt) / 1000
+      );
       const remaining = COUNTDOWN_SECONDS - elapsed;
 
       if (remaining <= 0) {

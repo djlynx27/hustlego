@@ -173,7 +173,11 @@ function TopZonesChart({ analytics }: { analytics: RevenueAnalytics }) {
         </p>
       </div>
       <ChartContainer config={chartConfig} className="h-[220px] w-full">
-        <BarChart data={analytics.zoneSeries} layout="vertical" margin={{ left: 12 }}>
+        <BarChart
+          data={analytics.zoneSeries}
+          layout="vertical"
+          margin={{ left: 12 }}
+        >
           <CartesianGrid horizontal={false} />
           <XAxis type="number" hide />
           <YAxis

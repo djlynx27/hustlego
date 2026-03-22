@@ -83,7 +83,10 @@ function getMatchingTrips({
 }
 
 function buildZoneEarningsPerHour(trips: ZonePerformanceTrip[]) {
-  const zoneStats: Record<string, { totalEarnings: number; totalHours: number }> = {};
+  const zoneStats: Record<
+    string,
+    { totalEarnings: number; totalHours: number }
+  > = {};
 
   for (const trip of trips) {
     if (!trip.zone_id) {
@@ -129,7 +132,8 @@ function buildZoneColors({
     return new Map<string, HeatmapColor>();
   }
 
-  const average = values.reduce((first, second) => first + second, 0) / values.length;
+  const average =
+    values.reduce((first, second) => first + second, 0) / values.length;
   const result = new Map<string, HeatmapColor>();
 
   for (const zone of zones) {

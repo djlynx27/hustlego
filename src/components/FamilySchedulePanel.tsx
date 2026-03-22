@@ -274,7 +274,9 @@ function FamilyScheduleSettingsPanel({
         <input
           type="time"
           value={settings.pickupTime}
-          onChange={(event) => updateSettings({ pickupTime: event.target.value })}
+          onChange={(event) =>
+            updateSettings({ pickupTime: event.target.value })
+          }
           className="h-9 w-full rounded-lg border border-border bg-muted px-2 text-[13px] font-body"
         />
         <p className="text-[11px] text-muted-foreground font-body">

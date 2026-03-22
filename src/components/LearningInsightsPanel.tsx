@@ -139,7 +139,10 @@ function SimilarContextsMatches({
 
       <div className="mt-3 space-y-2">
         {similarContexts.matches.map((match, index) => (
-          <div key={match.id} className="rounded-lg border border-border px-3 py-2">
+          <div
+            key={match.id}
+            className="rounded-lg border border-border px-3 py-2"
+          >
             <div className="flex items-center justify-between gap-3">
               <span className="text-sm font-medium">
                 {index === 0 ? 'Meilleur match' : `Match ${index + 1}`}
@@ -192,10 +195,9 @@ function SimilarContextsSection({
         </p>
       ) : hasMatches ? (
         <SimilarContextsMatches
-          similarContexts={similarContexts as Extract<
-            SimilarContextsResult,
-            { ok: true }
-          >}
+          similarContexts={
+            similarContexts as Extract<SimilarContextsResult, { ok: true }>
+          }
         />
       ) : (
         <Alert className="mt-3 border-dashed">
@@ -211,7 +213,11 @@ function SimilarContextsSection({
   );
 }
 
-function WeightSuggestionsSection({ insights }: { insights: LearningInsights }) {
+function WeightSuggestionsSection({
+  insights,
+}: {
+  insights: LearningInsights;
+}) {
   return (
     <div className="rounded-xl border border-border bg-background p-3">
       <h3 className="font-display font-semibold flex items-center gap-2">
@@ -233,7 +239,9 @@ function WeightSuggestionsSection({ insights }: { insights: LearningInsights }) 
                 <span className="text-sm font-medium">{suggestion.key}</span>
                 <span
                   className={`text-xs font-semibold ${
-                    suggestion.delta >= 0 ? 'text-emerald-500' : 'text-amber-500'
+                    suggestion.delta >= 0
+                      ? 'text-emerald-500'
+                      : 'text-amber-500'
                   }`}
                 >
                   {suggestion.delta >= 0 ? '+' : ''}

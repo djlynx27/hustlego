@@ -5,7 +5,11 @@ interface ScoreFactorIconsProps {
   factors: ScoreFactors | undefined;
 }
 
-function WeatherBoostIcon({ weatherBoostPoints }: { weatherBoostPoints: number }) {
+function WeatherBoostIcon({
+  weatherBoostPoints,
+}: {
+  weatherBoostPoints: number;
+}) {
   return (
     <span
       className="inline-flex items-center gap-0.5 text-primary"
