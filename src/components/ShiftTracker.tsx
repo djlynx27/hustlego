@@ -56,6 +56,151 @@ function formatMoneyPerHour(value: number) {
   return `${formatMoney(value)}/h`;
 }
 
+function getStartedLabel(startedAt: string | null) {
+  if (!startedAt) {
+    return null;
+  }
+
+  return new Date(startedAt).toLocaleString('fr-CA', {
+    hour: '2-digit',
+    minute: '2-digit',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
+function getShiftRevenuePerHour(summary: {
+  elapsedHours: number;
+  metrics: { revenue: number };
+} | null) {
+  if (!summary || summary.elapsedHours <= 0) {
+    return 0;
+  }
+
+  return summary.metrics.revenue / summary.elapsedHours;
+}
+
+function buildShiftStats(snapshot: NonNullable<ReturnType<typeof buildShiftSnapshot>>) {
+  return [
+    {
+      label: 'Revenu',
+      value: formatMoney(snapshot.metrics.revenue),
+      icon: Wallet,
+    },
+    {
+      label: '$/h en course',
+      value: formatMoney(snapshot.metrics.revenuePerHour),
+      icon: Clock3,
+    },
+    {
+      label: 'Courses',
+      value: String(snapshot.metrics.rides),
+      icon: Smartphone,
+    },
+    {
+      label: 'Distance',
+      value: `${snapshot.metrics.distanceKm.toFixed(1)} km`,
+      icon: Route,
+    },
+  ];
+}
+
+function ShiftSnapshotContent({
+  snapshot,
+  startedLabel,
+  stats,
+  shiftRevenuePerHour,
+  isSyncing,
+  onEndShift,
+}: {
+  snapshot: NonNullable<ReturnType<typeof buildShiftSnapshot>>;
+  startedLabel: string | null;
+  stats: ReturnType<typeof buildShiftStats>;
+  shiftRevenuePerHour: number;
+  isSyncing: boolean;
+  onEndShift: () => void;
+}) {
+  return (
+    <>
+      <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <p className="text-xs text-muted-foreground">Démarré à {startedLabel}</p>
+            <p className="text-lg font-display font-semibold">
+              {snapshot.elapsedHours.toFixed(1)} h en cours
+            </p>
+          </div>
+          <Button
+            variant="destructive"
+            size="sm"
+            onClick={onEndShift}
+            disabled={isSyncing}
+          >
+            {isSyncing ? 'Sync...' : 'Terminer'}
+          </Button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-2 gap-2">
+        {stats.map((stat) => (
+          <div
+            key={stat.label}
+            className="rounded-xl border border-border bg-background p-3"
+          >
+            <div className="flex items-center gap-2 text-muted-foreground text-xs">
+              <stat.icon className="h-3.5 w-3.5" />
+              {stat.label}
+            </div>
+            <p className="mt-1 text-lg font-semibold font-display">{stat.value}</p>
+          </div>
+        ))}
+      </div>
+
+      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-amber-100">Rythme réel du shift</span>
+          <span className="font-semibold text-foreground">
+            {formatMoneyPerHour(shiftRevenuePerHour)}
+          </span>
+        </div>
+        <p className="mt-1 text-xs text-amber-100">
+          Basé sur {snapshot.elapsedHours.toFixed(1)} h écoulées depuis le début
+          du shift. Le $/h en course ci-dessus exclut les temps morts.
+        </p>
+      </div>
+
+      <div className="grid gap-2 rounded-xl border border-border bg-background p-3 text-sm">
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-muted-foreground">Zone la plus rentable</span>
+          <span className="font-medium">
+            {snapshot.topZone ?? 'Pas encore de données'}
+          </span>
+        </div>
+        <div className="flex items-center justify-between gap-3">
+          <span className="text-muted-foreground">Plateforme dominante</span>
+          <span className="font-medium">
+            {snapshot.topPlatform ?? 'Pas encore de données'}
+          </span>
+        </div>
+      </div>
+    </>
+  );
+}
+
+function EmptyShiftContent({ onStartShift }: { onStartShift: () => void }) {
+  return (
+    <div className="rounded-xl border border-dashed border-border bg-background/50 p-4">
+      <p className="text-sm text-muted-foreground">
+        Lance un shift avant de rouler pour suivre automatiquement le revenu,
+        le rythme et la meilleure zone pendant la session.
+      </p>
+      <Button className="mt-3 w-full gap-2" onClick={onStartShift}>
+        <Play className="w-4 h-4" /> Démarrer un shift
+      </Button>
+    </div>
+  );
+}
+
 export function ShiftTracker() {
   const { data: trips = [] } = useTrips(500);
   const [activeShift, setActiveShift] = useState<ActiveShift | null>(() =>
@@ -115,45 +260,9 @@ export function ShiftTracker() {
     }
   };
 
-  const startedLabel = snapshot
-    ? new Date(snapshot.startedAt).toLocaleString('fr-CA', {
-        hour: '2-digit',
-        minute: '2-digit',
-        month: 'short',
-        day: 'numeric',
-      })
-    : null;
-
-  const shiftRevenuePerHour = snapshot
-    ? snapshot.elapsedHours > 0
-      ? snapshot.metrics.revenue / snapshot.elapsedHours
-      : 0
-    : 0;
-
-  const stats = snapshot
-    ? [
-        {
-          label: 'Revenu',
-          value: formatMoney(snapshot.metrics.revenue),
-          icon: Wallet,
-        },
-        {
-          label: '$/h en course',
-          value: formatMoney(snapshot.metrics.revenuePerHour),
-          icon: Clock3,
-        },
-        {
-          label: 'Courses',
-          value: String(snapshot.metrics.rides),
-          icon: Smartphone,
-        },
-        {
-          label: 'Distance',
-          value: `${snapshot.metrics.distanceKm.toFixed(1)} km`,
-          icon: Route,
-        },
-      ]
-    : [];
+  const startedLabel = getStartedLabel(snapshot?.startedAt ?? null);
+  const shiftRevenuePerHour = getShiftRevenuePerHour(snapshot);
+  const stats = snapshot ? buildShiftStats(snapshot) : [];
 
   return (
     <Card className="bg-card border-border">
@@ -168,88 +277,18 @@ export function ShiftTracker() {
       </CardHeader>
       <CardContent className="space-y-3">
         {snapshot ? (
-          <>
-            <div className="rounded-xl border border-primary/30 bg-primary/5 p-3">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <p className="text-xs text-muted-foreground">
-                    Démarré à {startedLabel}
-                  </p>
-                  <p className="text-lg font-display font-semibold">
-                    {snapshot.elapsedHours.toFixed(1)} h en cours
-                  </p>
-                </div>
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={endShift}
-                  disabled={isSyncing}
-                >
-                  {isSyncing ? 'Sync...' : 'Terminer'}
-                </Button>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              {stats.map((stat) => (
-                <div
-                  key={stat.label}
-                  className="rounded-xl border border-border bg-background p-3"
-                >
-                  <div className="flex items-center gap-2 text-muted-foreground text-xs">
-                    <stat.icon className="h-3.5 w-3.5" />
-                    {stat.label}
-                  </div>
-                  <p className="mt-1 text-lg font-semibold font-display">
-                    {stat.value}
-                  </p>
-                </div>
-              ))}
-            </div>
-
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-3 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-amber-100">Rythme réel du shift</span>
-                <span className="font-semibold text-foreground">
-                  {formatMoneyPerHour(shiftRevenuePerHour)}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-amber-100">
-                Basé sur {snapshot.elapsedHours.toFixed(1)} h écoulées depuis le
-                début du shift. Le $/h en course ci-dessus exclut les temps
-                morts.
-              </p>
-            </div>
-
-            <div className="grid gap-2 rounded-xl border border-border bg-background p-3 text-sm">
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">
-                  Zone la plus rentable
-                </span>
-                <span className="font-medium">
-                  {snapshot.topZone ?? 'Pas encore de données'}
-                </span>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <span className="text-muted-foreground">
-                  Plateforme dominante
-                </span>
-                <span className="font-medium">
-                  {snapshot.topPlatform ?? 'Pas encore de données'}
-                </span>
-              </div>
-            </div>
-          </>
+          <ShiftSnapshotContent
+            snapshot={snapshot}
+            startedLabel={startedLabel}
+            stats={stats}
+            shiftRevenuePerHour={shiftRevenuePerHour}
+            isSyncing={isSyncing}
+            onEndShift={() => {
+              void endShift();
+            }}
+          />
         ) : (
-          <div className="rounded-xl border border-dashed border-border bg-background/50 p-4">
-            <p className="text-sm text-muted-foreground">
-              Lance un shift avant de rouler pour suivre automatiquement le
-              revenu, le rythme et la meilleure zone pendant la session.
-            </p>
-            <Button className="mt-3 w-full gap-2" onClick={startShift}>
-              <Play className="w-4 h-4" /> Démarrer un shift
-            </Button>
-          </div>
+          <EmptyShiftContent onStartShift={startShift} />
         )}
 
         <p className={cn('text-[11px] leading-relaxed text-muted-foreground')}>

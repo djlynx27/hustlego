@@ -31,10 +31,39 @@ const SIZE_STYLES = {
   lg: 'text-[14px] px-3 py-1.5 gap-1.5',
 };
 
+type SurgeIndicatorModel = {
+  display: ReturnType<typeof getSurgeDisplay>;
+  sizeStyle: string;
+  pulseClass: string;
+  showBoost: boolean;
+};
+
 function getSurgeBarFillClass(surgeClass: SurgeResult['surgeClass']) {
   if (surgeClass === 'peak') return 'bg-red-500 animate-pulse';
   if (surgeClass === 'high') return 'bg-orange-500';
   return 'bg-yellow-500';
+}
+
+function buildSurgeIndicatorModel({
+  surgeClass,
+  size,
+  boostPct,
+}: {
+  surgeClass: SurgeResult['surgeClass'];
+  size: NonNullable<SurgeIndicatorProps['size']>;
+  boostPct: number | undefined;
+}): SurgeIndicatorModel | null {
+  if (surgeClass === 'normal') {
+    return null;
+  }
+
+  return {
+    display: getSurgeDisplay(surgeClass),
+    sizeStyle: SIZE_STYLES[size],
+    pulseClass:
+      surgeClass === 'peak' || surgeClass === 'high' ? 'animate-pulse' : '',
+    showBoost: boostPct !== undefined && boostPct > 0,
+  };
 }
 
 export function SurgeIndicator({
@@ -46,27 +75,23 @@ export function SurgeIndicator({
   showMultiplier = true,
   reasoning,
 }: SurgeIndicatorProps) {
-  if (surgeClass === 'normal') return null;
-
-  const display = getSurgeDisplay(surgeClass);
-  const sizeStyle = SIZE_STYLES[size];
-  const pulseClass =
-    surgeClass === 'peak' || surgeClass === 'high' ? 'animate-pulse' : '';
+  const model = buildSurgeIndicatorModel({ surgeClass, size, boostPct });
+  if (!model) return null;
 
   return (
     <span
       title={reasoning}
       className={`inline-flex items-center rounded-full border font-display font-bold
-        ${display.bgClass} ${display.textClass} ${display.borderClass}
-        ${pulseClass}
-        ${sizeStyle}
+        ${model.display.bgClass} ${model.display.textClass} ${model.display.borderClass}
+        ${model.pulseClass}
+        ${model.sizeStyle}
       `}
     >
-      {showLabel && <span>{display.label}</span>}
+      {showLabel && <span>{model.display.label}</span>}
       {showMultiplier && (
         <span className="tabular-nums">×{multiplier.toFixed(2)}</span>
       )}
-      {boostPct !== undefined && boostPct > 0 && (
+      {model.showBoost && (
         <span className="text-[0.85em] opacity-80">+{boostPct}%</span>
       )}
     </span>

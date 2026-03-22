@@ -52,6 +52,248 @@ interface FamilySchedulePanelProps {
   className?: string;
 }
 
+type FamilyScheduleSettings = HomeConstraintsResult['settings'];
+
+type WorkLocationEditorState = {
+  editingWork: boolean;
+  workName: string;
+  workAddress: string;
+  geocoding: boolean;
+  geocodeError: string | null;
+};
+
+function getFamilyToggleClasses(enabled: boolean) {
+  return enabled
+    ? 'border-purple-500/40 bg-purple-500/10'
+    : 'border-border bg-card';
+}
+
+function getFamilyStatusClasses(enabled: boolean) {
+  return enabled
+    ? 'bg-purple-500 text-white'
+    : 'bg-muted text-muted-foreground';
+}
+
+function getFamilySubtitle(settings: FamilyScheduleSettings) {
+  if (!settings.enabled) {
+    return 'Alertes retour maison + récupération maman';
+  }
+
+  return `Maison à ${settings.returnHomeWindowStart} · Maman à ${settings.pickupTime}`;
+}
+
+function FamilyScheduleToggleButton({
+  settings,
+  onToggle,
+  onToggleSettings,
+}: {
+  settings: FamilyScheduleSettings;
+  onToggle: () => void;
+  onToggleSettings: () => void;
+}) {
+  return (
+    <button
+      onClick={onToggle}
+      className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${getFamilyToggleClasses(
+        settings.enabled
+      )}`}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <Home className="w-4 h-4 text-purple-400 flex-shrink-0" />
+          <div className="min-w-0">
+            <p className="text-[14px] font-display font-bold">
+              Planning familial
+            </p>
+            <p className="text-[12px] text-muted-foreground font-body mt-0.5 truncate">
+              {getFamilySubtitle(settings)}
+            </p>
+          </div>
+        </div>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {settings.enabled && (
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                onToggleSettings();
+              }}
+              className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted/50 transition-colors"
+              aria-label="Paramètres du planning familial"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+          )}
+          <span
+            className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${getFamilyStatusClasses(
+              settings.enabled
+            )}`}
+          >
+            {settings.enabled ? 'ACTIF' : 'OFF'}
+          </span>
+        </div>
+      </div>
+    </button>
+  );
+}
+
+function WorkLocationEditor({
+  settings,
+  state,
+  onToggleEdit,
+  onWorkNameChange,
+  onWorkAddressChange,
+  onSave,
+}: {
+  settings: FamilyScheduleSettings;
+  state: WorkLocationEditorState;
+  onToggleEdit: () => void;
+  onWorkNameChange: (value: string) => void;
+  onWorkAddressChange: (value: string) => void;
+  onSave: () => void;
+}) {
+  return (
+    <div className="space-y-1.5">
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] font-display font-semibold text-muted-foreground uppercase tracking-wide">
+          Lieu de travail (maman)
+        </p>
+        <button
+          onClick={onToggleEdit}
+          className="text-[11px] font-bold text-primary hover:underline"
+        >
+          {state.editingWork ? 'Annuler' : 'Modifier'}
+        </button>
+      </div>
+
+      {state.editingWork ? (
+        <div className="space-y-2">
+          <input
+            type="text"
+            placeholder="Nom du lieu (ex: École Notre-Dame)"
+            value={state.workName}
+            onChange={(event) => onWorkNameChange(event.target.value)}
+            className="h-9 w-full rounded-lg border border-border bg-muted px-2 text-[13px] font-body"
+          />
+          <input
+            type="text"
+            placeholder="Adresse complète (ex: 123 rue X, Montréal, QC)"
+            value={state.workAddress}
+            onChange={(event) => onWorkAddressChange(event.target.value)}
+            className="h-9 w-full rounded-lg border border-border bg-muted px-2 text-[13px] font-body"
+          />
+          {state.geocodeError && (
+            <p className="text-[11px] text-orange-400 font-body">
+              ⚠️ {state.geocodeError}
+            </p>
+          )}
+          <Button
+            onClick={onSave}
+            disabled={state.geocoding || !state.workName.trim()}
+            className="w-full h-9 text-[13px] font-display font-bold"
+          >
+            {state.geocoding
+              ? '🔍 Recherche des coordonnées...'
+              : '✅ Enregistrer'}
+          </Button>
+        </div>
+      ) : (
+        <div className="flex items-start gap-2">
+          <MapPin className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-[13px] font-body font-medium">
+              {settings.momWorkName}
+            </p>
+            <p className="text-[11px] text-muted-foreground font-body">
+              {settings.momWorkAddress}
+            </p>
+            <p className="text-[10px] text-muted-foreground/50 font-body mt-0.5">
+              {settings.momWorkLat.toFixed(4)}, {settings.momWorkLng.toFixed(4)}
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FamilyScheduleSettingsPanel({
+  settings,
+  state,
+  updateSettings,
+  onToggleEdit,
+  onWorkNameChange,
+  onWorkAddressChange,
+  onSaveWork,
+}: {
+  settings: FamilyScheduleSettings;
+  state: WorkLocationEditorState;
+  updateSettings: HomeConstraintsResult['updateSettings'];
+  onToggleEdit: () => void;
+  onWorkNameChange: (value: string) => void;
+  onWorkAddressChange: (value: string) => void;
+  onSaveWork: () => void;
+}) {
+  return (
+    <div className="bg-card border border-border rounded-xl p-4 space-y-4">
+      <h4 className="text-[13px] font-display font-bold text-foreground">
+        ⚙️ Paramètres du planning familial
+      </h4>
+
+      <div className="space-y-1.5">
+        <p className="text-[11px] font-display font-semibold text-muted-foreground uppercase tracking-wide">
+          Fenêtre de retour à la maison
+        </p>
+        <div className="flex items-center gap-2">
+          <input
+            type="time"
+            value={settings.returnHomeWindowStart}
+            onChange={(event) =>
+              updateSettings({ returnHomeWindowStart: event.target.value })
+            }
+            className="h-9 flex-1 rounded-lg border border-border bg-muted px-2 text-[13px] font-body"
+          />
+          <span className="text-muted-foreground text-[13px] font-body">à</span>
+          <input
+            type="time"
+            value={settings.returnHomeWindowEnd}
+            onChange={(event) =>
+              updateSettings({ returnHomeWindowEnd: event.target.value })
+            }
+            className="h-9 flex-1 rounded-lg border border-border bg-muted px-2 text-[13px] font-body"
+          />
+        </div>
+        <p className="text-[11px] text-muted-foreground font-body leading-snug">
+          📍 {settings.homeAddress}
+        </p>
+      </div>
+
+      <div className="space-y-1.5">
+        <p className="text-[11px] font-display font-semibold text-muted-foreground uppercase tracking-wide">
+          Heure de récupération (après-midi)
+        </p>
+        <input
+          type="time"
+          value={settings.pickupTime}
+          onChange={(event) => updateSettings({ pickupTime: event.target.value })}
+          className="h-9 w-full rounded-lg border border-border bg-muted px-2 text-[13px] font-body"
+        />
+        <p className="text-[11px] text-muted-foreground font-body">
+          Le trajet tient compte des heures de pointe (16h–18h30).
+        </p>
+      </div>
+
+      <WorkLocationEditor
+        settings={settings}
+        state={state}
+        onToggleEdit={onToggleEdit}
+        onWorkNameChange={onWorkNameChange}
+        onWorkAddressChange={onWorkAddressChange}
+        onSave={onSaveWork}
+      />
+    </div>
+  );
+}
+
 /**
  * Toggle + settings + live alert for the family-schedule constraint feature.
  *
@@ -112,176 +354,32 @@ export function FamilySchedulePanel({
 
   return (
     <div className={`space-y-2 ${className}`}>
-      {/* ── Main toggle button ────────────────────────────────────────── */}
-      <button
-        onClick={handleToggle}
-        className={`w-full rounded-xl border px-3 py-3 text-left transition-colors ${
-          settings.enabled
-            ? 'border-purple-500/40 bg-purple-500/10'
-            : 'border-border bg-card'
-        }`}
-      >
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <Home className="w-4 h-4 text-purple-400 flex-shrink-0" />
-            <div className="min-w-0">
-              <p className="text-[14px] font-display font-bold">
-                Planning familial
-              </p>
-              <p className="text-[12px] text-muted-foreground font-body mt-0.5 truncate">
-                {settings.enabled
-                  ? `Maison à ${settings.returnHomeWindowStart} · Maman à ${settings.pickupTime}`
-                  : 'Alertes retour maison + récupération maman'}
-              </p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-shrink-0">
-            {settings.enabled && (
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setShowSettings((s) => !s);
-                }}
-                className="text-muted-foreground hover:text-foreground p-1 rounded-lg hover:bg-muted/50 transition-colors"
-                aria-label="Paramètres du planning familial"
-              >
-                <Settings className="w-4 h-4" />
-              </button>
-            )}
-            <span
-              className={`rounded-full px-2.5 py-1 text-[11px] font-bold ${
-                settings.enabled
-                  ? 'bg-purple-500 text-white'
-                  : 'bg-muted text-muted-foreground'
-              }`}
-            >
-              {settings.enabled ? 'ACTIF' : 'OFF'}
-            </span>
-          </div>
-        </div>
-      </button>
+      <FamilyScheduleToggleButton
+        settings={settings}
+        onToggle={handleToggle}
+        onToggleSettings={() => setShowSettings((current) => !current)}
+      />
 
-      {/* ── Settings panel ────────────────────────────────────────────── */}
       {settings.enabled && showSettings && (
-        <div className="bg-card border border-border rounded-xl p-4 space-y-4">
-          <h4 className="text-[13px] font-display font-bold text-foreground">
-            ⚙️ Paramètres du planning familial
-          </h4>
-
-          {/* Return home window */}
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-display font-semibold text-muted-foreground uppercase tracking-wide">
-              Fenêtre de retour à la maison
-            </p>
-            <div className="flex items-center gap-2">
-              <input
-                type="time"
-                value={settings.returnHomeWindowStart}
-                onChange={(e) =>
-                  updateSettings({ returnHomeWindowStart: e.target.value })
-                }
-                className="h-9 flex-1 rounded-lg border border-border bg-muted px-2 text-[13px] font-body"
-              />
-              <span className="text-muted-foreground text-[13px] font-body">
-                à
-              </span>
-              <input
-                type="time"
-                value={settings.returnHomeWindowEnd}
-                onChange={(e) =>
-                  updateSettings({ returnHomeWindowEnd: e.target.value })
-                }
-                className="h-9 flex-1 rounded-lg border border-border bg-muted px-2 text-[13px] font-body"
-              />
-            </div>
-            <p className="text-[11px] text-muted-foreground font-body leading-snug">
-              📍 {settings.homeAddress}
-            </p>
-          </div>
-
-          {/* Afternoon pickup time */}
-          <div className="space-y-1.5">
-            <p className="text-[11px] font-display font-semibold text-muted-foreground uppercase tracking-wide">
-              Heure de récupération (après-midi)
-            </p>
-            <input
-              type="time"
-              value={settings.pickupTime}
-              onChange={(e) => updateSettings({ pickupTime: e.target.value })}
-              className="h-9 w-full rounded-lg border border-border bg-muted px-2 text-[13px] font-body"
-            />
-            <p className="text-[11px] text-muted-foreground font-body">
-              Le trajet tient compte des heures de pointe (16h–18h30).
-            </p>
-          </div>
-
-          {/* Mom's workplace */}
-          <div className="space-y-1.5">
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-[11px] font-display font-semibold text-muted-foreground uppercase tracking-wide">
-                Lieu de travail (maman)
-              </p>
-              <button
-                onClick={handleOpenEdit}
-                className="text-[11px] font-bold text-primary hover:underline"
-              >
-                {editingWork ? 'Annuler' : 'Modifier'}
-              </button>
-            </div>
-
-            {editingWork ? (
-              <div className="space-y-2">
-                <input
-                  type="text"
-                  placeholder="Nom du lieu (ex: École Notre-Dame)"
-                  value={workName}
-                  onChange={(e) => setWorkName(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-border bg-muted px-2 text-[13px] font-body"
-                />
-                <input
-                  type="text"
-                  placeholder="Adresse complète (ex: 123 rue X, Montréal, QC)"
-                  value={workAddress}
-                  onChange={(e) => setWorkAddress(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-border bg-muted px-2 text-[13px] font-body"
-                />
-                {geocodeError && (
-                  <p className="text-[11px] text-orange-400 font-body">
-                    ⚠️ {geocodeError}
-                  </p>
-                )}
-                <Button
-                  onClick={() => void handleSaveWork()}
-                  disabled={geocoding || !workName.trim()}
-                  className="w-full h-9 text-[13px] font-display font-bold"
-                >
-                  {geocoding
-                    ? '🔍 Recherche des coordonnées...'
-                    : '✅ Enregistrer'}
-                </Button>
-              </div>
-            ) : (
-              <div className="flex items-start gap-2">
-                <MapPin className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0 mt-0.5" />
-                <div>
-                  <p className="text-[13px] font-body font-medium">
-                    {settings.momWorkName}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground font-body">
-                    {settings.momWorkAddress}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground/50 font-body mt-0.5">
-                    {settings.momWorkLat.toFixed(4)},{' '}
-                    {settings.momWorkLng.toFixed(4)}
-                  </p>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
+        <FamilyScheduleSettingsPanel
+          settings={settings}
+          state={{
+            editingWork,
+            workName,
+            workAddress,
+            geocoding,
+            geocodeError,
+          }}
+          updateSettings={updateSettings}
+          onToggleEdit={handleOpenEdit}
+          onWorkNameChange={setWorkName}
+          onWorkAddressChange={setWorkAddress}
+          onSaveWork={() => {
+            void handleSaveWork();
+          }}
+        />
       )}
 
-      {/* ── Active alert banner ───────────────────────────────────────── */}
       {settings.enabled && alert && (
         <FamilyConstraintAlertBanner alert={alert} />
       )}
