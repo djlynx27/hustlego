@@ -1,6 +1,11 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { sumTrackedSessionHours } from './reportMetrics.ts';
+// @ts-ignore Deno edge functions require explicit local .ts extensions.
+import {
+  sumTrackedSessionEarnings,
+  sumTrackedSessionHours,
+  sumTrackedSessionRides,
+} from './reportMetrics.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -48,16 +53,8 @@ serve(async (req) => {
 
     const trackedShiftCount = sessions?.length ?? 0;
     const trackedHours = sessions ? sumTrackedSessionHours(sessions) : 0;
-    const trackedEarnings =
-      sessions?.reduce(
-        (sum, session) => sum + Number(session.total_earnings ?? 0),
-        0
-      ) ?? 0;
-    const trackedRides =
-      sessions?.reduce(
-        (sum, session) => sum + Number(session.total_rides ?? 0),
-        0
-      ) ?? 0;
+    const trackedEarnings = sessions ? sumTrackedSessionEarnings(sessions) : 0;
+    const trackedRides = sessions ? sumTrackedSessionRides(sessions) : 0;
 
     // Compute hours worked from trip timestamps
     let hoursWorked = 0;

@@ -1,11 +1,18 @@
 export interface DailyReportSessionInput {
   total_hours: number | string | null;
+  total_earnings?: number | string | null;
+  total_rides?: number | string | null;
   started_at: string | null;
   ended_at: string | null;
 }
 
+function toFiniteNumber(value: number | string | null | undefined) {
+  const parsed = Number(value ?? 0);
+  return Number.isFinite(parsed) ? parsed : 0;
+}
+
 export function getTrackedSessionHours(session: DailyReportSessionInput) {
-  const explicitHours = Number(session.total_hours ?? 0);
+  const explicitHours = toFiniteNumber(session.total_hours);
 
   let derivedDurationHours = 0;
   if (session.started_at && session.ended_at) {
@@ -31,6 +38,20 @@ export function getTrackedSessionHours(session: DailyReportSessionInput) {
 export function sumTrackedSessionHours(sessions: DailyReportSessionInput[]) {
   return sessions.reduce(
     (sum, session) => sum + getTrackedSessionHours(session),
+    0
+  );
+}
+
+export function sumTrackedSessionEarnings(sessions: DailyReportSessionInput[]) {
+  return sessions.reduce(
+    (sum, session) => sum + toFiniteNumber(session.total_earnings),
+    0
+  );
+}
+
+export function sumTrackedSessionRides(sessions: DailyReportSessionInput[]) {
+  return sessions.reduce(
+    (sum, session) => sum + toFiniteNumber(session.total_rides),
     0
   );
 }

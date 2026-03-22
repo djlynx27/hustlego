@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  sumTrackedSessionEarnings,
   getTrackedSessionHours,
   sumTrackedSessionHours,
+  sumTrackedSessionRides,
 } from '../../supabase/functions/generate-daily-report/reportMetrics';
 
 describe('generate daily report tracked session hours', () => {
@@ -50,5 +52,55 @@ describe('generate daily report tracked session hours', () => {
     ]);
 
     expect(hours).toBe(8);
+  });
+
+  it('skips malformed earnings instead of propagating NaN', () => {
+    const earnings = sumTrackedSessionEarnings([
+      {
+        total_earnings: 50,
+        started_at: '2026-03-21T08:00:00Z',
+        ended_at: '2026-03-21T11:00:00Z',
+        total_hours: 3,
+      },
+      {
+        total_earnings: 'abc',
+        started_at: '2026-03-21T12:00:00Z',
+        ended_at: '2026-03-21T13:00:00Z',
+        total_hours: 1,
+      },
+      {
+        total_earnings: 30,
+        started_at: '2026-03-21T14:00:00Z',
+        ended_at: '2026-03-21T16:00:00Z',
+        total_hours: 2,
+      },
+    ]);
+
+    expect(earnings).toBe(80);
+  });
+
+  it('skips malformed ride counts instead of propagating NaN', () => {
+    const rides = sumTrackedSessionRides([
+      {
+        total_rides: 4,
+        started_at: '2026-03-21T08:00:00Z',
+        ended_at: '2026-03-21T11:00:00Z',
+        total_hours: 3,
+      },
+      {
+        total_rides: 'oops',
+        started_at: '2026-03-21T12:00:00Z',
+        ended_at: '2026-03-21T13:00:00Z',
+        total_hours: 1,
+      },
+      {
+        total_rides: 3,
+        started_at: '2026-03-21T14:00:00Z',
+        ended_at: '2026-03-21T16:00:00Z',
+        total_hours: 2,
+      },
+    ]);
+
+    expect(rides).toBe(7);
   });
 });
