@@ -1,5 +1,6 @@
 import { BottomNav } from '@/components/BottomNav';
 import { NearestHotspot } from '@/components/NearestHotspot';
+import { PwaInstallBanner } from '@/components/PwaInstallBanner';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { I18nProvider } from '@/contexts/I18nContext';
@@ -106,6 +107,7 @@ function AppContent() {
         </Routes>
       </Suspense>
       {showNearestHotspot && <NearestHotspot />}
+      <PwaInstallBanner />
       <BottomNav />
     </div>
   );

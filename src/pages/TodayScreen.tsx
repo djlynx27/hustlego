@@ -119,7 +119,7 @@ export default function TodayScreen() {
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
   const [now, setNow] = useState(new Date());
-  const { canInstall, install, dismiss: dismissInstall } = usePwaInstall();
+  const { install, dismiss: dismissInstall } = usePwaInstall();
   const isOnline = useOnlineStatus();
   const { location: userLocation } = useUserLocation();
   const [conservativePresence, setConservativePresence] = useState(() =>
@@ -538,7 +538,7 @@ export default function TodayScreen() {
         cancelTimer={cancelTimer}
         dismissExpired={dismissExpired}
         isOnline={isOnline}
-        canInstall={canInstall}
+        canInstall={false}
         install={install}
         dismissInstall={dismissInstall}
         notifEnabled={notifEnabled}
