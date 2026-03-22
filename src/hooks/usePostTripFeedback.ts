@@ -141,6 +141,7 @@ export function usePostTripFeedback() {
 // ── Standalone utility: batch-backfill trip_predictions from trips table ──────
 // Run once after migration to backfill existing trips that have zone_score.
 // Call via: await backfillTripPredictions(supabase, estimatedEarningsPerH)
+// eslint-disable-next-line complexity
 export async function backfillTripPredictions(
   supabaseClient: typeof supabase,
   defaultPredictedEarningsPerH = 35

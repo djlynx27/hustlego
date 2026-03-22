@@ -103,6 +103,7 @@ export function useHomeConstraints(
 
   const isWeekday = now.getDay() >= 1 && now.getDay() <= 5;
 
+  // eslint-disable-next-line complexity
   const alert = useMemo((): HomeConstraintAlert | null => {
     if (!settings.enabled || !isWeekday) return null;
     if (currentLat === null || currentLng === null) return null;

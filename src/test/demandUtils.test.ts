@@ -10,6 +10,7 @@ import {
   getUpcomingSlotTimes,
   normalize24hTime,
 } from '@/lib/demandUtils';
+import type { Zone } from '@/hooks/useSupabase';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 describe('normalize24hTime', () => {
@@ -169,18 +170,20 @@ describe('getCurrentSlotTime', () => {
   });
 });
 
-const MOCK_ZONE = {
+const MOCK_ZONE: Zone = {
   id: 'downtown-mtl',
   name: 'Downtown',
   type: 'commercial',
   latitude: 45.5,
   longitude: -73.57,
   city_id: 'mtl',
+  address: null,
+  base_score: 50,
+  category: null,
   created_at: '',
-  demand_weight: 1,
-  display_order: 1,
-  is_active: true,
-  radius_km: 2,
+  current_score: 50,
+  territory: null,
+  updated_at: '',
 };
 
 describe('createSimulatedSlotForTime', () => {
@@ -229,7 +232,7 @@ describe('generateSimulatedSlots', () => {
   });
 
   it('generates 96 × zones.length slots', () => {
-    const secondZone = {
+    const secondZone: Zone = {
       ...MOCK_ZONE,
       id: 'plateau',
       name: 'Plateau',

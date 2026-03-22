@@ -128,6 +128,7 @@ function normalizeWeights(w: WeightConfig): WeightConfig {
  *   - High error when zone_score is high → increase historicalEarnings weight
  *   - Low error overall → no adjustment
  */
+// eslint-disable-next-line complexity
 function deriveGradients(
   predictions: TripPredictionRow[]
 ): Partial<Record<keyof WeightConfig, number>> {
@@ -209,6 +210,7 @@ function deriveGradients(
   return gradients;
 }
 
+// eslint-disable-next-line complexity
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });

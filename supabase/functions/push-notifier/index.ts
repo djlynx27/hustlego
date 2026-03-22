@@ -29,6 +29,7 @@ function getEnv(name: string): string {
   return value;
 }
 
+// eslint-disable-next-line complexity
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });

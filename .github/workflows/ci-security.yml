@@ -121,7 +121,7 @@ jobs:
         run: npm audit --omit=dev --audit-level=high
 
   # ─── Secret scanning ────────────────────────────────────────────────────────
-  secret-scan:
+  secret-scan-trufflehog:
     name: Secret Scanning (TruffleHog)
     runs-on: ubuntu-latest
     steps:

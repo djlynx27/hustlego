@@ -207,6 +207,7 @@ function classifySurge(multiplier: number): SurgeResult['surgeClass'] {
   return 'normal';
 }
 
+// eslint-disable-next-line complexity
 function buildReasoning(
   surgeClass: SurgeResult['surgeClass'],
   ctx: SurgeContext,

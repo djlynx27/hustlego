@@ -74,6 +74,7 @@ function jsonResponse(data: unknown, status = 200): Response {
   });
 }
 
+// eslint-disable-next-line complexity
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });

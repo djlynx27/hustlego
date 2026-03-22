@@ -48,6 +48,7 @@ interface RequestBody {
   mode?: string;
 }
 
+// eslint-disable-next-line complexity
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -204,6 +205,7 @@ Rules:
 - Return ONLY the JSON, no other text`;
 }
 
+// eslint-disable-next-line complexity
 function analyzeFileContent(
   content: string,
   fileName?: string

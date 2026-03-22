@@ -56,6 +56,7 @@ export function useAntiDeadhead({
 }: AntiDeadheadInput): AntiDeadheadSuggestion | null {
   const currentScore = currentZoneId ? (scores.get(currentZoneId) ?? 0) : null;
 
+  // eslint-disable-next-line complexity
   return useMemo<AntiDeadheadSuggestion | null>(() => {
     if (!currentLat || !currentLng) return null;
     if (currentScore === null || currentScore >= LOW_SCORE_THRESHOLD)

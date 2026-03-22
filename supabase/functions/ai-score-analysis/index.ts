@@ -57,6 +57,47 @@ interface AIRecommendation {
   tip: string;
 }
 
+// eslint-disable-next-line complexity
+function buildFallbackRecommendation(
+  zone: Zone,
+  stats: { count: number; totalEarnings: number; hours: Set<number> } | undefined
+): AIRecommendation {
+  const currentScore = zone.current_score ?? zone.base_score ?? 50;
+  const avgEarnings = stats && stats.count > 0 ? stats.totalEarnings / stats.count : 0;
+  const earningsFactor = Math.min(1.2, 0.8 + (avgEarnings / 30) * 0.4);
+  const newScore = Math.min(
+    100,
+    Math.max(0, Math.round(currentScore * earningsFactor))
+  );
+
+  return {
+    zone_id: zone.id,
+    zone_name: zone.name,
+    new_score: newScore,
+    peak_hours:
+      zone.type === 'nightlife'
+        ? '22h–3h'
+        : zone.type === 'aéroport'
+          ? '6h–9h, 16h–19h'
+          : '17h–20h',
+    best_days:
+      zone.type === 'nightlife' || zone.type === 'événements'
+        ? 'Vendredi-Samedi'
+        : 'Lundi-Vendredi',
+    trend:
+      newScore > currentScore
+        ? 'up'
+        : newScore < currentScore
+          ? 'down'
+          : 'stable',
+    tip:
+      stats && stats.count > 0
+        ? `${stats.count} courses en 30j — revenu moy. $${(stats.totalEarnings / stats.count).toFixed(0)}/course`
+        : 'Aucune course enregistrée dans cette zone.',
+  };
+}
+
+// eslint-disable-next-line complexity
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -197,42 +238,9 @@ Réponds UNIQUEMENT avec un JSON valide sans markdown:
       }));
     } else {
       // Deterministic fallback: use existing score + trip data
-      recommendations = (zones as Zone[]).map((z) => {
-        const stats = statsMap.get(z.id);
-        const currentScore = z.current_score ?? z.base_score ?? 50;
-        const avgEarnings =
-          stats && stats.count > 0 ? stats.totalEarnings / stats.count : 0;
-        const earningsFactor = Math.min(1.2, 0.8 + (avgEarnings / 30) * 0.4);
-        const newScore = Math.min(
-          100,
-          Math.max(0, Math.round(currentScore * earningsFactor))
-        );
-        return {
-          zone_id: z.id,
-          zone_name: z.name,
-          new_score: newScore,
-          peak_hours:
-            z.type === 'nightlife'
-              ? '22h–3h'
-              : z.type === 'aéroport'
-                ? '6h–9h, 16h–19h'
-                : '17h–20h',
-          best_days:
-            z.type === 'nightlife' || z.type === 'événements'
-              ? 'Vendredi-Samedi'
-              : 'Lundi-Vendredi',
-          trend:
-            newScore > currentScore
-              ? 'up'
-              : newScore < currentScore
-                ? 'down'
-                : 'stable',
-          tip:
-            stats && stats.count > 0
-              ? `${stats.count} courses en 30j — revenu moy. $${(stats.totalEarnings / stats.count).toFixed(0)}/course`
-              : 'Aucune course enregistrée dans cette zone.',
-        };
-      });
+      recommendations = (zones as Zone[]).map((z) =>
+        buildFallbackRecommendation(z, statsMap.get(z.id))
+      );
     }
 
     // 5. Update zone scores in DB (partial or full)

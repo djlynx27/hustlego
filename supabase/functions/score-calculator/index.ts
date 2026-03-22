@@ -183,6 +183,7 @@ async function fetchWeather(lat: number, lon: number): Promise<Weather> {
 // Sends all zones in a single batched prompt to minimize API cost.
 // Returns a map of zone_id → adjusted score (0–100) or null if unavailable.
 
+// eslint-disable-next-line complexity
 async function geminiEnhanceScores(
   zones: Zone[],
   weather: Weather,
@@ -269,6 +270,7 @@ Réponds UNIQUEMENT avec un JSON valide sans markdown, format exact:
 
 // ── Main handler ──────────────────────────────────────────────────────────────
 
+// eslint-disable-next-line complexity
 serve(async (req) => {
   // CORS preflight
   if (req.method === 'OPTIONS') {

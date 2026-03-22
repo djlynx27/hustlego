@@ -35,6 +35,8 @@ export function NavigationSheet({
     <Sheet open={open} onOpenChange={(v) => !v && onClose()}>
       <SheetContent
         side="bottom"
+        closeLabel={t('close')}
+        onCloseClick={onClose}
         className="rounded-t-2xl px-4 pb-6 pt-4 bg-card border-border"
       >
         <SheetHeader>
