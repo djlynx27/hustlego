@@ -7,11 +7,11 @@ Il est lu automatiquement par Claude Code, GitHub Copilot Agent et tout autre ag
 
 ## Identité et rôles agents
 
-| Agent | Rôle | Scope autorisé |
-|---|---|---|
-| **Claude Code** | Agent principal — architecture, debug, refactoring | Tout le repo |
-| **GitHub Copilot (Sonnet)** | Agent secondaire — complétion, review, refactoring ciblé | Fichiers ouverts |
-| **Gemini 2.5 Flash** | Agent scoring — calcul score zones via Edge Function | `score-calculator` uniquement |
+| Agent                       | Rôle                                                     | Scope autorisé                |
+| --------------------------- | -------------------------------------------------------- | ----------------------------- |
+| **Claude Code**             | Agent principal — architecture, debug, refactoring       | Tout le repo                  |
+| **GitHub Copilot (Sonnet)** | Agent secondaire — complétion, review, refactoring ciblé | Fichiers ouverts              |
+| **Gemini 2.5 Flash**        | Agent scoring — calcul score zones via Edge Function     | `score-calculator` uniquement |
 
 ---
 
@@ -51,6 +51,7 @@ npm run test:run              # régression tests
 ### 2. Identification des problèmes
 
 Classer par sévérité avant d'agir :
+
 - **P0 — Bloquant production** : corriger immédiatement
 - **P1 — Régression** : corriger avant tout commit
 - **P2 — Qualité** : corriger dans la même session si possible
@@ -99,14 +100,15 @@ Exemples:
 
 Cibles ISO 25010 (seuils minimum enforced dans `vitest.config.ts`) :
 
-| Métrique | Seuil CI | Cible finale |
-|---|---|---|
-| Statements | 73% | 80% |
-| Branches | 57% | 80% |
-| Functions | 78% | 80% |
-| Lines | 76% | 80% |
+| Métrique   | Seuil CI | Cible finale |
+| ---------- | -------- | ------------ |
+| Statements | 73%      | 80%          |
+| Branches   | 57%      | 80%          |
+| Functions  | 78%      | 80%          |
+| Lines      | 76%      | 80%          |
 
 Écrire au minimum :
+
 - 1 test happy path par fonction publique
 - 1 test edge case / valeur limite
 - 1 test cas d'erreur / input invalide
@@ -158,6 +160,7 @@ Jamais : `lib/` ne dépend de `hooks/` ou `components/`
 ### Kill switch
 
 Si un agent produit un résultat inattendu ou dangereux :
+
 1. `git stash` — mettre de côté les changements
 2. `git log --oneline -5` — identifier le dernier commit stable
 3. `git revert <sha>` — annuler proprement (ne pas utiliser `reset --hard`)
@@ -168,6 +171,7 @@ Si un agent produit un résultat inattendu ou dangereux :
 ## Audit trail
 
 Chaque session d'agent doit laisser une trace dans les commits :
+
 - Commits atomiques par feature/fix (pas de mega-commits)
 - Message décrivant le POURQUOI, pas le comment
 - Si contournement d'un obstacle : noter `# WORKAROUND:` dans le code + explication dans le commit

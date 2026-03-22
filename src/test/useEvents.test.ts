@@ -107,7 +107,9 @@ describe('invalid date guards in event filters', () => {
       start_at: '2026-03-21T13:00:00Z',
       end_at: '2026-03-21T14:30:00Z',
     });
-    expect(getEndingSoonEvents([badEvent, goodEvent], now, 60)).toEqual([goodEvent]);
+    expect(getEndingSoonEvents([badEvent, goodEvent], now, 60)).toEqual([
+      goodEvent,
+    ]);
   });
 
   it('getStartingSoonEvents silently drops events with invalid start_at', () => {
@@ -116,6 +118,8 @@ describe('invalid date guards in event filters', () => {
       start_at: '2026-03-21T14:30:00Z',
       end_at: '2026-03-21T16:00:00Z',
     });
-    expect(getStartingSoonEvents([badEvent, goodEvent], now, 90)).toEqual([goodEvent]);
+    expect(getStartingSoonEvents([badEvent, goodEvent], now, 90)).toEqual([
+      goodEvent,
+    ]);
   });
 });

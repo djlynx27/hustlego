@@ -204,7 +204,10 @@ describe('trip analytics', () => {
       },
     ];
 
-    const analytics = aggregateTripAnalytics(mixedCaseTrips, new Date('2026-03-30T12:00:00'));
+    const analytics = aggregateTripAnalytics(
+      mixedCaseTrips,
+      new Date('2026-03-30T12:00:00')
+    );
     // All 3 trips should merge into one zone bucket — revenue = 60
     expect(analytics.zoneSeries).toHaveLength(1);
     expect(analytics.zoneSeries[0].revenue).toBe(60);

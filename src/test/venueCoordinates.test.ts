@@ -65,4 +65,3 @@ describe('getWazeNavUrl', () => {
     expect(url).toContain('-73.5');
   });
 });
-

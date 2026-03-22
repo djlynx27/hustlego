@@ -185,7 +185,12 @@ const MOCK_ZONE = {
 
 describe('createSimulatedSlotForTime', () => {
   it('creates a slot with the expected shape', () => {
-    const slot = createSimulatedSlotForTime('mtl', '2026-03-21', '10:00', MOCK_ZONE);
+    const slot = createSimulatedSlotForTime(
+      'mtl',
+      '2026-03-21',
+      '10:00',
+      MOCK_ZONE
+    );
     expect(slot.city_id).toBe('mtl');
     expect(slot.date).toBe('2026-03-21');
     expect(slot.start_time).toBe('10:00');
@@ -196,13 +201,23 @@ describe('createSimulatedSlotForTime', () => {
   });
 
   it('assigns a unique id containing date and zone id', () => {
-    const slot = createSimulatedSlotForTime('mtl', '2026-03-21', '14:30', MOCK_ZONE);
+    const slot = createSimulatedSlotForTime(
+      'mtl',
+      '2026-03-21',
+      '14:30',
+      MOCK_ZONE
+    );
     expect(slot.id).toContain('2026-03-21');
     expect(slot.id).toContain('downtown-mtl');
   });
 
   it('normalizes time to HH:MM format', () => {
-    const slot = createSimulatedSlotForTime('mtl', '2026-03-21', '9:0', MOCK_ZONE);
+    const slot = createSimulatedSlotForTime(
+      'mtl',
+      '2026-03-21',
+      '9:0',
+      MOCK_ZONE
+    );
     expect(slot.start_time).toBe('09:00');
   });
 });
@@ -214,8 +229,16 @@ describe('generateSimulatedSlots', () => {
   });
 
   it('generates 96 × zones.length slots', () => {
-    const secondZone = { ...MOCK_ZONE, id: 'plateau', name: 'Plateau', type: 'résidentiel' };
-    const slots = generateSimulatedSlots('mtl', '2026-03-21', [MOCK_ZONE, secondZone]);
+    const secondZone = {
+      ...MOCK_ZONE,
+      id: 'plateau',
+      name: 'Plateau',
+      type: 'résidentiel',
+    };
+    const slots = generateSimulatedSlots('mtl', '2026-03-21', [
+      MOCK_ZONE,
+      secondZone,
+    ]);
     expect(slots).toHaveLength(192);
   });
 

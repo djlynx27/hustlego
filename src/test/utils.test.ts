@@ -12,7 +12,9 @@ describe('cn', () => {
 
   it('filters falsy values', () => {
     const condition: boolean = false;
-    expect(cn('base', condition && 'conditional', undefined, null, 'end')).toBe('base end');
+    expect(cn('base', condition && 'conditional', undefined, null, 'end')).toBe(
+      'base end'
+    );
   });
 
   it('returns empty string when no classes given', () => {

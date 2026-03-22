@@ -16,8 +16,8 @@
 import {
   _lerp,
   buildSurgeContext,
-  cosineSimilarity,
   computeSurge,
+  cosineSimilarity,
   getSurgeDisplay,
   type SurgeContext,
 } from '@/lib/surgeEngine';
