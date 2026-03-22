@@ -49,6 +49,7 @@ export interface LearningInsights {
   accuracyPercent: number;
   suggestedWeights: WeightConfig;
   suggestions: WeightAdjustmentSuggestion[];
+  weightAdjustmentSuggestions: WeightAdjustmentSuggestion[];
   topLearnedZones: Array<{
     zoneId: string;
     zoneName: string;
@@ -256,8 +257,10 @@ function getPredictionStats(predictions: PredictionRecord[]) {
   }
 
   const meanAbsoluteError = round(
-    predictions.reduce((sum, prediction) => sum + Math.abs(prediction.error), 0) /
-      predictions.length
+    predictions.reduce(
+      (sum, prediction) => sum + Math.abs(prediction.error),
+      0
+    ) / predictions.length
   );
   const accuratePredictions = predictions.filter(
     (prediction) => Math.abs(prediction.error) <= 15
@@ -277,7 +280,11 @@ function getPredictionStats(predictions: PredictionRecord[]) {
   };
 }
 
-function applyBiasAdjustments(weights: WeightConfig, sampleCount: number, recentBias: number) {
+function applyBiasAdjustments(
+  weights: WeightConfig,
+  sampleCount: number,
+  recentBias: number
+) {
   const adjustedWeights: WeightConfig = { ...weights };
 
   if (sampleCount >= 8) {
@@ -415,6 +422,7 @@ export function deriveLearningInsights(
     accuracyPercent,
     suggestedWeights,
     suggestions,
+    weightAdjustmentSuggestions: suggestions,
     topLearnedZones,
   };
 }

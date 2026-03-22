@@ -119,6 +119,50 @@ function serializeContextVector(vector: number[]) {
   return `[${vector.map((value) => round(value, 6).toString()).join(',')}]`;
 }
 
+function isWeekendDay(dayOfWeek: number) {
+  return dayOfWeek === 0 || dayOfWeek === 6;
+}
+
+function isWinterMonth(month: number) {
+  return month <= 3 || month === 12;
+}
+
+function safeVectorValue(vector: number[], index: number) {
+  return vector[index] ?? 0;
+}
+
+function normalizeRatio(value: number | null | undefined, max: number) {
+  return clamp01((value ?? 0) / max);
+}
+
+function getTripPredictedScore(trip: TripWithZone) {
+  return clamp(
+    Math.round(
+      Number(
+        (trip as { zone_score?: number | null }).zone_score ??
+          trip.zones?.current_score ??
+          50
+      )
+    ),
+    0,
+    100
+  );
+}
+
+function isNightlifeLikeZone(zoneType?: string | null) {
+  return zoneType === 'nightlife' || zoneType === 'événements' ? 1 : 0;
+}
+
+function createEmptySyncCounts(): LearningSyncResult['syncedCounts'] {
+  return {
+    emaPatterns: 0,
+    beliefs: 0,
+    predictions: 0,
+    demandPatterns: 0,
+    sessionZones: 0,
+  };
+}
+
 const USER_PING_CACHE_KEY = 'hustlego_user_ping_cache';
 const USER_PING_COOLDOWN_MS = 15 * 60 * 1000;
 
@@ -195,13 +239,12 @@ export function encodeZoneContextVector(input: ZoneContextInput): number[] {
   const hour = input.now.getHours();
   const dayOfWeek = input.now.getDay();
   const month = input.now.getMonth() + 1;
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6 ? 1 : 0;
-  const isWinter = month <= 3 || month === 12 ? 1 : 0;
+  const isWeekend = isWeekendDay(dayOfWeek) ? 1 : 0;
+  const isWinter = isWinterMonth(month) ? 1 : 0;
   const normalizedTraffic = clamp01(input.trafficCongestion ?? 0);
   const normalizedWeather = clamp01((input.weatherDemandBoostPoints ?? 0) / 30);
   const normalizedScore = clamp01(Number(input.currentScore ?? 50) / 100);
-  const nightlifeLike =
-    input.zoneType === 'nightlife' || input.zoneType === 'événements' ? 1 : 0;
+  const nightlifeLike = isNightlifeLikeZone(input.zoneType);
 
   return [
     round(Math.sin((2 * Math.PI * hour) / 24), 6),
@@ -239,27 +282,27 @@ export function encodeUserPingContextVector(
   input: UserPingContextInput
 ): number[] {
   const base = encodeZoneContextVector(input);
-  const normalizedDistance = clamp01((input.distanceKm ?? 0) / 20);
-  const normalizedLyftDemand = clamp01((input.lyftDemandLevel ?? 0) / 10);
-  const normalizedWait = clamp01((input.estimatedWaitMin ?? 0) / 20);
+  const normalizedDistance = normalizeRatio(input.distanceKm, 20);
+  const normalizedLyftDemand = normalizeRatio(input.lyftDemandLevel, 10);
+  const normalizedWait = normalizeRatio(input.estimatedWaitMin, 20);
 
   return [
-    base[0] ?? 0,
-    base[1] ?? 0,
-    base[2] ?? 0,
-    base[3] ?? 0,
-    base[4] ?? 0,
-    base[5] ?? 0,
-    base[6] ?? 0,
+    safeVectorValue(base, 0),
+    safeVectorValue(base, 1),
+    safeVectorValue(base, 2),
+    safeVectorValue(base, 3),
+    safeVectorValue(base, 4),
+    safeVectorValue(base, 5),
+    safeVectorValue(base, 6),
     round(normalizedDistance, 6),
     round(normalizedLyftDemand, 6),
     round(normalizedWait, 6),
     1,
     input.conservativePresence ? 1 : 0,
-    base[11] ?? 0,
-    base[12] ?? 0,
-    base[13] ?? 0,
-    base[14] ?? 0,
+    safeVectorValue(base, 11),
+    safeVectorValue(base, 12),
+    safeVectorValue(base, 13),
+    safeVectorValue(base, 14),
   ];
 }
 
@@ -287,8 +330,9 @@ export function encodeContextVector(trip: TripWithZone): number[] {
   const revenue = getTripRevenue(trip);
   const hours = getTripHours(trip);
   const earningsPerHour = hours > 0 ? revenue / hours : 0;
-  const isWeekend = dayOfWeek === 0 || dayOfWeek === 6 ? 1 : 0;
-  const isWinter = month <= 3 || month === 12 ? 1 : 0;
+  const isWeekend = isWeekendDay(dayOfWeek) ? 1 : 0;
+  const isWinter = isWinterMonth(month) ? 1 : 0;
+  const predictedNightlifeLike = isNightlifeLikeZone(trip.zones?.type);
 
   return [
     round(Math.sin((2 * Math.PI * hour) / 24), 6),
@@ -305,11 +349,176 @@ export function encodeContextVector(trip: TripWithZone): number[] {
     isWeekend,
     month / 12,
     isWinter,
-    trip.zones?.type === 'nightlife' || trip.zones?.type === 'événements'
-      ? 1
-      : 0,
+    predictedNightlifeLike,
     normalizeScoreFromEarnings(earningsPerHour) / 100,
   ];
+}
+
+type ShiftZoneAccumulator = {
+  zoneId: string;
+  zoneName: string;
+  enteredAt: string;
+  exitedAt: string;
+  ridesCount: number;
+  earnings: number;
+  predictedScore: number;
+  factorsSnapshot: Record<string, unknown>;
+};
+
+function isTripInShiftWindow(
+  trip: TripWithZone,
+  startedAt: Date,
+  endedAt: Date
+) {
+  const started = new Date(trip.started_at);
+  return started >= startedAt && started <= endedAt;
+}
+
+function createZoneAccumulator(
+  trip: TripWithZone & { zone_id: string }
+): ShiftZoneAccumulator {
+  return {
+    zoneId: trip.zone_id,
+    zoneName: trip.zones?.name ?? 'Zone inconnue',
+    enteredAt: trip.started_at,
+    exitedAt: trip.ended_at ?? trip.started_at,
+    ridesCount: 0,
+    earnings: 0,
+    predictedScore: 0,
+    factorsSnapshot: {
+      source: 'trip_sync',
+      zone_type: trip.zones?.type ?? null,
+    },
+  };
+}
+
+function accumulateShiftZone(
+  current: ShiftZoneAccumulator,
+  trip: TripWithZone & { zone_id: string }
+) {
+  current.enteredAt =
+    new Date(trip.started_at) < new Date(current.enteredAt)
+      ? trip.started_at
+      : current.enteredAt;
+  current.exitedAt =
+    new Date(trip.ended_at ?? trip.started_at) > new Date(current.exitedAt)
+      ? (trip.ended_at ?? trip.started_at)
+      : current.exitedAt;
+  current.ridesCount += 1;
+  current.earnings += getTripRevenue(trip);
+  current.predictedScore += getTripPredictedScore(trip);
+
+  return current;
+}
+
+function groupTripsByZone(shiftTrips: TripWithZone[]) {
+  const groupedByZone = new Map<string, ShiftZoneAccumulator>();
+
+  for (const trip of shiftTrips) {
+    if (!trip.zone_id) continue;
+
+    const zonedTrip = trip as TripWithZone & { zone_id: string };
+    const current =
+      groupedByZone.get(zonedTrip.zone_id) ?? createZoneAccumulator(zonedTrip);
+
+    groupedByZone.set(
+      zonedTrip.zone_id,
+      accumulateShiftZone(current, zonedTrip)
+    );
+  }
+
+  return groupedByZone;
+}
+
+function withZoneId(
+  trip: TripWithZone
+): trip is TripWithZone & { zone_id: string } {
+  return Boolean(trip.zone_id);
+}
+
+function buildShiftPredictions(
+  trips: Array<TripWithZone & { zone_id: string }>
+) {
+  return trips.flatMap<PredictionInsert>((trip) => {
+    const hours = getTripHours(trip);
+    if (hours <= 0) return [];
+
+    const earningsPerHour = getTripRevenue(trip) / hours;
+    const predictedScore = getTripPredictedScore(trip);
+    const actualScore = normalizeScoreFromEarnings(earningsPerHour);
+
+    return [
+      {
+        zone_id: trip.zone_id,
+        predicted_at: trip.started_at,
+        predicted_score: predictedScore,
+        factors_snapshot: {
+          source_trip_id: trip.id,
+          platform: trip.platform ?? null,
+        },
+        actual_earnings_per_hour: round(earningsPerHour),
+        prediction_error: round(actualScore - predictedScore, 4),
+      },
+    ];
+  });
+}
+
+function buildShiftDemandPatterns(
+  trips: Array<TripWithZone & { zone_id: string }>
+) {
+  return trips.flatMap<DemandPatternInsert>((trip) => {
+    const hours = getTripHours(trip);
+    if (hours <= 0) return [];
+
+    return [
+      {
+        zone_id: trip.zone_id,
+        context_vector: serializeContextVector(encodeContextVector(trip)),
+        actual_earnings_per_hour: round(getTripRevenue(trip) / hours),
+      },
+    ];
+  });
+}
+
+function buildSessionZoneRows(
+  groupedByZone: Map<string, ShiftZoneAccumulator>
+) {
+  return [...groupedByZone.values()].map<Omit<SessionZoneInsert, 'session_id'>>(
+    (zone) => ({
+      zone_id: zone.zoneId,
+      entered_at: zone.enteredAt,
+      exited_at: zone.exitedAt,
+      rides_count: zone.ridesCount,
+      earnings: round(zone.earnings),
+      predicted_score: round(
+        zone.predictedScore / Math.max(zone.ridesCount, 1)
+      ),
+      factors_snapshot: zone.factorsSnapshot,
+    })
+  );
+}
+
+function buildSessionInsertPayload(
+  summary: ReturnType<typeof derivePostShiftSummary>,
+  startedAtIso: string,
+  endedAtIso: string,
+  startedAt: Date,
+  endedAt: Date
+): SessionInsert {
+  return {
+    started_at: startedAtIso,
+    ended_at: endedAtIso,
+    total_earnings: summary.revenue,
+    total_rides: summary.tripCount,
+    total_hours: round(
+      Math.max((endedAt.getTime() - startedAt.getTime()) / 3_600_000, 0)
+    ),
+    notes: summary.suggestedFocus,
+    weather_snapshot: {
+      accuracy_percent: summary.accuracyPercent,
+      mean_absolute_error: summary.meanAbsoluteError,
+    },
+  };
 }
 
 export function buildLearningPersistencePayload(
@@ -354,10 +563,9 @@ export function buildShiftPersistencePayload(
 ) {
   const startedAt = new Date(startedAtIso);
   const endedAt = new Date(endedAtIso);
-  const shiftTrips = trips.filter((trip) => {
-    const started = new Date(trip.started_at);
-    return started >= startedAt && started <= endedAt;
-  });
+  const shiftTrips = trips.filter((trip) =>
+    isTripInShiftWindow(trip, startedAt, endedAt)
+  );
 
   const summary = derivePostShiftSummary(
     shiftTrips,
@@ -366,135 +574,152 @@ export function buildShiftPersistencePayload(
     weights
   );
 
-  const groupedByZone = new Map<
-    string,
-    {
-      zoneId: string;
-      zoneName: string;
-      enteredAt: string;
-      exitedAt: string;
-      ridesCount: number;
-      earnings: number;
-      predictedScore: number;
-      factorsSnapshot: Record<string, unknown>;
-    }
-  >();
-
-  for (const trip of shiftTrips) {
-    if (!trip.zone_id) continue;
-    const zoneId = trip.zone_id;
-    const current = groupedByZone.get(zoneId) ?? {
-      zoneId,
-      zoneName: trip.zones?.name ?? 'Zone inconnue',
-      enteredAt: trip.started_at,
-      exitedAt: trip.ended_at ?? trip.started_at,
-      ridesCount: 0,
-      earnings: 0,
-      predictedScore: 0,
-      factorsSnapshot: {
-        source: 'trip_sync',
-        zone_type: trip.zones?.type ?? null,
-      },
-    };
-
-    current.enteredAt =
-      new Date(trip.started_at) < new Date(current.enteredAt)
-        ? trip.started_at
-        : current.enteredAt;
-    current.exitedAt =
-      new Date(trip.ended_at ?? trip.started_at) > new Date(current.exitedAt)
-        ? (trip.ended_at ?? trip.started_at)
-        : current.exitedAt;
-    current.ridesCount += 1;
-    current.earnings += getTripRevenue(trip);
-    current.predictedScore += Number(
-      (trip as { zone_score?: number | null }).zone_score ??
-        trip.zones?.current_score ??
-        50
-    );
-    groupedByZone.set(zoneId, current);
-  }
-
-  const tripsWithZone = shiftTrips.filter(
-    (trip): trip is TripWithZone & { zone_id: string } => Boolean(trip.zone_id)
-  );
-
-  const predictions = tripsWithZone.flatMap<PredictionInsert>((trip) => {
-    const hours = getTripHours(trip);
-    if (hours <= 0) return [];
-    const earningsPerHour = getTripRevenue(trip) / hours;
-    const predictedScore = clamp(
-      Math.round(
-        Number(
-          (trip as { zone_score?: number | null }).zone_score ??
-            trip.zones?.current_score ??
-            50
-        )
-      ),
-      0,
-      100
-    );
-    const actualScore = normalizeScoreFromEarnings(earningsPerHour);
-
-    return [
-      {
-        zone_id: trip.zone_id,
-        predicted_at: trip.started_at,
-        predicted_score: predictedScore,
-        factors_snapshot: {
-          source_trip_id: trip.id,
-          platform: trip.platform ?? null,
-        },
-        actual_earnings_per_hour: round(earningsPerHour),
-        prediction_error: round(actualScore - predictedScore, 4),
-      },
-    ];
-  });
-
-  const demandPatterns = tripsWithZone.flatMap<DemandPatternInsert>((trip) => {
-    const hours = getTripHours(trip);
-    if (hours <= 0) return [];
-
-    return [
-      {
-        zone_id: trip.zone_id,
-        context_vector: serializeContextVector(encodeContextVector(trip)),
-        actual_earnings_per_hour: round(getTripRevenue(trip) / hours),
-      },
-    ];
-  });
+  const groupedByZone = groupTripsByZone(shiftTrips);
+  const tripsWithZone = shiftTrips.filter(withZoneId);
+  const predictions = buildShiftPredictions(tripsWithZone);
+  const demandPatterns = buildShiftDemandPatterns(tripsWithZone);
 
   return {
-    session: {
-      started_at: startedAtIso,
-      ended_at: endedAtIso,
-      total_earnings: summary.revenue,
-      total_rides: summary.tripCount,
-      total_hours: round(
-        Math.max((endedAt.getTime() - startedAt.getTime()) / 3_600_000, 0)
-      ),
-      notes: summary.suggestedFocus,
-      weather_snapshot: {
-        accuracy_percent: summary.accuracyPercent,
-        mean_absolute_error: summary.meanAbsoluteError,
-      },
-    } satisfies SessionInsert,
-    sessionZones: [...groupedByZone.values()].map<
-      Omit<SessionZoneInsert, 'session_id'>
-    >((zone) => ({
-      zone_id: zone.zoneId,
-      entered_at: zone.enteredAt,
-      exited_at: zone.exitedAt,
-      rides_count: zone.ridesCount,
-      earnings: round(zone.earnings),
-      predicted_score: round(
-        zone.predictedScore / Math.max(zone.ridesCount, 1)
-      ),
-      factors_snapshot: zone.factorsSnapshot,
-    })),
+    session: buildSessionInsertPayload(
+      summary,
+      startedAtIso,
+      endedAtIso,
+      startedAt,
+      endedAt
+    ),
+    sessionZones: buildSessionZoneRows(groupedByZone),
     predictions,
     demandPatterns,
   };
+}
+
+function mapSimilarContextRow(row: SimilarContextRpcRow): SimilarContextMatch {
+  return {
+    id: Number(row.id),
+    zoneId: row.zone_id,
+    actualEarningsPerHour: round(Number(row.actual_earnings_per_hour ?? 0)),
+    similarity: round(Number(row.similarity ?? 0), 4),
+    createdAt: row.created_at,
+  };
+}
+
+function getAverageFromMatches<T>(
+  matches: T[],
+  selector: (match: T) => number,
+  digits = 2
+) {
+  if (matches.length === 0) return 0;
+  return round(
+    matches.reduce((sum, match) => sum + selector(match), 0) / matches.length,
+    digits
+  );
+}
+
+function hasMissingSimilarContextMigration(message: string) {
+  const rawMessage = message.toLowerCase();
+  return (
+    rawMessage.includes('match_similar_contexts') ||
+    rawMessage.includes('function') ||
+    rawMessage.includes('schema cache') ||
+    rawMessage.includes('demand_patterns')
+  );
+}
+
+function buildInvalidSimilarContextResult(
+  message: string
+): SimilarContextsResult {
+  return {
+    ok: false,
+    matches: [],
+    averageEarningsPerHour: 0,
+    averageSimilarity: 0,
+    message,
+  };
+}
+
+function buildSimilarContextSuccessResult(
+  rows: SimilarContextRpcRow[] | null | undefined
+): SimilarContextsResult {
+  const matches = (rows ?? []).map(mapSimilarContextRow);
+  return {
+    ok: true,
+    matches,
+    averageEarningsPerHour: getAverageFromMatches(
+      matches,
+      (match) => match.actualEarningsPerHour
+    ),
+    averageSimilarity: getAverageFromMatches(
+      matches,
+      (match) => match.similarity,
+      4
+    ),
+    message:
+      matches.length > 0
+        ? 'Contextes similaires récupérés.'
+        : 'Aucun contexte similaire trouvé pour cette zone.',
+  };
+}
+
+function buildSimilarContextErrorResult(error: unknown): SimilarContextsResult {
+  const message = getErrorMessage(
+    error,
+    'Recherche de contextes similaires impossible.'
+  );
+  return buildInvalidSimilarContextResult(
+    hasMissingSimilarContextMigration(message)
+      ? 'La recherche de contextes similaires sera disponible après application de la migration Supabase.'
+      : message
+  );
+}
+
+function buildShiftSyncedCounts(
+  aggregateCounts: LearningSyncResult['syncedCounts'],
+  sessionZonesCount: number,
+  predictionsCount: number,
+  demandPatternsCount: number
+) {
+  return {
+    emaPatterns: aggregateCounts.emaPatterns,
+    beliefs: aggregateCounts.beliefs,
+    predictions: predictionsCount,
+    demandPatterns: demandPatternsCount,
+    sessionZones: sessionZonesCount,
+  };
+}
+
+async function cleanupFailedShiftSync(sessionId: number) {
+  const { error: cleanupZonesError } = await supabase
+    .from('session_zones')
+    .delete()
+    .eq('session_id', sessionId);
+
+  if (cleanupZonesError) {
+    console.warn(
+      '[syncShiftLearning] Failed to cleanup session_zones after error:',
+      cleanupZonesError
+    );
+  }
+
+  const { error: cleanupSessionError } = await supabase
+    .from('sessions')
+    .delete()
+    .eq('id', sessionId);
+
+  if (cleanupSessionError) {
+    console.warn(
+      '[syncShiftLearning] Failed to cleanup session after error:',
+      cleanupSessionError
+    );
+  }
+}
+
+async function insertOptionalRows<T>(
+  tableName: 'session_zones' | 'predictions' | 'demand_patterns',
+  rows: T[]
+) {
+  if (rows.length === 0) return;
+  const { error } = await supabase.from(tableName).insert(rows);
+  if (error) throw error;
 }
 
 export async function syncLearningAggregates(
@@ -537,13 +762,7 @@ export async function syncLearningAggregates(
   } catch (error: unknown) {
     return {
       ok: false,
-      syncedCounts: {
-        emaPatterns: 0,
-        beliefs: 0,
-        predictions: 0,
-        demandPatterns: 0,
-        sessionZones: 0,
-      },
+      syncedCounts: createEmptySyncCounts(),
       message: getErrorMessage(error, 'Sync Supabase impossible.'),
     };
   }
@@ -582,64 +801,24 @@ export async function syncShiftLearning(
       session_id: sessionId,
     })) satisfies SessionZoneInsert[];
 
-    if (sessionZones.length > 0) {
-      const { error: zoneError } = await supabase
-        .from('session_zones')
-        .insert(sessionZones);
-      if (zoneError) throw zoneError;
-    }
-
-    if (payload.predictions.length > 0) {
-      const { error: predictionsError } = await supabase
-        .from('predictions')
-        .insert(payload.predictions);
-      if (predictionsError) throw predictionsError;
-    }
-
-    if (payload.demandPatterns.length > 0) {
-      const { error: patternError } = await supabase
-        .from('demand_patterns')
-        .insert(payload.demandPatterns);
-      if (patternError) throw patternError;
-    }
+    await insertOptionalRows('session_zones', sessionZones);
+    await insertOptionalRows('predictions', payload.predictions);
+    await insertOptionalRows('demand_patterns', payload.demandPatterns);
 
     return {
       ok: true,
       sessionId,
-      syncedCounts: {
-        emaPatterns: aggregateResult.syncedCounts.emaPatterns,
-        beliefs: aggregateResult.syncedCounts.beliefs,
-        predictions: payload.predictions.length,
-        demandPatterns: payload.demandPatterns.length,
-        sessionZones: sessionZones.length,
-      },
+      syncedCounts: buildShiftSyncedCounts(
+        aggregateResult.syncedCounts,
+        sessionZones.length,
+        payload.predictions.length,
+        payload.demandPatterns.length
+      ),
       message: 'Shift, prédictions et patterns synchronisés vers Supabase.',
     };
   } catch (error: unknown) {
     if (sessionId !== null) {
-      const { error: cleanupZonesError } = await supabase
-        .from('session_zones')
-        .delete()
-        .eq('session_id', sessionId);
-
-      if (cleanupZonesError) {
-        console.warn(
-          '[syncShiftLearning] Failed to cleanup session_zones after error:',
-          cleanupZonesError
-        );
-      }
-
-      const { error: cleanupSessionError } = await supabase
-        .from('sessions')
-        .delete()
-        .eq('id', sessionId);
-
-      if (cleanupSessionError) {
-        console.warn(
-          '[syncShiftLearning] Failed to cleanup session after error:',
-          cleanupSessionError
-        );
-      }
+      await cleanupFailedShiftSync(sessionId);
     }
 
     return {
@@ -656,78 +835,19 @@ export async function findSimilarContextsForTrip(
 ): Promise<SimilarContextsResult> {
   const args = buildSimilarContextRpcArgs(trip, matchCount);
   if (!args) {
-    return {
-      ok: false,
-      matches: [],
-      averageEarningsPerHour: 0,
-      averageSimilarity: 0,
-      message: 'Cette course n’est liée à aucune zone exploitable.',
-    };
+    return buildInvalidSimilarContextResult(
+      'Cette course n’est liée à aucune zone exploitable.'
+    );
   }
 
   try {
     const { data, error } = await supabase.rpc('match_similar_contexts', args);
     if (error) throw error;
-
-    const matches: SimilarContextMatch[] = (
+    return buildSimilarContextSuccessResult(
       (data ?? []) as SimilarContextRpcRow[]
-    ).map((row) => ({
-      id: Number(row.id),
-      zoneId: row.zone_id,
-      actualEarningsPerHour: round(Number(row.actual_earnings_per_hour ?? 0)),
-      similarity: round(Number(row.similarity ?? 0), 4),
-      createdAt: row.created_at,
-    }));
-
-    const averageEarningsPerHour =
-      matches.length > 0
-        ? round(
-            matches.reduce(
-              (sum, match) => sum + match.actualEarningsPerHour,
-              0
-            ) / matches.length
-          )
-        : 0;
-    const averageSimilarity =
-      matches.length > 0
-        ? round(
-            matches.reduce((sum, match) => sum + match.similarity, 0) /
-              matches.length,
-            4
-          )
-        : 0;
-
-    return {
-      ok: true,
-      matches,
-      averageEarningsPerHour,
-      averageSimilarity,
-      message:
-        matches.length > 0
-          ? 'Contextes similaires récupérés.'
-          : 'Aucun contexte similaire trouvé pour cette zone.',
-    };
-  } catch (error: unknown) {
-    const message = getErrorMessage(
-      error,
-      'Recherche de contextes similaires impossible.'
     );
-    const rawMessage = message.toLowerCase();
-    const migrationMissing =
-      rawMessage.includes('match_similar_contexts') ||
-      rawMessage.includes('function') ||
-      rawMessage.includes('schema cache') ||
-      rawMessage.includes('demand_patterns');
-
-    return {
-      ok: false,
-      matches: [],
-      averageEarningsPerHour: 0,
-      averageSimilarity: 0,
-      message: migrationMissing
-        ? 'La recherche de contextes similaires sera disponible après application de la migration Supabase.'
-        : message,
-    };
+  } catch (error: unknown) {
+    return buildSimilarContextErrorResult(error);
   }
 }
 
@@ -737,78 +857,17 @@ export async function findSimilarContextsForZoneContext(
 ): Promise<SimilarContextsResult> {
   const args = buildZoneSimilarContextRpcArgs(input, matchCount);
   if (!args) {
-    return {
-      ok: false,
-      matches: [],
-      averageEarningsPerHour: 0,
-      averageSimilarity: 0,
-      message: 'Contexte de zone invalide.',
-    };
+    return buildInvalidSimilarContextResult('Contexte de zone invalide.');
   }
 
   try {
     const { data, error } = await supabase.rpc('match_similar_contexts', args);
     if (error) throw error;
-
-    const matches: SimilarContextMatch[] = (
+    return buildSimilarContextSuccessResult(
       (data ?? []) as SimilarContextRpcRow[]
-    ).map((row) => ({
-      id: Number(row.id),
-      zoneId: row.zone_id,
-      actualEarningsPerHour: round(Number(row.actual_earnings_per_hour ?? 0)),
-      similarity: round(Number(row.similarity ?? 0), 4),
-      createdAt: row.created_at,
-    }));
-
-    const averageEarningsPerHour =
-      matches.length > 0
-        ? round(
-            matches.reduce(
-              (sum, match) => sum + match.actualEarningsPerHour,
-              0
-            ) / matches.length
-          )
-        : 0;
-    const averageSimilarity =
-      matches.length > 0
-        ? round(
-            matches.reduce((sum, match) => sum + match.similarity, 0) /
-              matches.length,
-            4
-          )
-        : 0;
-
-    return {
-      ok: true,
-      matches,
-      averageEarningsPerHour,
-      averageSimilarity,
-      message:
-        matches.length > 0
-          ? 'Contextes similaires récupérés.'
-          : 'Aucun contexte similaire trouvé pour cette zone.',
-    };
-  } catch (error: unknown) {
-    const message = getErrorMessage(
-      error,
-      'Recherche de contextes similaires impossible.'
     );
-    const rawMessage = message.toLowerCase();
-    const migrationMissing =
-      rawMessage.includes('match_similar_contexts') ||
-      rawMessage.includes('function') ||
-      rawMessage.includes('schema cache') ||
-      rawMessage.includes('demand_patterns');
-
-    return {
-      ok: false,
-      matches: [],
-      averageEarningsPerHour: 0,
-      averageSimilarity: 0,
-      message: migrationMissing
-        ? 'La recherche de contextes similaires sera disponible après application de la migration Supabase.'
-        : message,
-    };
+  } catch (error: unknown) {
+    return buildSimilarContextErrorResult(error);
   }
 }
 
