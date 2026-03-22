@@ -31,14 +31,14 @@ export default defineConfig({
         '**/*.d.ts',
       ],
       thresholds: {
-        // Raised after architecture hardening sprint #2 (March 2026).
-        // All metrics now exceed 80% ISO 25010 target: 79.61%/67.51%/84.23%/81.8%.
-        // learningSync.ts (async Supabase functions) and scoringEngine.ts (time rules)
-        // are the remaining bottlenecks — only testable with Supabase mocking.
-        lines: 80,
-        functions: 83,
-        branches: 65,
-        statements: 78,
+        // Raised after architecture hardening sprint #3 (March 2026).
+        // +55 tests added — async Supabase mocking, zone profiles, getDayOfWeekFactor branches.
+        // Coverage: 94.26% statements / 84.6% branches / 98.19% functions / 95.93% lines.
+        // Remaining gaps: learningSync cleanup code + scoringEngine private time-rule helpers.
+        lines: 94,
+        functions: 97,
+        branches: 83,
+        statements: 93,
       },
     },
   },

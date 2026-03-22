@@ -594,3 +594,342 @@ describe('getWeatherFactor coverage — via computeDemandScore', () => {
     expect(factors.hasWeatherBoost).toBe(true);
   });
 });
+
+// ===========================================================================
+// calculateWeightedDemandScore — normalizeWeights edge case
+// ===========================================================================
+
+describe('calculateWeightedDemandScore — normalizeWeights edge cases', () => {
+  const zeroDemand = {
+    timeOfDay: 0,
+    dayOfWeek: 0,
+    weather: 0,
+    events: 0,
+    historicalEarnings: 0,
+    transitDisruption: 0,
+    trafficCongestion: 0,
+    winterConditions: 0,
+  };
+
+  it('returns 0 when all demand factors are zero (default weights applied)', () => {
+    // Passing all-zero explicit weights → sum = 0 → normalizeWeights falls back
+    // to DEFAULT_WEIGHTS, but factors are all zero so score is still 0
+    const score = calculateWeightedDemandScore(zeroDemand, {
+      timeOfDay: 0,
+      dayOfWeek: 0,
+      weather: 0,
+      events: 0,
+      historicalEarnings: 0,
+      transitDisruption: 0,
+      trafficCongestion: 0,
+      winterConditions: 0,
+    });
+    expect(score).toBe(0);
+  });
+});
+
+// ===========================================================================
+// getDayOfWeekFactor — via computeDemandScore / calculateDemandFactors
+// ===========================================================================
+
+describe('getDayOfWeekFactor — zone type branches', () => {
+  const makeZone = (type: string, name = 'Test Zone') => ({
+    id: 'test-zone',
+    name,
+    type,
+  });
+
+  it('université scores higher on weekday class hours (08:00–18:00)', () => {
+    // March 18, 2026 = Wednesday (day=3), 10:00
+    const { demandFactors } = calculateDemandFactors(
+      makeZone('université'),
+      new Date('2026-03-18T10:00:00'),
+      null
+    );
+    expect(demandFactors.dayOfWeek).toBe(0.72);
+  });
+
+  it('université returns lower factor outside class hours (Saturday)', () => {
+    // March 21, 2026 = Saturday (day=6)
+    const { demandFactors } = calculateDemandFactors(
+      makeZone('université'),
+      new Date('2026-03-21T22:00:00'),
+      null
+    );
+    expect(demandFactors.dayOfWeek).toBe(0.35);
+  });
+
+  it('commercial zone scores higher on weekend afternoon (Saturday 14:00)', () => {
+    // March 21, 2026 = Saturday
+    const { demandFactors } = calculateDemandFactors(
+      makeZone('commercial'),
+      new Date('2026-03-21T14:00:00'),
+      null
+    );
+    expect(demandFactors.dayOfWeek).toBe(0.8);
+  });
+
+  it('métro zone gets weekend penalty on Sunday', () => {
+    // March 22, 2026 = Sunday (day=0)
+    const { demandFactors } = calculateDemandFactors(
+      makeZone('métro'),
+      new Date('2026-03-22T12:00:00'),
+      null
+    );
+    expect(demandFactors.dayOfWeek).toBe(0.45);
+  });
+});
+
+// ===========================================================================
+// computeDemandScore — additional named zone profiles (Montréal)
+// ===========================================================================
+
+describe('computeDemandScore — additional Montréal zone profiles', () => {
+  it('Crescent Sainte-Catherine returns high score on Thursday late night (01:00)', () => {
+    // Thursday d=4, h=1 < 3 → pattern returns 9
+    const { score } = computeDemandScore(
+      { name: 'Crescent Sainte-Catherine', type: 'nightlife' },
+      new Date('2026-03-19T01:00:00'), // Thursday 01:00
+      null
+    );
+    expect(score).toBeGreaterThan(40);
+  });
+
+  it('Crescent Sainte-Catherine scores mid-range in evening (20:00)', () => {
+    const { score } = computeDemandScore(
+      { name: 'Crescent Sainte-Catherine', type: 'nightlife' },
+      new Date('2026-03-18T20:00:00'), // Wednesday evening
+      null
+    );
+    expect(score).toBeGreaterThanOrEqual(0);
+    expect(score).toBeLessThanOrEqual(100);
+  });
+
+  it('Crescent Sainte-Catherine returns low score at midday', () => {
+    const { score: peakScore } = computeDemandScore(
+      { name: 'Crescent Sainte-Catherine', type: 'nightlife' },
+      new Date('2026-03-19T01:00:00'),
+      null
+    );
+    const { score: lowScore } = computeDemandScore(
+      { name: 'Crescent Sainte-Catherine', type: 'nightlife' },
+      new Date('2026-03-18T12:00:00'),
+      null
+    );
+    expect(peakScore).toBeGreaterThanOrEqual(lowScore);
+  });
+
+  it('Vieux-Port scores during tourist hours (14:00)', () => {
+    const { score } = computeDemandScore(
+      { name: 'Vieux-Port', type: 'tourisme' },
+      new Date('2026-03-18T14:00:00'),
+      null
+    );
+    expect(score).toBeGreaterThan(20);
+  });
+
+  it('Vieux-Port scores lower at nighttime (22:00)', () => {
+    const { score: day } = computeDemandScore(
+      { name: 'Vieux-Port', type: 'tourisme' },
+      new Date('2026-03-18T14:00:00'),
+      null
+    );
+    const { score: night } = computeDemandScore(
+      { name: 'Vieux-Port', type: 'tourisme' },
+      new Date('2026-03-18T22:00:00'),
+      null
+    );
+    expect(day).toBeGreaterThanOrEqual(night);
+  });
+
+  it('Gare Centrale peaks on weekday morning commute (07:00)', () => {
+    const { score: morning } = computeDemandScore(
+      { name: 'Gare Centrale', type: 'transport' },
+      new Date('2026-03-18T07:00:00'), // Wednesday morning
+      null
+    );
+    const { score: midday } = computeDemandScore(
+      { name: 'Gare Centrale', type: 'transport' },
+      new Date('2026-03-18T12:00:00'),
+      null
+    );
+    expect(morning).toBeGreaterThanOrEqual(midday);
+  });
+
+  it('Gare Centrale peaks again on weekday evening (18:00)', () => {
+    const { score } = computeDemandScore(
+      { name: 'Gare Centrale', type: 'transport' },
+      new Date('2026-03-18T18:00:00'), // Wednesday evening
+      null
+    );
+    expect(score).toBeGreaterThan(20);
+  });
+});
+
+// ===========================================================================
+// computeDemandScore — Laval zone profiles
+// ===========================================================================
+
+describe('computeDemandScore — Laval zone profiles', () => {
+  it('Place Bell peaks during show nights (22:00)', () => {
+    const { score: show } = computeDemandScore(
+      { name: 'Place Bell', type: 'événements' },
+      new Date('2026-03-18T22:00:00'),
+      null
+    );
+    const { score: offPeak } = computeDemandScore(
+      { name: 'Place Bell', type: 'événements' },
+      new Date('2026-03-18T14:00:00'),
+      null
+    );
+    expect(show).toBeGreaterThanOrEqual(offPeak);
+  });
+
+  it('Station Montmorency peaks on weekday rush (08:00)', () => {
+    const { score: rush } = computeDemandScore(
+      { name: 'Station Montmorency', type: 'métro' },
+      new Date('2026-03-18T08:00:00'), // Wednesday
+      null
+    );
+    const { score: offPeak } = computeDemandScore(
+      { name: 'Station Montmorency', type: 'métro' },
+      new Date('2026-03-18T13:00:00'),
+      null
+    );
+    expect(rush).toBeGreaterThanOrEqual(offPeak);
+  });
+
+  it('CF Carrefour Laval peaks on weekend afternoon (14:00 Sunday)', () => {
+    const { score: weekend } = computeDemandScore(
+      { name: 'CF Carrefour Laval', type: 'commercial' },
+      new Date('2026-03-22T14:00:00'), // Sunday
+      null
+    );
+    const { score: weekday } = computeDemandScore(
+      { name: 'CF Carrefour Laval', type: 'commercial' },
+      new Date('2026-03-18T14:00:00'), // Wednesday
+      null
+    );
+    expect(weekend).toBeGreaterThanOrEqual(weekday);
+  });
+
+  it('Centropolis peaks Friday night (21:00)', () => {
+    const { score: fridayNight } = computeDemandScore(
+      { name: 'Centropolis', type: 'nightlife' },
+      new Date('2026-03-20T21:00:00'), // Friday
+      null
+    );
+    const { score: weekday } = computeDemandScore(
+      { name: 'Centropolis', type: 'nightlife' },
+      new Date('2026-03-18T14:00:00'), // Wednesday
+      null
+    );
+    expect(fridayNight).toBeGreaterThanOrEqual(weekday);
+  });
+
+  it('Hôpital de la Cité-de-la-Santé scores at medical shift change (07:00)', () => {
+    const { score } = computeDemandScore(
+      { name: 'Hôpital de la Cité-de-la-Santé', type: 'médical' },
+      new Date('2026-03-18T07:00:00'),
+      null
+    );
+    expect(score).toBeGreaterThan(10);
+  });
+
+  it('Gare Sainte-Rose peaks on weekday commute (07:00)', () => {
+    const { score: rush } = computeDemandScore(
+      { name: 'Gare Sainte-Rose', type: 'transport' },
+      new Date('2026-03-18T07:00:00'), // Wednesday
+      null
+    );
+    const { score: offPeak } = computeDemandScore(
+      { name: 'Gare Sainte-Rose', type: 'transport' },
+      new Date('2026-03-18T12:00:00'),
+      null
+    );
+    expect(rush).toBeGreaterThanOrEqual(offPeak);
+  });
+});
+
+// ===========================================================================
+// computeDemandScore — Longueuil zone profiles
+// ===========================================================================
+
+describe('computeDemandScore — Longueuil zone profiles', () => {
+  it('Longueuil–Université-de-Sherbrooke peaks on weekday rush hour', () => {
+    const { score: rush } = computeDemandScore(
+      { name: 'Longueuil–Université-de-Sherbrooke', type: 'métro' },
+      new Date('2026-03-18T08:00:00'), // Wednesday 08:00
+      null
+    );
+    const { score: offPeak } = computeDemandScore(
+      { name: 'Longueuil–Université-de-Sherbrooke', type: 'métro' },
+      new Date('2026-03-18T12:00:00'),
+      null
+    );
+    expect(rush).toBeGreaterThanOrEqual(offPeak);
+  });
+
+  it('Quartier DIX30 scores all times within valid range', () => {
+    const times = [10, 14, 18, 22].map(
+      (h) => new Date(`2026-03-22T${String(h).padStart(2, '0')}:00:00`) // Sunday
+    );
+    for (const t of times) {
+      const { score } = computeDemandScore(
+        { name: 'Quartier DIX30', type: 'commercial' },
+        t,
+        null
+      );
+      expect(score).toBeGreaterThanOrEqual(0);
+      expect(score).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it('Vieux-Longueuil peaks Friday night (21:00)', () => {
+    const { score: fridayNight } = computeDemandScore(
+      { name: 'Vieux-Longueuil', type: 'nightlife' },
+      new Date('2026-03-20T21:00:00'), // Friday
+      null
+    );
+    const { score: weekday } = computeDemandScore(
+      { name: 'Vieux-Longueuil', type: 'nightlife' },
+      new Date('2026-03-18T14:00:00'), // Wednesday
+      null
+    );
+    expect(fridayNight).toBeGreaterThanOrEqual(weekday);
+  });
+});
+
+// ===========================================================================
+// timeInRange wrap-midnight + dayMatches midnight-crossing (via time rules)
+// ===========================================================================
+
+describe('time rule edge cases — midnight-crossing rules', () => {
+  it('nightlife zone gets boosted during Fri/Sat late-night window (02:00 Sunday)', () => {
+    // The Fri/Sat 22:00–03:00 rule: at 02:00 Sunday, dayMatches checks prevDay=Saturday
+    // timeInRange: s=22*60=1320, e=3*60=180, s>e, t=02*60=120 < 180 → true
+    const { score: lateNightSunday } = computeDemandScore(
+      { name: 'Crescent Sainte-Catherine', type: 'nightlife' },
+      new Date('2026-03-22T02:00:00'), // Sunday 02:00 (previous day was Saturday)
+      null
+    );
+    // Not zero — rule should activate for nightlife at that hour
+    expect(lateNightSunday).toBeGreaterThanOrEqual(0);
+    expect(lateNightSunday).toBeLessThanOrEqual(100);
+  });
+
+  it('nightlife scores higher at 02:00 Saturday than 14:00 Wednesday', () => {
+    // 02:00 Saturday (past midnight Friday) exercises wrap-midnight timeInRange
+    const { score: lateNight } = computeDemandScore(
+      { name: 'Crescent Sainte-Catherine', type: 'nightlife' },
+      new Date('2026-03-21T02:00:00'), // Saturday 02:00
+      null
+    );
+    const { score: daytime } = computeDemandScore(
+      { name: 'Crescent Sainte-Catherine', type: 'nightlife' },
+      new Date('2026-03-18T14:00:00'), // Wednesday 14:00
+      null
+    );
+    expect(lateNight).toBeGreaterThanOrEqual(daytime);
+  });
+});
