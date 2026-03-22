@@ -285,7 +285,9 @@ describe('buildUserPingMatchRpcArgs', () => {
   });
 
   it('returns null when zone id is empty', () => {
-    expect(buildUserPingMatchRpcArgs('fp-123', { ...input, zoneId: '' })).toBeNull();
+    expect(
+      buildUserPingMatchRpcArgs('fp-123', { ...input, zoneId: '' })
+    ).toBeNull();
   });
 
   it('clamps matchCount to at least 1', () => {
@@ -335,28 +337,38 @@ describe('encodeContextVector — platform and zone type branches', () => {
 
   it('sets nightlife flag at index 14 for nightlife zone', () => {
     const vector = encodeContextVector(
-      makeTrip({ zones: { name: 'Crescent', current_score: 70, type: 'nightlife' } })
+      makeTrip({
+        zones: { name: 'Crescent', current_score: 70, type: 'nightlife' },
+      })
     );
     expect(vector[14]).toBe(1);
   });
 
   it('clears nightlife flag for non-event zone', () => {
     const vector = encodeContextVector(
-      makeTrip({ zones: { name: 'NDG', current_score: 55, type: 'résidentiel' } })
+      makeTrip({
+        zones: { name: 'NDG', current_score: 55, type: 'résidentiel' },
+      })
     );
     expect(vector[14]).toBe(0);
   });
 
   it('sets winter flag at index 13 for winter month (January)', () => {
     const vector = encodeContextVector(
-      makeTrip({ started_at: '2026-01-10T22:00:00.000Z', ended_at: '2026-01-10T23:00:00.000Z' })
+      makeTrip({
+        started_at: '2026-01-10T22:00:00.000Z',
+        ended_at: '2026-01-10T23:00:00.000Z',
+      })
     );
     expect(vector[13]).toBe(1); // isWinter = 1
   });
 
   it('clears winter flag for summer month (July)', () => {
     const vector = encodeContextVector(
-      makeTrip({ started_at: '2026-07-10T22:00:00.000Z', ended_at: '2026-07-10T23:00:00.000Z' })
+      makeTrip({
+        started_at: '2026-07-10T22:00:00.000Z',
+        ended_at: '2026-07-10T23:00:00.000Z',
+      })
     );
     expect(vector[13]).toBe(0); // isWinter = 0
   });

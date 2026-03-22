@@ -408,22 +408,42 @@ describe('computeDemandScore — zone type variety', () => {
   const now = new Date('2026-03-21T22:00:00'); // Saturday night
 
   it('scores nightlife zone higher than residential on Saturday night', () => {
-    const nightlife = { name: 'Crescent', type: 'nightlife', latitude: 45.49, longitude: -73.58 };
-    const residential = { name: 'NDG', type: 'résidentiel', latitude: 45.48, longitude: -73.6 };
+    const nightlife = {
+      name: 'Crescent',
+      type: 'nightlife',
+      latitude: 45.49,
+      longitude: -73.58,
+    };
+    const residential = {
+      name: 'NDG',
+      type: 'résidentiel',
+      latitude: 45.48,
+      longitude: -73.6,
+    };
     const { score: nlScore } = computeDemandScore(nightlife, now, null);
     const { score: resScore } = computeDemandScore(residential, now, null);
     expect(nlScore).toBeGreaterThan(resScore);
   });
 
   it('airport scores reasonably on any time', () => {
-    const airport = { name: 'YUL', type: 'aéroport', latitude: 45.47, longitude: -73.74 };
+    const airport = {
+      name: 'YUL',
+      type: 'aéroport',
+      latitude: 45.47,
+      longitude: -73.74,
+    };
     const { score } = computeDemandScore(airport, now, null);
     expect(score).toBeGreaterThan(0);
     expect(score).toBeLessThanOrEqual(100);
   });
 
   it('event boost type filtering — boost_zone_types restricts boost to matching types', () => {
-    const eventZone = { name: 'Centre Bell', type: 'événements', latitude: 45.496, longitude: -73.5694 };
+    const eventZone = {
+      name: 'Centre Bell',
+      type: 'événements',
+      latitude: 45.496,
+      longitude: -73.5694,
+    };
     const nearEvent: ActiveEventBoost = {
       latitude: 45.496,
       longitude: -73.5694,
@@ -439,14 +459,24 @@ describe('computeDemandScore — zone type variety', () => {
 
 describe('computeDemandScore — named zone profiles', () => {
   it('Centre Bell scores high on Saturday 22:00 (event night)', () => {
-    const zone = { name: 'Centre Bell', type: 'événements', latitude: 45.496, longitude: -73.5694 };
+    const zone = {
+      name: 'Centre Bell',
+      type: 'événements',
+      latitude: 45.496,
+      longitude: -73.5694,
+    };
     const saturdayNight = new Date('2026-03-21T22:00:00'); // Saturday
     const { score } = computeDemandScore(zone, saturdayNight, null);
     expect(score).toBeGreaterThan(60);
   });
 
   it('Aéroport Trudeau (YUL) scores well during early morning peak (04:00)', () => {
-    const zone = { name: 'Aéroport Trudeau (YUL)', type: 'aéroport', latitude: 45.47, longitude: -73.74 };
+    const zone = {
+      name: 'Aéroport Trudeau (YUL)',
+      type: 'aéroport',
+      latitude: 45.47,
+      longitude: -73.74,
+    };
     const earlyMorning = new Date('2026-03-22T04:00:00'); // Sunday 04:00
     const { score } = computeDemandScore(zone, earlyMorning, null);
     expect(score).toBeGreaterThan(0);
@@ -454,28 +484,48 @@ describe('computeDemandScore — named zone profiles', () => {
   });
 
   it('Station Berri-UQAM scores well on Wednesday morning commute (08:00)', () => {
-    const zone = { name: 'Station Berri-UQAM', type: 'métro', latitude: 45.5188, longitude: -73.5637 };
+    const zone = {
+      name: 'Station Berri-UQAM',
+      type: 'métro',
+      latitude: 45.5188,
+      longitude: -73.5637,
+    };
     const wednesdayMorning = new Date('2026-03-18T08:00:00'); // Wednesday
     const { score } = computeDemandScore(zone, wednesdayMorning, null);
     expect(score).toBeGreaterThan(0);
   });
 
   it('Casino de Montréal scores high at 23:00', () => {
-    const zone = { name: 'Casino de Montréal', type: 'nightlife', latitude: 45.508, longitude: -73.532 };
+    const zone = {
+      name: 'Casino de Montréal',
+      type: 'nightlife',
+      latitude: 45.508,
+      longitude: -73.532,
+    };
     const lateNight = new Date('2026-03-21T23:00:00');
     const { score } = computeDemandScore(zone, lateNight, null);
     expect(score).toBeGreaterThan(0);
   });
 
   it('CHUM scores moderate at shift change hour (07:00)', () => {
-    const zone = { name: 'CHUM', type: 'médical', latitude: 45.5126, longitude: -73.5565 };
+    const zone = {
+      name: 'CHUM',
+      type: 'médical',
+      latitude: 45.5126,
+      longitude: -73.5565,
+    };
     const shiftChange = new Date('2026-03-18T07:00:00');
     const { score } = computeDemandScore(zone, shiftChange, null);
     expect(score).toBeGreaterThan(0);
   });
 
   it('Quartier DIX30 scores higher on weekend afternoon than weekday', () => {
-    const zone = { name: 'Quartier DIX30', type: 'commercial', latitude: 45.44, longitude: -73.47 };
+    const zone = {
+      name: 'Quartier DIX30',
+      type: 'commercial',
+      latitude: 45.44,
+      longitude: -73.47,
+    };
     const weekendAfternoon = new Date('2026-03-22T14:00:00'); // Sunday
     const weekdayAfternoon = new Date('2026-03-19T14:00:00'); // Thursday
     const { score: wknd } = computeDemandScore(zone, weekendAfternoon, null);
@@ -486,7 +536,12 @@ describe('computeDemandScore — named zone profiles', () => {
 });
 
 describe('getWeatherFactor coverage — via computeDemandScore', () => {
-  const zone = { name: 'Downtown', type: 'commercial', latitude: 45.5, longitude: -73.56 };
+  const zone = {
+    name: 'Downtown',
+    type: 'commercial',
+    latitude: 45.5,
+    longitude: -73.56,
+  };
 
   it('weather with demandBoostPoints boosts score vs no weather', () => {
     const weather: WeatherCondition = {
@@ -496,20 +551,46 @@ describe('getWeatherFactor coverage — via computeDemandScore', () => {
       condition: 'clear',
       demandBoostPoints: 25,
     };
-    const { score: withBoost } = computeDemandScore(zone, new Date('2026-03-18T14:00:00'), weather);
-    const { score: noBoost } = computeDemandScore(zone, new Date('2026-03-18T14:00:00'), null);
+    const { score: withBoost } = computeDemandScore(
+      zone,
+      new Date('2026-03-18T14:00:00'),
+      weather
+    );
+    const { score: noBoost } = computeDemandScore(
+      zone,
+      new Date('2026-03-18T14:00:00'),
+      null
+    );
     expect(withBoost).toBeGreaterThanOrEqual(noBoost);
   });
 
   it('snow weather sets winter factor and marks weather boost', () => {
-    const snow: WeatherCondition = { weatherId: 601, temp: -5, precipMm: 5, condition: 'snow' };
-    const { factors } = computeDemandScore(zone, new Date('2026-03-18T18:00:00'), snow);
+    const snow: WeatherCondition = {
+      weatherId: 601,
+      temp: -5,
+      precipMm: 5,
+      condition: 'snow',
+    };
+    const { factors } = computeDemandScore(
+      zone,
+      new Date('2026-03-18T18:00:00'),
+      snow
+    );
     expect(factors.hasWeatherBoost).toBe(true);
   });
 
   it('thunderstorm sets weather boost', () => {
-    const thunder: WeatherCondition = { weatherId: 210, temp: 10, precipMm: 30, condition: 'storm' };
-    const { factors } = computeDemandScore(zone, new Date('2026-03-18T18:00:00'), thunder);
+    const thunder: WeatherCondition = {
+      weatherId: 210,
+      temp: 10,
+      precipMm: 30,
+      condition: 'storm',
+    };
+    const { factors } = computeDemandScore(
+      zone,
+      new Date('2026-03-18T18:00:00'),
+      thunder
+    );
     expect(factors.hasWeatherBoost).toBe(true);
   });
 });
