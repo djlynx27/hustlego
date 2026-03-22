@@ -11,9 +11,9 @@ import { describe, expect, it } from 'vitest';
 const sessions = [
   {
     id: 1,
-    created_at: '2026-03-15T12:10:00.000Z',
-    started_at: '2026-03-15T08:00:00.000Z',
-    ended_at: '2026-03-15T12:00:00.000Z',
+    created_at: '2026-03-15T12:10:00',
+    started_at: '2026-03-15T08:00:00',
+    ended_at: '2026-03-15T12:00:00',
     total_earnings: 140,
     total_hours: 4,
     total_rides: 6,
@@ -22,9 +22,9 @@ const sessions = [
   },
   {
     id: 2,
-    created_at: '2026-03-16T16:10:00.000Z',
-    started_at: '2026-03-16T12:00:00.000Z',
-    ended_at: '2026-03-16T16:00:00.000Z',
+    created_at: '2026-03-16T16:10:00',
+    started_at: '2026-03-16T12:00:00',
+    ended_at: '2026-03-16T16:00:00',
     total_earnings: 100,
     total_hours: 4,
     total_rides: 5,
@@ -36,13 +36,13 @@ const sessions = [
 const trips: TripWithZone[] = [
   {
     id: '1',
-    created_at: '2026-03-15T08:00:00.000Z',
+    created_at: '2026-03-15T08:00:00',
     distance_km: 12,
     earnings: 30,
-    ended_at: '2026-03-15T09:00:00.000Z',
+    ended_at: '2026-03-15T09:00:00',
     experiment: false,
     notes: null,
-    started_at: '2026-03-15T08:00:00.000Z',
+    started_at: '2026-03-15T08:00:00',
     tips: 5,
     zone_id: 'downtown',
     platform: 'lyft',
@@ -50,13 +50,13 @@ const trips: TripWithZone[] = [
   },
   {
     id: '2',
-    created_at: '2026-03-16T18:00:00.000Z',
+    created_at: '2026-03-16T18:00:00',
     distance_km: 9,
     earnings: 25,
-    ended_at: '2026-03-16T18:30:00.000Z',
+    ended_at: '2026-03-16T18:30:00',
     experiment: false,
     notes: null,
-    started_at: '2026-03-16T18:00:00.000Z',
+    started_at: '2026-03-16T18:00:00',
     tips: 0,
     zone_id: 'plateau',
     platform: 'uber',
@@ -64,13 +64,13 @@ const trips: TripWithZone[] = [
   },
   {
     id: '3',
-    created_at: '2026-03-16T22:00:00.000Z',
+    created_at: '2026-03-16T22:00:00',
     distance_km: 6,
     earnings: 18,
-    ended_at: '2026-03-16T22:20:00.000Z',
+    ended_at: '2026-03-16T22:20:00',
     experiment: false,
     notes: null,
-    started_at: '2026-03-16T22:00:00.000Z',
+    started_at: '2026-03-16T22:00:00',
     tips: 2,
     zone_id: 'plateau',
     platform: 'uber',
@@ -82,8 +82,8 @@ describe('trip analytics', () => {
   it('summarizes a date window', () => {
     const summary = summarizeTrips(
       trips,
-      new Date('2026-03-15T00:00:00.000Z'),
-      new Date('2026-03-16T23:59:59.000Z')
+      new Date('2026-03-15T00:00:00'),
+      new Date('2026-03-16T23:59:59')
     );
 
     expect(summary.rides).toBe(3);
@@ -95,7 +95,7 @@ describe('trip analytics', () => {
   it('builds ranked analytics', () => {
     const analytics = aggregateTripAnalytics(
       trips,
-      new Date('2026-03-17T12:00:00.000Z')
+      new Date('2026-03-17T12:00:00')
     );
 
     expect(analytics.bestZone).toBe('Plateau');
@@ -106,7 +106,7 @@ describe('trip analytics', () => {
   it('keeps all dayparts in analytics, including those with zero rides', () => {
     const analytics = aggregateTripAnalytics(
       trips,
-      new Date('2026-03-17T12:00:00.000Z')
+      new Date('2026-03-17T12:00:00')
     );
 
     expect(analytics.daypartSeries.map((entry) => entry.label)).toEqual([
@@ -128,8 +128,8 @@ describe('trip analytics', () => {
   it('tracks an active shift snapshot', () => {
     const snapshot = buildShiftSnapshot(
       trips,
-      '2026-03-16T00:00:00.000Z',
-      new Date('2026-03-17T00:00:00.000Z')
+      '2026-03-16T00:00:00',
+      new Date('2026-03-17T00:00:00')
     );
 
     expect(snapshot.metrics.rides).toBe(2);
@@ -141,7 +141,7 @@ describe('trip analytics', () => {
     const incompleteTrip: TripWithZone = {
       ...trips[0],
       id: '4',
-      started_at: '2026-03-16T10:00:00.000Z',
+      started_at: '2026-03-16T10:00:00',
       ended_at: null,
       earnings: 40,
       tips: 5,
@@ -151,8 +151,8 @@ describe('trip analytics', () => {
 
     const summary = summarizeTrips(
       [incompleteTrip],
-      new Date('2026-03-16T00:00:00.000Z'),
-      new Date('2026-03-20T00:00:00.000Z')
+      new Date('2026-03-16T00:00:00'),
+      new Date('2026-03-20T00:00:00')
     );
 
     expect(summary.rides).toBe(1);
@@ -163,8 +163,8 @@ describe('trip analytics', () => {
   it('summarizes tracked shift sessions separately from trip durations', () => {
     const summary = summarizeTrackedSessions(
       sessions,
-      new Date('2026-03-15T00:00:00.000Z'),
-      new Date('2026-03-16T23:59:59.000Z')
+      new Date('2026-03-15T00:00:00'),
+      new Date('2026-03-16T23:59:59')
     );
 
     expect(summary.shiftCount).toBe(2);
