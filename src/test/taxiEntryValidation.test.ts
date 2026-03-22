@@ -74,4 +74,17 @@ describe('validateTaxiEntryForm', () => {
       message: 'Ajoute une durée active en minutes pour calculer le $/heure',
     });
   });
+
+  it('rejects empty amount with dedicated message', () => {
+    const result = validateTaxiEntryForm({
+      amount: '',
+      km: '10',
+      durationMin: '30',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'Ajoute un montant pour enregistrer l\u2019entr\u00e9e',
+    });
+  });
 });

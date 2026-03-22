@@ -28,4 +28,18 @@ describe('parseCsvRecords', () => {
       },
     ]);
   });
+
+  it('parses the final non-empty row without a trailing newline', () => {
+    const rows = parseCsvRecords(
+      'Date,Notes,Earnings\n2026-03-20,"Montreal, QC",12.50'
+    );
+
+    expect(rows).toEqual([
+      {
+        date: '2026-03-20',
+        notes: 'Montreal, QC',
+        earnings: '12.50',
+      },
+    ]);
+  });
 });

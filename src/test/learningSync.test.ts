@@ -47,9 +47,7 @@ vi.mock('@/integrations/supabase/client', () => ({
  *  - supports `.select().single()` chain → resolves to `{ data, error }`
  */
 function makeInsertChain(error: Error | null = null, sessionId = 42) {
-  const single = vi
-    .fn()
-    .mockResolvedValue({ data: { id: sessionId }, error });
+  const single = vi.fn().mockResolvedValue({ data: { id: sessionId }, error });
   const select = vi.fn().mockReturnValue({ single });
   return {
     then: (
@@ -640,6 +638,32 @@ describe('syncShiftLearning', () => {
     expect(result.ok).toBe(true);
     expect(result.syncedCounts.sessionZones).toBe(0);
     expect(result.syncedCounts.predictions).toBe(0);
+  });
+
+  it('cleans up session and session_zones when session_zones insert fails after successful session insert', async () => {
+    mockUpsert.mockResolvedValue({ error: null });
+    // Call order for mockInsert inside a full run:
+    // #1 = weight_history (direct await, from syncLearningAggregates)
+    // #2 = sessions (.select().single(), from syncShiftLearning) → SUCCESS → sessionId = 99
+    // #3 = session_zones (direct await) → FAIL → triggers cleanup
+    mockInsert
+      .mockImplementationOnce(() => makeInsertChain(null)) // weight_history
+      .mockImplementationOnce(() => makeInsertChain(null, 99)) // sessions ok
+      .mockImplementationOnce(() =>
+        makeInsertChain(new Error('session_zones DB error'))
+      ); // session_zones fail
+
+    const result = await syncShiftLearning(
+      sharedTrips,
+      START,
+      END,
+      DEFAULT_WEIGHTS
+    );
+
+    expect(result.ok).toBe(false);
+    expect(result.message).toContain('session_zones DB error');
+    // Cleanup should have fired two delete() calls
+    expect(mockDelete).toHaveBeenCalledTimes(2);
   });
 });
 

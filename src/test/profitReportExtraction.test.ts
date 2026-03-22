@@ -33,6 +33,33 @@ describe('profit report extraction', () => {
     });
   });
 
+  it('rejects invalid distance_km value', () => {
+    expect(
+      extractProfitReportMetrics({
+        earnings: 50,
+        trips_count: 2,
+        distance_km: 'invalid',
+      })
+    ).toEqual({
+      ok: false,
+      message: 'Distance invalide dans l\u2019analyse',
+    });
+  });
+
+  it('rejects invalid hours_worked value', () => {
+    expect(
+      extractProfitReportMetrics({
+        earnings: 50,
+        trips_count: 2,
+        distance_km: 10,
+        hours_worked: 'bad',
+      })
+    ).toEqual({
+      ok: false,
+      message: 'Heures invalides dans l\u2019analyse',
+    });
+  });
+
   it('merges extracted metrics into an existing daily report', () => {
     expect(
       buildProfitReportUpdate(

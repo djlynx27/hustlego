@@ -933,3 +933,117 @@ describe('time rule edge cases — midnight-crossing rules', () => {
     expect(lateNight).toBeGreaterThanOrEqual(daytime);
   });
 });
+
+// ── Off-peak branches for previously uncovered zone profiles ─────────────────
+
+describe('computeDemandScore — off-peak branches for uncovered zone profiles', () => {
+  it('Centre Bell returns low score off-peak (10:00 Monday)', () => {
+    const { score } = computeDemandScore(
+      { name: 'Centre Bell', type: 'événements' },
+      new Date('2026-03-16T10:00:00'), // Monday 10:00 — not 18-23
+      null
+    );
+    expect(score).toBeGreaterThanOrEqual(0);
+    expect(score).toBeLessThanOrEqual(100);
+  });
+
+  it('Aéroport Trudeau (YUL) returns mid-range score in evening (19:00)', () => {
+    const { score } = computeDemandScore(
+      { name: 'Aéroport Trudeau (YUL)', type: 'aéroport' },
+      new Date('2026-03-16T19:00:00'), // Monday 19:00 — pattern returns 7
+      null
+    );
+    expect(score).toBeGreaterThan(0);
+    expect(score).toBeLessThanOrEqual(100);
+  });
+
+  it('Aéroport Trudeau (YUL) returns mid-range score during morning (07:00)', () => {
+    const { score } = computeDemandScore(
+      { name: 'Aéroport Trudeau (YUL)', type: 'aéroport' },
+      new Date('2026-03-16T07:00:00'), // Monday 07:00 — pattern returns 6
+      null
+    );
+    expect(score).toBeGreaterThan(0);
+    expect(score).toBeLessThanOrEqual(100);
+  });
+
+  it('Aéroport Trudeau (YUL) returns lower score at midday (12:00)', () => {
+    const { score: morning } = computeDemandScore(
+      { name: 'Aéroport Trudeau (YUL)', type: 'aéroport' },
+      new Date('2026-03-16T04:00:00'), // peak — pattern returns 8
+      null
+    );
+    const { score: midday } = computeDemandScore(
+      { name: 'Aéroport Trudeau (YUL)', type: 'aéroport' },
+      new Date('2026-03-16T12:00:00'), // off-peak — pattern returns 4
+      null
+    );
+    expect(morning).toBeGreaterThanOrEqual(midday);
+  });
+
+  it('CHUM returns lower score during non-medical hours (12:00)', () => {
+    const { score: shift } = computeDemandScore(
+      { name: 'CHUM', type: 'médical' },
+      new Date('2026-03-16T07:00:00'), // shift change — pattern returns 7
+      null
+    );
+    const { score: offPeak } = computeDemandScore(
+      { name: 'CHUM', type: 'médical' },
+      new Date('2026-03-16T12:00:00'), // midday — pattern returns 3
+      null
+    );
+    expect(shift).toBeGreaterThanOrEqual(offPeak);
+  });
+
+  it('Casino de Montréal returns lower score during daytime (14:00)', () => {
+    const { score: night } = computeDemandScore(
+      { name: 'Casino de Montréal', type: 'nightlife' },
+      new Date('2026-03-16T23:00:00'), // late night — pattern returns 7
+      null
+    );
+    const { score: daytime } = computeDemandScore(
+      { name: 'Casino de Montréal', type: 'nightlife' },
+      new Date('2026-03-16T14:00:00'), // afternoon — pattern returns 2
+      null
+    );
+    expect(night).toBeGreaterThanOrEqual(daytime);
+  });
+
+  it('Station Berri-UQAM returns mid score on weekday midday (12:00)', () => {
+    const { score } = computeDemandScore(
+      { name: 'Station Berri-UQAM', type: 'métro' },
+      new Date('2026-03-16T12:00:00'), // Monday 12:00 — pattern returns 5
+      null
+    );
+    expect(score).toBeGreaterThan(0);
+    expect(score).toBeLessThanOrEqual(100);
+  });
+
+  it('Station Berri-UQAM returns low score on weekend (Sunday 12:00)', () => {
+    const { score: weekday } = computeDemandScore(
+      { name: 'Station Berri-UQAM', type: 'métro' },
+      new Date('2026-03-18T08:00:00'), // Wednesday rush — pattern returns 8
+      null
+    );
+    const { score: weekend } = computeDemandScore(
+      { name: 'Station Berri-UQAM', type: 'métro' },
+      new Date('2026-03-22T12:00:00'), // Sunday 12:00 — pattern returns 3
+      null
+    );
+    expect(weekday).toBeGreaterThanOrEqual(weekend);
+  });
+
+  it('Hôpital de la Cité-de-la-Santé returns lower score at non-medical hours (12:00)', () => {
+    const { score: shift } = computeDemandScore(
+      { name: 'Hôpital de la Cité-de-la-Santé', type: 'médical' },
+      new Date('2026-03-16T07:00:00'), // shift change — pattern returns 7
+      null
+    );
+    const { score: offPeak } = computeDemandScore(
+      { name: 'Hôpital de la Cité-de-la-Santé', type: 'médical' },
+      new Date('2026-03-16T12:00:00'), // midday — pattern returns 3
+      null
+    );
+    expect(shift).toBeGreaterThanOrEqual(offPeak);
+  });
+});

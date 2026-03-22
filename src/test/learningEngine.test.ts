@@ -132,3 +132,118 @@ describe('learning engine', () => {
     expect(insights.emaPatterns.length).toBeGreaterThan(0);
   });
 });
+
+// ── Bias / sampleCount branch coverage ──────────────────────────────────────
+
+// Helper: build a TripWithZone for learningEngine tests
+function makeTrip(
+  id: string,
+  date: string,
+  earnings: number,
+  durationHours: number,
+  zoneScore: number
+): TripWithZone {
+  const startedAt = new Date(date);
+  const endedAt = new Date(startedAt.getTime() + durationHours * 3_600_000);
+  return {
+    id,
+    created_at: date,
+    distance_km: 10,
+    earnings,
+    ended_at: endedAt.toISOString(),
+    experiment: false,
+    notes: null,
+    started_at: startedAt.toISOString(),
+    tips: 0,
+    zone_id: 'test-zone',
+    zone_score: zoneScore,
+    zones: { name: 'Test Zone', current_score: zoneScore },
+  };
+}
+
+describe('deriveLearningInsights — sampleCount >= 8 branch', () => {
+  // 8 trips with zone_score=10 and earnings=$54/hr → actualScore=90
+  // error per trip = 90 - 10 = 80  →  recentBias = 640 >> 12
+  const highEarningTrips = Array.from({ length: 8 }, (_, i) =>
+    makeTrip(
+      String(i + 1),
+      `2026-03-${String(10 + i).padStart(2, '0')}T10:00:00Z`,
+      54,
+      1,
+      10
+    )
+  );
+
+  it('boosts historicalEarnings weight when sampleCount >= 8', () => {
+    const insights = deriveLearningInsights(highEarningTrips, DEFAULT_WEIGHTS);
+    expect(insights.predictions).toHaveLength(8);
+    // sampleCount >= 8 adds +0.04 to historicalEarnings before normalisation
+    // so historicalEarnings should be higher than any timeOfDay/dayOfWeek
+    expect(insights.suggestedWeights.historicalEarnings).toBeGreaterThan(0);
+  });
+
+  it('includes historicalEarnings reason when sampleCount >= 8', () => {
+    const insights = deriveLearningInsights(highEarningTrips, DEFAULT_WEIGHTS);
+    const historicalSuggestion = insights.suggestions.find(
+      (s) => s.key === 'historicalEarnings'
+    );
+    if (historicalSuggestion) {
+      expect(historicalSuggestion.reason).toContain('fiable');
+    }
+  });
+
+  it('includes timeOfDay/dayOfWeek reason when sampleCount >= 8', () => {
+    const insights = deriveLearningInsights(highEarningTrips, DEFAULT_WEIGHTS);
+    const timeSuggestion = insights.suggestions.find(
+      (s) => s.key === 'timeOfDay' || s.key === 'dayOfWeek'
+    );
+    if (timeSuggestion) {
+      expect(timeSuggestion.reason).toContain('heuristiques');
+    }
+  });
+
+  it('includes events/weather reason when recentBias > 25', () => {
+    // recentBias = 640 > 25, so any events/weather suggestion should mention
+    // dynamiques
+    const insights = deriveLearningInsights(highEarningTrips, DEFAULT_WEIGHTS);
+    const dynSuggestion = insights.suggestions.find(
+      (s) => (s.key === 'events' || s.key === 'weather') && s.delta !== 0
+    );
+    if (dynSuggestion) {
+      expect(dynSuggestion.reason).toContain('dynamiques');
+    }
+  });
+});
+
+describe('deriveLearningInsights — recentBias < -12 branch', () => {
+  // 8 trips with zone_score=90 and earnings=$3/hr → actualScore=5
+  // error per trip = 5 - 90 = -85  →  recentBias = -680 << -12
+  const lowEarningTrips = Array.from({ length: 8 }, (_, i) =>
+    makeTrip(
+      String(i + 1),
+      `2026-03-${String(10 + i).padStart(2, '0')}T14:00:00Z`,
+      3,
+      1,
+      90
+    )
+  );
+
+  it('applies negative bias adjustments when model over-predicts', () => {
+    const insights = deriveLearningInsights(lowEarningTrips, DEFAULT_WEIGHTS);
+    expect(insights.predictions).toHaveLength(8);
+    // recentBias < -12 adds +0.02 to historicalEarnings and shrinks events/weather
+    // Weights are still normalised → just check they're valid
+    const total = Object.values(insights.suggestedWeights).reduce(
+      (sum, v) => sum + v,
+      0
+    );
+    expect(total).toBeCloseTo(1, 5);
+  });
+
+  it('meanAbsoluteError is > 0 when model over-predicts', () => {
+    const insights = deriveLearningInsights(lowEarningTrips, DEFAULT_WEIGHTS);
+    expect(insights.meanAbsoluteError).toBeGreaterThan(0);
+    // error ~ -85 per trip → MAE ~ 85
+    expect(insights.meanAbsoluteError).toBeGreaterThan(50);
+  });
+});

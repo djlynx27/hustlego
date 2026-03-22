@@ -31,14 +31,15 @@ export default defineConfig({
         '**/*.d.ts',
       ],
       thresholds: {
-        // Raised after architecture hardening sprint #3 (March 2026).
-        // +55 tests added — async Supabase mocking, zone profiles, getDayOfWeekFactor branches.
-        // Coverage: 94.26% statements / 84.6% branches / 98.19% functions / 95.93% lines.
-        // Remaining gaps: learningSync cleanup code + scoringEngine private time-rule helpers.
-        lines: 94,
-        functions: 97,
-        branches: 83,
-        statements: 93,
+        // Raised after the follow-up coverage sprint.
+        // Current measured coverage on src/lib: 97.54% statements / 88.66% branches /
+        // 99.09% functions / 99.08% lines.
+        // Keep a small buffer under the observed result to make regressions fail
+        // without making the gate overly brittle on routine test churn.
+        lines: 99,
+        functions: 99,
+        branches: 88,
+        statements: 97,
       },
     },
   },

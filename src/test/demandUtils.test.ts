@@ -10,7 +10,7 @@ import {
   getUpcomingSlotTimes,
   normalize24hTime,
 } from '@/lib/demandUtils';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 describe('normalize24hTime', () => {
   it('pads single-digit hours and minutes', () => {
@@ -253,5 +253,49 @@ describe('generateSimulatedSlots', () => {
   it('returns empty array when no zones provided', () => {
     const slots = generateSimulatedSlots('mtl', '2026-03-21', []);
     expect(slots).toHaveLength(0);
+  });
+});
+
+// generateDemandScore branches — triggered via createSimulatedSlotForTime with
+// controlled day-of-week using fake timers so all code paths execute reliably.
+describe('generateDemandScore — branch coverage via createSimulatedSlotForTime', () => {
+  // Freeze time to Monday 2026-03-16 so isWeekend=false and dayOfWeek=1
+  const MONDAY = new Date('2026-03-16T00:00:00.000Z');
+
+  afterEach(() => vi.useRealTimers());
+
+  it('hits weekday rush-hour branch (08:00, non-weekend)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(MONDAY);
+    const slot = createSimulatedSlotForTime('mtl', '2026-03-16', '08:00', {
+      ...MOCK_ZONE,
+      type: 'commercial',
+    });
+    // Rush-hour adds 30 to base; score should be above the non-rush minimum
+    expect(slot.demand_score).toBeGreaterThan(0);
+  });
+
+  it('hits airport nightlife-hours branch (22:00, aéroport)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(MONDAY);
+    const slot = createSimulatedSlotForTime('mtl', '2026-03-16', '22:00', {
+      ...MOCK_ZONE,
+      type: 'aéroport',
+    });
+    // hour >= 22 && type=aéroport → base += 20
+    expect(slot.demand_score).toBeGreaterThan(0);
+    expect(slot.demand_score).toBeLessThanOrEqual(100);
+  });
+
+  it('hits university weekday branch (10:00, université, weekday)', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(MONDAY);
+    const slot = createSimulatedSlotForTime('mtl', '2026-03-16', '10:00', {
+      ...MOCK_ZONE,
+      type: 'université',
+    });
+    // Weekday 10:00 + université → base += 20
+    expect(slot.demand_score).toBeGreaterThan(0);
+    expect(slot.demand_score).toBeLessThanOrEqual(100);
   });
 });

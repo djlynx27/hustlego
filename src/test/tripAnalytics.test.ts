@@ -173,6 +173,54 @@ describe('trip analytics', () => {
     expect(summary.revenuePerHour).toBe(30);
   });
 
+  it('skips sessions with missing started_at or ended_at', () => {
+    const incompleteSession = {
+      id: 99,
+      created_at: '2026-03-17T10:00:00',
+      started_at: null,
+      ended_at: null,
+      total_earnings: 50,
+      total_hours: 0,
+      total_rides: 2,
+      notes: null,
+      weather_snapshot: null,
+    };
+
+    const summary = summarizeTrackedSessions(
+      [incompleteSession],
+      new Date('2026-03-17T00:00:00'),
+      new Date('2026-03-17T23:59:59')
+    );
+
+    expect(summary.shiftCount).toBe(0);
+    expect(summary.hours).toBe(0);
+    expect(summary.revenue).toBe(0);
+  });
+
+  it('skips sessions that do not overlap the query window', () => {
+    // Session ran 08:00–12:00, query window is 14:00–20:00 → no overlap
+    const pastSession = {
+      id: 98,
+      created_at: '2026-03-17T08:00:00',
+      started_at: '2026-03-17T08:00:00',
+      ended_at: '2026-03-17T12:00:00',
+      total_earnings: 80,
+      total_hours: 4,
+      total_rides: 3,
+      notes: null,
+      weather_snapshot: null,
+    };
+
+    const summary = summarizeTrackedSessions(
+      [pastSession],
+      new Date('2026-03-17T14:00:00'),
+      new Date('2026-03-17T20:00:00')
+    );
+
+    expect(summary.shiftCount).toBe(0);
+    expect(summary.hours).toBe(0);
+  });
+
   it('merges zone buckets with inconsistent casing into single bucket', () => {
     const mixedCaseTrips: TripWithZone[] = [
       {

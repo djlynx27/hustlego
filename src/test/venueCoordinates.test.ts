@@ -2,8 +2,12 @@ import {
   getDropoffCoords,
   getGoogleMapsNavUrl,
   getWazeNavUrl,
+  launchExternalNavigation,
+  launchGoogleMapsNavigation,
 } from '@/lib/venueCoordinates';
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+const mockAssign = vi.fn();
 
 describe('getDropoffCoords', () => {
   it('returns exact venue override when zone name matches', () => {
@@ -63,5 +67,39 @@ describe('getWazeNavUrl', () => {
     const url = getWazeNavUrl('Unknown', 45.5, -73.5);
     expect(url).toContain('45.5');
     expect(url).toContain('-73.5');
+  });
+});
+
+describe('launchExternalNavigation', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(window, 'location', 'get').mockReturnValue({
+      assign: mockAssign,
+    } as unknown as Location);
+    mockAssign.mockReset();
+  });
+
+  it('calls window.location.assign with the given URL', () => {
+    launchExternalNavigation('https://example.com/nav');
+    expect(window.location.assign).toHaveBeenCalledWith(
+      'https://example.com/nav'
+    );
+  });
+});
+
+describe('launchGoogleMapsNavigation', () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    vi.spyOn(window, 'location', 'get').mockReturnValue({
+      assign: mockAssign,
+    } as unknown as Location);
+    mockAssign.mockReset();
+  });
+
+  it('delegates to launchExternalNavigation with a Google Maps URL', () => {
+    launchGoogleMapsNavigation('Centre Bell', 0, 0);
+    expect(mockAssign).toHaveBeenCalledTimes(1);
+    const calledUrl = mockAssign.mock.calls[0]?.[0] as string;
+    expect(calledUrl).toContain('google.com/maps');
   });
 });

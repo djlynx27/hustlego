@@ -74,6 +74,23 @@ describe('validateTripEntryForm', () => {
     });
   });
 
+  it('rejects form when zone_id is missing', () => {
+    const result = validateTripEntryForm({
+      zone_id: '',
+      date: '2026-03-21',
+      start_time: '08:00',
+      end_time: '09:00',
+      earnings: '20',
+      tips: '',
+      distance_km: '',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      message: 'Zone, date et montant requis',
+    });
+  });
+
   it('normalizes empty optional numeric fields to zero', () => {
     const result = validateTripEntryForm({
       zone_id: 'zone-1',
