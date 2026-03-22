@@ -7,6 +7,62 @@ import { scoreAllZones, type WeatherCondition } from '@/lib/scoringEngine';
 import { getGoogleMapsNavUrl } from '@/lib/venueCoordinates';
 import { useMemo } from 'react';
 
+function getBorderClass(level: ReturnType<typeof getDemandLevel>) {
+  if (level === 'high') return 'border-l-[hsl(var(--demand-high))]';
+  if (level === 'medium') return 'border-l-[hsl(var(--demand-medium))]';
+  return 'border-l-[hsl(var(--demand-low))]';
+}
+
+function buildWeatherCondition(weatherMtl: {
+  weatherId: number;
+  temp: number;
+  demandBoostPoints: number;
+} | null | undefined): WeatherCondition | null {
+  if (!weatherMtl) return null;
+
+  return {
+    weatherId: weatherMtl.weatherId,
+    temp: weatherMtl.temp,
+    demandBoostPoints: weatherMtl.demandBoostPoints,
+  };
+}
+
+function findNearestHotspot(
+  userLocation: { latitude: number; longitude: number } | null,
+  allZones: Array<{
+    id: string;
+    name: string;
+    latitude: number;
+    longitude: number;
+    score?: number | null;
+  }>,
+  weatherMtl: {
+    weatherId: number;
+    temp: number;
+    demandBoostPoints: number;
+  } | null | undefined
+) {
+  if (!userLocation || allZones.length === 0) return null;
+
+  const now = new Date();
+  const { scores } = scoreAllZones(allZones, now, buildWeatherCondition(weatherMtl));
+
+  const ranked = allZones
+    .map((zone) => ({
+      ...zone,
+      distance: haversineKm(
+        userLocation.latitude,
+        userLocation.longitude,
+        zone.latitude,
+        zone.longitude
+      ),
+      score: scores.get(zone.id) ?? 40,
+    }))
+    .sort((left, right) => left.distance - right.distance);
+
+  return ranked.find((zone) => zone.score >= 60 && zone.distance <= 10) ?? ranked[0] ?? null;
+}
+
 export function NearestHotspot() {
   const { location: userLocation } = useUserLocation(30000);
 
@@ -43,45 +99,15 @@ export function NearestHotspot() {
     ]
   );
 
-  const nearest = useMemo(() => {
-    if (!userLocation || allZones.length === 0) return null;
-
-    const now = new Date();
-    const wc: WeatherCondition | null = weatherMtl
-      ? {
-          weatherId: weatherMtl.weatherId,
-          temp: weatherMtl.temp,
-          demandBoostPoints: weatherMtl.demandBoostPoints,
-        }
-      : null;
-    const { scores } = scoreAllZones(allZones, now, wc);
-
-    const ranked = allZones
-      .map((zone) => ({
-        ...zone,
-        distance: haversineKm(
-          userLocation.latitude,
-          userLocation.longitude,
-          zone.latitude,
-          zone.longitude
-        ),
-        score: scores.get(zone.id) ?? 40,
-      }))
-      .sort((a, b) => a.distance - b.distance);
-
-    const hotspot = ranked.find((z) => z.score >= 60 && z.distance <= 10);
-    return hotspot ?? ranked[0] ?? null;
-  }, [userLocation, allZones, weatherMtl]);
+  const nearest = useMemo(
+    () => findNearestHotspot(userLocation, allZones, weatherMtl),
+    [userLocation, allZones, weatherMtl]
+  );
 
   if (!nearest) return null;
 
   const level = getDemandLevel(nearest.score);
-  const borderClass =
-    level === 'high'
-      ? 'border-l-[hsl(var(--demand-high))]'
-      : level === 'medium'
-        ? 'border-l-[hsl(var(--demand-medium))]'
-        : 'border-l-[hsl(var(--demand-low))]';
+  const borderClass = getBorderClass(level);
   const googleUrl = getGoogleMapsNavUrl(
     nearest.name,
     nearest.latitude,

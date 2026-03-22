@@ -31,6 +31,12 @@ const SIZE_STYLES = {
   lg: 'text-[14px] px-3 py-1.5 gap-1.5',
 };
 
+function getSurgeBarFillClass(surgeClass: SurgeResult['surgeClass']) {
+  if (surgeClass === 'peak') return 'bg-red-500 animate-pulse';
+  if (surgeClass === 'high') return 'bg-orange-500';
+  return 'bg-yellow-500';
+}
+
 export function SurgeIndicator({
   surgeClass,
   multiplier,
@@ -44,14 +50,15 @@ export function SurgeIndicator({
 
   const display = getSurgeDisplay(surgeClass);
   const sizeStyle = SIZE_STYLES[size];
-  const isPulsing = surgeClass === 'peak' || surgeClass === 'high';
+  const pulseClass =
+    surgeClass === 'peak' || surgeClass === 'high' ? 'animate-pulse' : '';
 
   return (
     <span
       title={reasoning}
       className={`inline-flex items-center rounded-full border font-display font-bold
         ${display.bgClass} ${display.textClass} ${display.borderClass}
-        ${isPulsing ? 'animate-pulse' : ''}
+        ${pulseClass}
         ${sizeStyle}
       `}
     >
@@ -84,13 +91,7 @@ export function SurgeBar({
   return (
     <div className="mt-1 h-1 w-full rounded-full bg-border overflow-hidden">
       <div
-        className={`h-full rounded-full transition-all duration-500 ${
-          surgeClass === 'peak'
-            ? 'bg-red-500 animate-pulse'
-            : surgeClass === 'high'
-              ? 'bg-orange-500'
-              : 'bg-yellow-500'
-        }`}
+        className={`h-full rounded-full transition-all duration-500 ${getSurgeBarFillClass(surgeClass)}`}
         style={{ width: `${fillPct}%` }}
       />
     </div>

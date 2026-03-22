@@ -34,6 +34,94 @@ function formatMoney(n: number): string {
   }).format(n);
 }
 
+function getExitAriaLabel(exitHint: boolean) {
+  return exitHint
+    ? 'Appuyer encore pour quitter'
+    : 'Quitter mode conduite (appuyer 2×)';
+}
+
+function ExitButton({
+  exitHint,
+  onClick,
+}: {
+  exitHint: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className="flex flex-col items-center justify-center rounded-2xl bg-white/10 active:bg-white/20 transition-colors"
+      aria-label={getExitAriaLabel(exitHint)}
+      style={{ minWidth: 64, minHeight: 64 }}
+    >
+      <X className="w-6 h-6 text-white/70" />
+      {exitHint ? (
+        <span className="text-[10px] text-white/60 mt-0.5">encore</span>
+      ) : null}
+    </button>
+  );
+}
+
+function HeroZoneDisplay({
+  heroZone,
+  score,
+  color,
+}: {
+  heroZone: DrivingHUDZone | null;
+  score: number;
+  color: string;
+}) {
+  if (!heroZone) {
+    return <div className="text-white/30 text-3xl">Calcul…</div>;
+  }
+
+  return (
+    <>
+      <div
+        className="text-5xl font-black text-center leading-tight font-display"
+        style={{ color }}
+        aria-label={`Meilleure zone: ${heroZone.name}`}
+      >
+        {heroZone.name}
+      </div>
+
+      <div
+        className="text-9xl font-black tabular-nums leading-none"
+        style={{ color }}
+        aria-label={`Score: ${score} sur 100`}
+      >
+        {score}
+      </div>
+      <div className="text-white/30 text-2xl font-semibold">/100</div>
+
+      {heroZone.distKm !== undefined ? (
+        <div className="text-white/50 text-2xl font-semibold mt-1">
+          {heroZone.distKm.toFixed(1)} km
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function NextZonePill({ nextZone }: { nextZone?: DrivingHUDZone | null }) {
+  if (!nextZone) return null;
+
+  return (
+    <div className="mx-6 mb-3 px-5 py-3 rounded-2xl bg-white/5 flex items-center justify-between gap-3">
+      <span className="text-white/40 text-lg">Prochaine</span>
+      <span className="text-white text-xl font-semibold flex-1 text-center truncate">
+        {nextZone.name}
+      </span>
+      <span
+        className="text-xl font-black"
+        style={{ color: getDemandColor(nextZone.score) }}
+      >
+        {nextZone.score}
+      </span>
+    </div>
+  );
+}
+
 /**
  * NHTSA-compliant driving HUD overlay.
  *
@@ -119,7 +207,6 @@ export function DrivingHUD({
     >
       {/* ── Row 1: Clock · Speed · Exit ── */}
       <div className="flex items-center justify-between px-6 pt-6 pb-2">
-        {/* Clock — data element 1 */}
         <span
           className="text-white text-4xl font-black tabular-nums font-display"
           aria-label={`Heure: ${timeStr}`}
@@ -134,77 +221,15 @@ export function DrivingHUD({
           </span>
         )}
 
-        {/* Exit (double-tap) — not counted as data element */}
-        <button
-          onClick={handleExitClick}
-          className="flex flex-col items-center justify-center rounded-2xl bg-white/10 active:bg-white/20 transition-colors"
-          aria-label={
-            exitHint
-              ? 'Appuyer encore pour quitter'
-              : 'Quitter mode conduite (appuyer 2×)'
-          }
-          style={{ minWidth: 64, minHeight: 64 }}
-        >
-          <X className="w-6 h-6 text-white/70" />
-          {exitHint && (
-            <span className="text-[10px] text-white/60 mt-0.5">encore</span>
-          )}
-        </button>
+        <ExitButton exitHint={exitHint} onClick={handleExitClick} />
       </div>
 
-      {/* ── Row 2: Hero zone (central focal point) ── */}
       <div className="flex-1 flex flex-col items-center justify-center px-6 gap-2">
-        {/* Zone icon — visual anchor */}
         <Car className="w-9 h-9 opacity-30" style={{ color }} />
-
-        {heroZone ? (
-          <>
-            {/* Zone name — data element 3 */}
-            <div
-              className="text-5xl font-black text-center leading-tight font-display"
-              style={{ color }}
-              aria-label={`Meilleure zone: ${heroZone.name}`}
-            >
-              {heroZone.name}
-            </div>
-
-            {/* Score — data element 4 */}
-            <div
-              className="text-9xl font-black tabular-nums leading-none"
-              style={{ color }}
-              aria-label={`Score: ${score} sur 100`}
-            >
-              {score}
-            </div>
-            <div className="text-white/30 text-2xl font-semibold">/100</div>
-
-            {/* Distance — data element 5 */}
-            {heroZone.distKm !== undefined && (
-              <div className="text-white/50 text-2xl font-semibold mt-1">
-                {heroZone.distKm.toFixed(1)} km
-              </div>
-            )}
-          </>
-        ) : (
-          <div className="text-white/30 text-3xl">Calcul…</div>
-        )}
+        <HeroZoneDisplay heroZone={heroZone} score={score} color={color} />
       </div>
 
-      {/* ── Row 3: Next zone pill — data element 6 ── */}
-      {nextZone && (
-        <div className="mx-6 mb-3 px-5 py-3 rounded-2xl bg-white/5 flex items-center justify-between gap-3">
-          <span className="text-white/40 text-lg">Prochaine</span>
-          <span className="text-white text-xl font-semibold flex-1 text-center truncate">
-            {nextZone.name}
-          </span>
-          <span
-            className="text-xl font-black"
-            style={{ color: getDemandColor(nextZone.score) }}
-          >
-            {nextZone.score}
-          </span>
-        </div>
-      )}
+      <NextZonePill nextZone={nextZone} />
 
       {/* ── Row 4: Earnings + Navigate CTA ── */}
       <div className="px-6 pb-10 flex gap-4">

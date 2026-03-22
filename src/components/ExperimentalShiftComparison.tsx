@@ -22,6 +22,37 @@ type ShiftComparisonStats = {
   bestZone: string;
 };
 
+function getBestZone(zoneCounts: Record<string, number>) {
+  return Object.entries(zoneCounts).sort((left, right) => right[1] - left[1])[0]?.[0] || '-';
+}
+
+function calcStats(
+  trips: ShiftComparisonTrip[]
+): ShiftComparisonStats | null {
+  if (trips.length === 0) return null;
+
+  let totalEarnings = 0;
+  let totalHours = 0;
+  let totalKm = 0;
+  const zoneCounts: Record<string, number> = {};
+
+  for (const trip of trips) {
+    totalEarnings += Number(trip.earnings || 0) + Number(trip.tips || 0);
+    totalKm += Number(trip.distance_km || 0);
+    totalHours += getTripHours(trip);
+    const zoneName = trip.zones?.name || 'Inconnu';
+    zoneCounts[zoneName] = (zoneCounts[zoneName] || 0) + 1;
+  }
+
+  return {
+    count: trips.length,
+    earningsPerHour: totalHours > 0 ? totalEarnings / totalHours : 0,
+    totalEarnings,
+    avgKm: totalKm / trips.length,
+    bestZone: getBestZone(zoneCounts),
+  };
+}
+
 function useShiftComparison() {
   return useQuery({
     queryKey: ['shift-comparison'],
@@ -42,32 +73,6 @@ function useShiftComparison() {
       for (const t of data ?? []) {
         const key = t.experiment ? 'experiment' : 'normal';
         groups[key].push(t as ShiftComparisonTrip);
-      }
-
-      function calcStats(
-        trips: ShiftComparisonTrip[]
-      ): ShiftComparisonStats | null {
-        if (trips.length === 0) return null;
-        let totalEarnings = 0,
-          totalHours = 0,
-          totalKm = 0;
-        const zoneCounts: Record<string, number> = {};
-        for (const t of trips) {
-          totalEarnings += Number(t.earnings || 0) + Number(t.tips || 0);
-          totalKm += Number(t.distance_km || 0);
-          totalHours += getTripHours(t);
-          const zn = t.zones?.name || 'Inconnu';
-          zoneCounts[zn] = (zoneCounts[zn] || 0) + 1;
-        }
-        const bestZone =
-          Object.entries(zoneCounts).sort((a, b) => b[1] - a[1])[0]?.[0] || '-';
-        return {
-          count: trips.length,
-          earningsPerHour: totalHours > 0 ? totalEarnings / totalHours : 0,
-          totalEarnings,
-          avgKm: totalKm / trips.length,
-          bestZone,
-        };
       }
 
       return {

@@ -23,6 +23,33 @@ function saveState(s: DeadTimeState) {
   localStorage.setItem(LS_KEY, JSON.stringify(s));
 }
 
+function getTimerAppearance(paused: boolean, warning: boolean) {
+  if (paused) {
+    return {
+      containerClass: 'bg-muted/30 border-border',
+      icon: <Pause className="w-4 h-4 text-muted-foreground" />,
+      label: 'Temps mort (en pause)',
+      valueClass: 'text-foreground',
+    };
+  }
+
+  if (warning) {
+    return {
+      containerClass: 'bg-yellow-500/15 border-yellow-500/40',
+      icon: <AlertTriangle className="w-4 h-4 text-yellow-500" />,
+      label: 'Temps mort',
+      valueClass: 'text-yellow-500',
+    };
+  }
+
+  return {
+    containerClass: 'bg-card border-border',
+    icon: <Timer className="w-4 h-4 text-muted-foreground" />,
+    label: 'Temps mort',
+    valueClass: 'text-foreground',
+  };
+}
+
 interface Props {
   nearestZoneName?: string | null;
 }
@@ -85,35 +112,20 @@ export function DeadTimeTimer({ nearestZoneName }: Props) {
   const secs = seconds % 60;
   const display = `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
   const isWarning = mins >= 10;
+  const appearance = getTimerAppearance(state.paused, isWarning);
 
   return (
     <div
-      className={`rounded-xl border px-4 py-3 ${
-        state.paused
-          ? 'bg-muted/30 border-border'
-          : isWarning
-            ? 'bg-yellow-500/15 border-yellow-500/40'
-            : 'bg-card border-border'
-      }`}
+      className={`rounded-xl border px-4 py-3 ${appearance.containerClass}`}
     >
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          {state.paused ? (
-            <Pause className="w-4 h-4 text-muted-foreground" />
-          ) : isWarning ? (
-            <AlertTriangle className="w-4 h-4 text-yellow-500" />
-          ) : (
-            <Timer className="w-4 h-4 text-muted-foreground" />
-          )}
+          {appearance.icon}
           <span className="text-[14px] font-body text-muted-foreground">
-            {state.paused ? 'Temps mort (en pause)' : 'Temps mort'}
+            {appearance.label}
           </span>
         </div>
-        <span
-          className={`text-[24px] font-display font-bold tabular-nums ${
-            isWarning && !state.paused ? 'text-yellow-500' : 'text-foreground'
-          }`}
-        >
+        <span className={`text-[24px] font-display font-bold tabular-nums ${appearance.valueClass}`}>
           {display}
         </span>
       </div>
