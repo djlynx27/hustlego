@@ -66,6 +66,7 @@ export function getActiveEvents(
   return events.filter((e) => {
     const start = new Date(e.start_at).getTime();
     const end = new Date(e.end_at).getTime();
+    if (!Number.isFinite(start) || !Number.isFinite(end)) return false;
     const graceMinutes = Math.min(windowMinutes, getEventDemandGraceMinutes(e));
     return (
       nowMs >= start &&
@@ -84,6 +85,7 @@ export function getEndingSoonEvents(
   const nowMs = now.getTime();
   return events.filter((e) => {
     const end = new Date(e.end_at).getTime();
+    if (!Number.isFinite(end)) return false;
     const diff = end - nowMs;
     return (
       diff > 0 &&
@@ -102,6 +104,7 @@ export function getStartingSoonEvents(
   const nowMs = now.getTime();
   return events.filter((e) => {
     const start = new Date(e.start_at).getTime();
+    if (!Number.isFinite(start)) return false;
     const diff = start - nowMs;
     return (
       diff > 0 &&

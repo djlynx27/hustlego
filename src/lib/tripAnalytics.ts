@@ -185,12 +185,16 @@ function buildRankedSeries(
   bucket: (trip: TripWithZone) => string,
   limit: number
 ) {
+  // Normalize key by trimming + lower-casing to prevent duplicate buckets
+  // when DB entries have inconsistent casing (e.g. "Downtown" vs "downtown").
+  // The original label is preserved for display via the first occurrence.
   const map = new Map<string, RankedBucket>();
 
   for (const trip of trips) {
-    const label = bucket(trip);
-    const current = map.get(label) ?? {
-      label,
+    const rawLabel = bucket(trip);
+    const key = rawLabel.trim().toLowerCase();
+    const current = map.get(key) ?? {
+      label: rawLabel.trim(),
       revenue: 0,
       rides: 0,
       hours: 0,
@@ -198,7 +202,7 @@ function buildRankedSeries(
     current.revenue += getTripRevenue(trip);
     current.rides += 1;
     current.hours += getTripHours(trip);
-    map.set(label, current);
+    map.set(key, current);
   }
 
   return [...map.values()]

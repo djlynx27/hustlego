@@ -31,11 +31,13 @@ export default defineConfig({
         '**/*.d.ts',
       ],
       thresholds: {
-        // Focused on src/lib — raise per sprint until 80%.
-        lines: 60,
-        functions: 55,
-        branches: 45,
-        statements: 60,
+        // Raised from 60/55/45/60 after architecture hardening sprint (March 2026).
+        // Functions >80% achieved. Target 80% across all metrics per ISO 25010.
+        // learningSync.ts and scoringEngine.ts are the remaining bottlenecks.
+        lines: 76,
+        functions: 78,
+        branches: 57,
+        statements: 73,
       },
     },
   },

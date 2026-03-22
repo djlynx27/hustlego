@@ -13,7 +13,14 @@
  *   - computeSurge API complète
  */
 
-import { computeSurge, type SurgeContext } from '@/lib/surgeEngine';
+import {
+  _lerp,
+  buildSurgeContext,
+  cosineSimilarity,
+  computeSurge,
+  getSurgeDisplay,
+  type SurgeContext,
+} from '@/lib/surgeEngine';
 import { describe, expect, it } from 'vitest';
 
 // ── Fixture helpers ────────────────────────────────────────────────────────────
@@ -428,5 +435,93 @@ describe('computeSurge API shape', () => {
     const valid = ['normal', 'elevated', 'high', 'peak'];
     const r = computeSurge(baseCtx());
     expect(valid).toContain(r.surgeClass);
+  });
+});
+
+describe('buildSurgeContext', () => {
+  it('extracts hour, dayOfWeek and month from now', () => {
+    const now = new Date(2026, 2, 21, 17, 30, 0); // Saturday March 21, 17:30
+    const ctx = buildSurgeContext({
+      now,
+      currentScore: 80,
+      baselineScore: 55,
+      weatherScore: 0.3,
+      eventProximity: 0.5,
+      trafficIndex: 0.4,
+      deadheadKm: 2,
+    });
+    expect(ctx.hour).toBe(17);
+    expect(ctx.dayOfWeek).toBe(6); // Saturday
+    expect(ctx.month).toBe(2); // March (0-indexed)
+    expect(ctx.currentScore).toBe(80);
+    expect(ctx.baselineScore).toBe(55);
+  });
+});
+
+describe('getSurgeDisplay', () => {
+  it('returns peak display for peak class', () => {
+    const d = getSurgeDisplay('peak');
+    expect(d.label).toContain('PEAK');
+    expect(d.pulseClass).toBe('animate-pulse');
+  });
+
+  it('returns high display for high class', () => {
+    const d = getSurgeDisplay('high');
+    expect(d.label).toContain('SURGE');
+  });
+
+  it('returns elevated display for elevated class', () => {
+    const d = getSurgeDisplay('elevated');
+    expect(d.pulseClass).toBe('');
+  });
+
+  it('returns normal (default) display for normal class', () => {
+    const d = getSurgeDisplay('normal');
+    expect(d.label).toContain('Normal');
+    expect(d.bgClass).toContain('green');
+  });
+});
+
+describe('cosineSimilarity', () => {
+  it('returns 1 for identical vectors', () => {
+    expect(cosineSimilarity([1, 0, 0], [1, 0, 0])).toBeCloseTo(1);
+  });
+
+  it('returns 0 for orthogonal vectors', () => {
+    expect(cosineSimilarity([1, 0], [0, 1])).toBeCloseTo(0);
+  });
+
+  it('returns 0 for zero vectors', () => {
+    expect(cosineSimilarity([0, 0, 0], [0, 0, 0])).toBe(0);
+  });
+
+  it('returns 0 for vectors of different lengths', () => {
+    expect(cosineSimilarity([1, 2], [1, 2, 3])).toBe(0);
+  });
+
+  it('returns ~0.707 for 45-degree vectors in 2D', () => {
+    expect(cosineSimilarity([1, 1], [1, 0])).toBeCloseTo(Math.SQRT1_2, 3);
+  });
+});
+
+describe('_lerp', () => {
+  it('returns a when t=0', () => {
+    expect(_lerp(10, 20, 0)).toBe(10);
+  });
+
+  it('returns b when t=1', () => {
+    expect(_lerp(10, 20, 1)).toBe(20);
+  });
+
+  it('returns midpoint when t=0.5', () => {
+    expect(_lerp(10, 20, 0.5)).toBe(15);
+  });
+
+  it('clamps t above 1', () => {
+    expect(_lerp(10, 20, 2)).toBe(20);
+  });
+
+  it('clamps t below 0', () => {
+    expect(_lerp(10, 20, -1)).toBe(10);
   });
 });

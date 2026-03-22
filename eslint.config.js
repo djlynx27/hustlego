@@ -31,6 +31,10 @@ export default defineConfig([
       // Each any should be progressively replaced with unknown + type guard.
       '@typescript-eslint/no-explicit-any': 'warn',
 
+      // Cyclomatic complexity ≤ 10 (ISO 25010 / document architecture standard).
+      // Functions exceeding this threshold must be split into smaller units.
+      'complexity': ['warn', 10],
+
       // react-refresh: warn only (only affects DX / HMR, not production correctness)
       'react-refresh/only-export-components': 'warn',
 

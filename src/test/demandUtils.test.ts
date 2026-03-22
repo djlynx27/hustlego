@@ -1,6 +1,8 @@
 import {
+  createSimulatedSlotForTime,
   formatTime24h,
   generate96TimeLabels,
+  generateSimulatedSlots,
   getCurrentSlotTime,
   getDemandClass,
   getDemandLevel,
@@ -164,5 +166,69 @@ describe('getCurrentSlotTime', () => {
     const now = new Date(2026, 2, 21, 9, 30, 0); // exactly on boundary
     const { start } = getCurrentSlotTime(now);
     expect(start).toBe('09:30');
+  });
+});
+
+const MOCK_ZONE = {
+  id: 'downtown-mtl',
+  name: 'Downtown',
+  type: 'commercial',
+  latitude: 45.5,
+  longitude: -73.57,
+  city_id: 'mtl',
+  created_at: '',
+  demand_weight: 1,
+  display_order: 1,
+  is_active: true,
+  radius_km: 2,
+};
+
+describe('createSimulatedSlotForTime', () => {
+  it('creates a slot with the expected shape', () => {
+    const slot = createSimulatedSlotForTime('mtl', '2026-03-21', '10:00', MOCK_ZONE);
+    expect(slot.city_id).toBe('mtl');
+    expect(slot.date).toBe('2026-03-21');
+    expect(slot.start_time).toBe('10:00');
+    expect(slot.end_time).toBe('10:15');
+    expect(typeof slot.demand_score).toBe('number');
+    expect(slot.demand_score).toBeGreaterThanOrEqual(0);
+    expect(slot.demand_score).toBeLessThanOrEqual(100);
+  });
+
+  it('assigns a unique id containing date and zone id', () => {
+    const slot = createSimulatedSlotForTime('mtl', '2026-03-21', '14:30', MOCK_ZONE);
+    expect(slot.id).toContain('2026-03-21');
+    expect(slot.id).toContain('downtown-mtl');
+  });
+
+  it('normalizes time to HH:MM format', () => {
+    const slot = createSimulatedSlotForTime('mtl', '2026-03-21', '9:0', MOCK_ZONE);
+    expect(slot.start_time).toBe('09:00');
+  });
+});
+
+describe('generateSimulatedSlots', () => {
+  it('generates 96 slots per zone', () => {
+    const slots = generateSimulatedSlots('mtl', '2026-03-21', [MOCK_ZONE]);
+    expect(slots).toHaveLength(96);
+  });
+
+  it('generates 96 × zones.length slots', () => {
+    const secondZone = { ...MOCK_ZONE, id: 'plateau', name: 'Plateau', type: 'résidentiel' };
+    const slots = generateSimulatedSlots('mtl', '2026-03-21', [MOCK_ZONE, secondZone]);
+    expect(slots).toHaveLength(192);
+  });
+
+  it('all slots have demand_score between 0 and 100', () => {
+    const slots = generateSimulatedSlots('mtl', '2026-03-21', [MOCK_ZONE]);
+    for (const slot of slots) {
+      expect(slot.demand_score).toBeGreaterThanOrEqual(0);
+      expect(slot.demand_score).toBeLessThanOrEqual(100);
+    }
+  });
+
+  it('returns empty array when no zones provided', () => {
+    const slots = generateSimulatedSlots('mtl', '2026-03-21', []);
+    expect(slots).toHaveLength(0);
   });
 });

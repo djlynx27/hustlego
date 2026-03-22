@@ -11,6 +11,22 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  # ─── Secret scanning (Gitleaks) ─────────────────────────────────────────────
+  # Prevents accidental credential leaks (API keys, tokens, passwords).
+  # Architecture doc Phase 1: "pre-commit + CI secret scanning".
+  secret-scan:
+    name: Secret Scan (Gitleaks)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Gitleaks — detect hardcoded secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
   # ─── Lint + Type-check ──────────────────────────────────────────────────────
   lint-typecheck:
     name: Lint & Type-check
@@ -27,13 +43,19 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: ESLint (zero warnings)
+      - name: ESLint (zero errors, complexity warnings tolerated)
+        # --max-warnings 74: current tech debt baseline for cyclomatic complexity warnings.
+        # Lower this number as large components (DriveScreen, TodayScreen, etc.) are refactored.
+        # New violations beyond 73 will fail this check. Target: reach 0 warnings (ISO 25010 M≤10).
         run: npm run lint
 
       - name: TypeScript strict check
         run: npm run type-check
 
   # ─── Unit tests + Coverage ──────────────────────────────────────────────────
+  # Coverage thresholds enforced via vitest.config.ts.
+  # Architecture target: statements ≥ 73%, branches ≥ 57%, functions ≥ 78%, lines ≥ 76%.
+  # Update thresholds as coverage improves toward ISO 25010 target of 80% across all metrics.
   test:
     name: Unit Tests
     runs-on: ubuntu-latest
@@ -64,6 +86,7 @@ jobs:
   build:
     name: Build
     runs-on: ubuntu-latest
+    needs: [lint-typecheck, test]
     steps:
       - uses: actions/checkout@v4
 

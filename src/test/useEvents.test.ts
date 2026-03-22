@@ -1,5 +1,6 @@
 import {
   getActiveEvents,
+  getEndingSoonEvents,
   getStartingSoonEvents,
   isDemandRelevantEvent,
   type AppEvent,
@@ -80,5 +81,41 @@ describe('event demand relevance', () => {
     ];
 
     expect(getStartingSoonEvents(events, now, 90)).toHaveLength(1);
+  });
+});
+
+describe('invalid date guards in event filters', () => {
+  const now = new Date('2026-03-21T14:00:00Z');
+
+  it('getActiveEvents silently drops events with invalid start_at', () => {
+    const badEvent = makeEvent({ start_at: 'not-a-date' });
+    const goodEvent = makeEvent({
+      start_at: '2026-03-21T13:00:00Z',
+      end_at: '2026-03-21T15:00:00Z',
+    });
+    expect(getActiveEvents([badEvent, goodEvent], now)).toEqual([goodEvent]);
+  });
+
+  it('getActiveEvents silently drops events with invalid end_at', () => {
+    const badEvent = makeEvent({ end_at: 'not-a-date' });
+    expect(getActiveEvents([badEvent], now)).toEqual([]);
+  });
+
+  it('getEndingSoonEvents silently drops events with invalid end_at', () => {
+    const badEvent = makeEvent({ end_at: 'invalid' });
+    const goodEvent = makeEvent({
+      start_at: '2026-03-21T13:00:00Z',
+      end_at: '2026-03-21T14:30:00Z',
+    });
+    expect(getEndingSoonEvents([badEvent, goodEvent], now, 60)).toEqual([goodEvent]);
+  });
+
+  it('getStartingSoonEvents silently drops events with invalid start_at', () => {
+    const badEvent = makeEvent({ start_at: 'garbage' });
+    const goodEvent = makeEvent({
+      start_at: '2026-03-21T14:30:00Z',
+      end_at: '2026-03-21T16:00:00Z',
+    });
+    expect(getStartingSoonEvents([badEvent, goodEvent], now, 90)).toEqual([goodEvent]);
   });
 });

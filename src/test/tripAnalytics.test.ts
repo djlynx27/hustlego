@@ -172,4 +172,42 @@ describe('trip analytics', () => {
     expect(summary.revenue).toBe(240);
     expect(summary.revenuePerHour).toBe(30);
   });
+
+  it('merges zone buckets with inconsistent casing into single bucket', () => {
+    const mixedCaseTrips: TripWithZone[] = [
+      {
+        ...trips[0],
+        id: '10',
+        started_at: '2026-03-01T10:00:00',
+        ended_at: '2026-03-01T10:30:00',
+        earnings: 20,
+        tips: 0,
+        zones: { name: 'downtown' },
+      },
+      {
+        ...trips[0],
+        id: '11',
+        started_at: '2026-03-01T12:00:00',
+        ended_at: '2026-03-01T12:30:00',
+        earnings: 30,
+        tips: 0,
+        zones: { name: 'Downtown' },
+      },
+      {
+        ...trips[0],
+        id: '12',
+        started_at: '2026-03-01T14:00:00',
+        ended_at: '2026-03-01T14:30:00',
+        earnings: 10,
+        tips: 0,
+        zones: { name: 'DOWNTOWN' },
+      },
+    ];
+
+    const analytics = aggregateTripAnalytics(mixedCaseTrips, new Date('2026-03-30T12:00:00'));
+    // All 3 trips should merge into one zone bucket — revenue = 60
+    expect(analytics.zoneSeries).toHaveLength(1);
+    expect(analytics.zoneSeries[0].revenue).toBe(60);
+    expect(analytics.zoneSeries[0].rides).toBe(3);
+  });
 });

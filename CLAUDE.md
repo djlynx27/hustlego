@@ -138,3 +138,79 @@ npm run test:run
 - Commits sur main sans test de build
 - Edge Functions sans handler OPTIONS pour CORS
 - Score Gemini sans try/catch + validation JSON
+
+---
+
+## Architecture — Progressive Disclosure Architecture (PDA)
+
+Principes issus du document "Vers une Architecture Logique et Physique Intégrée" (implémenté mars 2026).
+
+### 1. Evidence-First Exploration
+
+Avant toute modification, lire :
+- Les fichiers ouverts + README.md + CLAUDE.md
+- `package.json`, `tsconfig.json`, `.env.example`
+- L'historique Git récent (`git log --oneline -20`)
+- Les commentaires `TODO`, `FIXME`, `HACK` dans le code
+
+Ne jamais modifier du code non lu. Reconstruire le contexte complet avant d'agir.
+
+### 2. Complexité cyclomatique
+
+Seuil maximal : **M ≤ 10** (ISO 25010).
+- ESLint rule `complexity: ['warn', 10]` activée dans `eslint.config.js`
+- Fonctions > 10 branches : OBLIGATOIREMENT extraire en sous-fonctions
+- Pages React (DriveScreen, TodayScreen, etc.) : refactoriser progressivement avec des composants spécialisés
+
+### 3. Couverture de tests — cibles ISO 25010
+
+| Métrique | Seuil actuel | Cible finale |
+|---|---|---|
+| Statements | ≥ 73% | ≥ 80% |
+| Branches | ≥ 57% | ≥ 80% |
+| Functions | ≥ 78% | ≥ 80% |
+| Lines | ≥ 76% | ≥ 80% |
+
+Thresholds configurés dans `vitest.config.ts`. Un build CI échoue si on descend sous ces seuils.
+Fichiers sous-testés : `driverPreferences.ts`, `learningSync.ts`, `scoringEngine.ts`, `demandUtils.ts`.
+
+### 4. Software Immunology (détection automatique)
+
+À chaque session, scanner :
+- Erreurs TypeScript : `npm run type-check -- --pretty false`
+- Erreurs ESLint : `npm run lint`
+- Tests régressés : `npm run test:run`
+- Secrets exposés : Gitleaks intégré dans CI
+
+Si une régression est détectée → corriger immédiatement, ne pas commiter.
+
+### 5. Antifragilité — Protocole de résolution d'obstacles
+
+1. **Résoudre directement** — corriger à la source
+2. **Modifier** — adapter le code autour du problème
+3. **Contourner** — alternative produisant le même résultat
+4. **Recréer** — réécrire la partie problématique from scratch
+5. **Imiter** — reproduire le comportement par un autre mécanisme
+
+Ne jamais s'arrêter sur un obstacle. Documenter ce qui a été contourné et pourquoi.
+
+### 6. Intégrité des commits
+
+Validation chain obligatoire avant chaque commit :
+```bash
+npm run test:run
+npm run type-check -- --pretty false
+npm run lint
+git add -A && git commit -m "type(scope): description"
+git push origin main
+```
+
+Jamais de `--no-verify` sauf urgence documentée.
+
+### 7. Souveraineté des données
+
+- Gemini : appelé uniquement via Edge Functions Supabase (jamais côté client)
+- Clés Supabase : `supabase/config.toml` + variables d'environnement Vercel
+- Aucune donnée utilisateur envoyée à des APIs tierces sans consentement explicite
+- Edge Functions : toujours `corsHeaders` + handler `OPTIONS` + try/catch complet
+
