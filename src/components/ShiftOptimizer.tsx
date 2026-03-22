@@ -11,7 +11,7 @@
  */
 
 import { DemandBadge } from '@/components/DemandBadge';
-import { useZones } from '@/hooks/useSupabase';
+import { useZones, type Zone } from '@/hooks/useSupabase';
 import { useTrips } from '@/hooks/useTrips';
 import { useWeather } from '@/hooks/useWeather';
 import { getDemandClass } from '@/lib/demandUtils';
@@ -74,6 +74,395 @@ function fmt(h: number): string {
   return `${h}h`;
 }
 
+function buildWeatherCondition(weather: ReturnType<typeof useWeather>['data']) {
+  if (!weather) {
+    return null;
+  }
+
+  return {
+    weatherId: weather.weatherId,
+    temp: weather.temp,
+    demandBoostPoints: weather.demandBoostPoints,
+  } satisfies WeatherCondition;
+}
+
+function getLearningAdjustedEarningsPerHour({
+  bestScore,
+  block,
+  bestZoneId,
+  learningInsights,
+  jsDay,
+}: {
+  bestScore: number;
+  block: (typeof PRIME_BLOCKS)[number];
+  bestZoneId: string;
+  learningInsights: ReturnType<typeof deriveLearningInsights> | null;
+  jsDay: number;
+}) {
+  const earningsPerH = scoreToEarningsPerH(bestScore);
+
+  if (!learningInsights) {
+    return earningsPerH;
+  }
+
+  const slotIdx = block.startHour * 4;
+  const emaPattern = learningInsights.emaPatterns.find(
+    (pattern) =>
+      pattern.dayOfWeek === jsDay &&
+      Math.abs(pattern.slotIndex - slotIdx) < 8 &&
+      pattern.zoneId === bestZoneId
+  );
+
+  if (!emaPattern || emaPattern.observationCount < 2) {
+    return earningsPerH;
+  }
+
+  const emaTrust = Math.min(0.85, emaPattern.observationCount * 0.1);
+  return (
+    emaTrust * emaPattern.emaEarningsPerHour +
+    (1 - emaTrust) * earningsPerH
+  );
+}
+
+function getBlockReason(startHour: number, dayIndex: number) {
+  if (startHour >= 20) {
+    return dayIndex >= 4
+      ? 'Bars + nightlife (vendredi/samedi)'
+      : 'Soirée demande modérée';
+  }
+
+  if (startHour >= 16) {
+    return 'Rush heure de pointe soir';
+  }
+
+  if (startHour >= 11) {
+    return 'Heure de lunch';
+  }
+
+  return 'Rush matinal';
+}
+
+function buildShiftBlock({
+  date,
+  dayIndex,
+  block,
+  bestScore,
+  bestZoneName,
+  bestZoneId,
+  learningInsights,
+  jsDay,
+}: {
+  date: Date;
+  dayIndex: number;
+  block: (typeof PRIME_BLOCKS)[number];
+  bestScore: number;
+  bestZoneName: string;
+  bestZoneId: string;
+  learningInsights: ReturnType<typeof deriveLearningInsights> | null;
+  jsDay: number;
+}): ShiftBlock {
+  const earningsPerH = getLearningAdjustedEarningsPerHour({
+    bestScore,
+    block,
+    bestZoneId,
+    learningInsights,
+    jsDay,
+  });
+  const estimatedRevenue = Math.round(earningsPerH * block.hours * 10) / 10;
+  const dateLabel = date.toLocaleDateString('fr-CA', {
+    day: 'numeric',
+    month: 'short',
+  });
+  const dayName = DAY_LABELS_FR[dayIndex] ?? 'Jour';
+
+  return {
+    dayLabel: `${dayName} ${dateLabel}`,
+    dayIndex,
+    startHour: block.startHour,
+    endHour: block.endHour,
+    label: `${dayName} ${fmt(block.startHour)}–${fmt(block.endHour)}`,
+    estimatedRevenue,
+    avgScore: Math.round(bestScore),
+    topZone: bestZoneName,
+    topZoneId: bestZoneId,
+    reason: getBlockReason(block.startHour, dayIndex),
+  };
+}
+
+function findTopZoneForBlock({
+  zones,
+  slotDate,
+  weatherCond,
+}: {
+  zones: Zone[];
+  slotDate: Date;
+  weatherCond: WeatherCondition | null;
+}) {
+  let bestScore = 0;
+  let bestZoneName = '';
+  let bestZoneId = '';
+
+  for (const zone of zones) {
+    const { score } = computeDemandScore(zone, slotDate, weatherCond);
+    if (score > bestScore) {
+      bestScore = score;
+      bestZoneName = zone.name;
+      bestZoneId = zone.id;
+    }
+  }
+
+  return { bestScore, bestZoneName, bestZoneId };
+}
+
+function buildRecommendedBlocks({
+  zones,
+  weatherCond,
+  learningInsights,
+}: {
+  zones: Zone[];
+  weatherCond: WeatherCondition | null;
+  learningInsights: ReturnType<typeof deriveLearningInsights> | null;
+}) {
+  if (zones.length === 0) {
+    return [];
+  }
+
+  const today = new Date();
+  const blocks: ShiftBlock[] = [];
+
+  for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    const date = new Date(today);
+    date.setDate(today.getDate() + dayOffset);
+    const jsDay = date.getDay();
+    const dayIndex = DOW_JS_TO_MON0[jsDay] ?? 0;
+
+    for (const block of PRIME_BLOCKS) {
+      const slotDate = new Date(date);
+      slotDate.setHours(block.startHour, 0, 0, 0);
+
+      const { bestScore, bestZoneName, bestZoneId } = findTopZoneForBlock({
+        zones,
+        slotDate,
+        weatherCond,
+      });
+
+      if (bestScore < 40) {
+        continue;
+      }
+
+      blocks.push(
+        buildShiftBlock({
+          date,
+          dayIndex,
+          block,
+          bestScore,
+          bestZoneName,
+          bestZoneId,
+          learningInsights,
+          jsDay,
+        })
+      );
+    }
+  }
+
+  return blocks
+    .sort((first, second) => second.estimatedRevenue - first.estimatedRevenue)
+    .slice(0, 14);
+}
+
+function selectBlocksForTarget({
+  recommended,
+  targetRevenue,
+}: {
+  recommended: ShiftBlock[];
+  targetRevenue: number;
+}) {
+  const selected: ShiftBlock[] = [];
+  const hoursPerDay = new Map<number, number>();
+  let accRevenue = 0;
+
+  for (const block of recommended) {
+    if (accRevenue >= targetRevenue) {
+      break;
+    }
+
+    const dayHours = hoursPerDay.get(block.dayIndex) ?? 0;
+    const blockHours = block.endHour - block.startHour;
+    if (dayHours + blockHours > 10) {
+      continue;
+    }
+
+    selected.push(block);
+    hoursPerDay.set(block.dayIndex, dayHours + blockHours);
+    accRevenue += block.estimatedRevenue;
+  }
+
+  return selected.sort((first, second) =>
+    first.dayIndex !== second.dayIndex
+      ? first.dayIndex - second.dayIndex
+      : first.startHour - second.startHour
+  );
+}
+
+function TargetRevenueControl({
+  targetRevenue,
+  setTargetRevenue,
+}: {
+  targetRevenue: number;
+  setTargetRevenue: (value: number) => void;
+}) {
+  return (
+    <div className="flex items-center gap-1">
+      <span className="text-[12px] text-muted-foreground font-body">
+        Objectif
+      </span>
+      <div className="flex items-center gap-0.5 bg-muted rounded-lg px-2 py-1">
+        <span className="text-[13px] text-muted-foreground">$</span>
+        <input
+          type="number"
+          value={targetRevenue}
+          min={100}
+          max={3000}
+          step={50}
+          onChange={(e) => setTargetRevenue(Number(e.target.value))}
+          className="w-16 bg-transparent text-[14px] font-mono font-bold text-foreground outline-none"
+        />
+        <span className="text-[12px] text-muted-foreground">/sem</span>
+      </div>
+    </div>
+  );
+}
+
+function ShiftOptimizerSummary({
+  projectedRevenue,
+  totalHours,
+  gapToTarget,
+}: {
+  projectedRevenue: number;
+  totalHours: number;
+  gapToTarget: number;
+}) {
+  return (
+    <div className="rounded-xl bg-card border border-border p-3 flex items-center gap-4">
+      <div className="flex-1 text-center">
+        <span className="text-[22px] font-mono font-bold text-primary leading-tight block">
+          ${Math.round(projectedRevenue)}
+        </span>
+        <span className="text-[11px] text-muted-foreground font-body">
+          projeté
+        </span>
+      </div>
+      <div className="w-px h-10 bg-border" />
+      <div className="flex-1 text-center">
+        <span className="text-[22px] font-mono font-bold leading-tight block">
+          {totalHours}h
+        </span>
+        <span className="text-[11px] text-muted-foreground font-body">
+          heures planifiées
+        </span>
+      </div>
+      <div className="w-px h-10 bg-border" />
+      <div className="flex-1 text-center">
+        <span
+          className={cn(
+            'text-[22px] font-mono font-bold leading-tight block',
+            gapToTarget === 0 ? 'text-emerald-400' : 'text-orange-400'
+          )}
+        >
+          {gapToTarget === 0 ? '✓' : `-$${Math.round(gapToTarget)}`}
+        </span>
+        <span className="text-[11px] text-muted-foreground font-body">
+          {gapToTarget === 0 ? 'objectif atteint' : 'manquant'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
+function ShiftBlocksList({ selectedBlocks }: { selectedBlocks: ShiftBlock[] }) {
+  if (selectedBlocks.length === 0) {
+    return (
+      <p className="text-center text-[14px] text-muted-foreground font-body py-4">
+        Aucun shift recommandé — ajustez votre objectif.
+      </p>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {selectedBlocks.map((block, index) => {
+        const demandClass = getDemandClass(block.avgScore);
+
+        return (
+          <div
+            key={`${block.dayIndex}-${block.startHour}`}
+            className={cn(
+              'bg-card rounded-xl border-l-4 border border-border p-3',
+              demandClass.border
+            )}
+          >
+            <div className="flex items-start justify-between gap-2">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2">
+                  {index === 0 && (
+                    <span className="text-[10px] font-bold bg-primary/20 text-primary rounded px-1.5 py-0.5">
+                      TOP
+                    </span>
+                  )}
+                  <span className="text-[15px] font-display font-bold leading-tight">
+                    {block.label}
+                  </span>
+                </div>
+                <span className="text-[13px] text-primary font-body block mt-0.5">
+                  📍 {block.topZone}
+                </span>
+                <span className="text-[12px] text-muted-foreground font-body">
+                  {block.reason}
+                </span>
+              </div>
+              <div className="text-right flex-shrink-0 space-y-1">
+                <DemandBadge score={block.avgScore} size="sm" />
+                <span className="text-[14px] font-mono font-bold text-foreground block">
+                  ~${block.estimatedRevenue}
+                </span>
+                <span className="text-[11px] text-muted-foreground font-body block">
+                  ({block.endHour - block.startHour}h)
+                </span>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function LearningCalibrationFooter({
+  learningInsights,
+}: {
+  learningInsights: ReturnType<typeof deriveLearningInsights> | null;
+}) {
+  if (!learningInsights || learningInsights.predictions.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="rounded-xl bg-muted/40 border border-border/50 p-3">
+      <p className="text-[12px] text-muted-foreground font-body text-center">
+        📊 Calibré sur {learningInsights.predictions.length} courses ·
+        Précision :{' '}
+        <span className="text-foreground font-semibold">
+          {Math.round(learningInsights.accuracyPercent)}%
+        </span>{' '}
+        · MAE{' '}
+        <span className="text-foreground font-semibold">
+          ${Math.round(learningInsights.meanAbsoluteError)}/h
+        </span>
+      </p>
+    </div>
+  );
+}
+
 export function ShiftOptimizer({
   cityId,
   targetWeeklyRevenue = 700,
@@ -85,14 +474,7 @@ export function ShiftOptimizer({
   const { data: trips = [] } = useTrips(300);
 
   const weatherCond: WeatherCondition | null = useMemo(
-    () =>
-      weather
-        ? {
-            weatherId: weather.weatherId,
-            temp: weather.temp,
-            demandBoostPoints: weather.demandBoostPoints,
-          }
-        : null,
+    () => buildWeatherCondition(weather),
     [weather]
   );
 
@@ -103,127 +485,16 @@ export function ShiftOptimizer({
   }, [trips]);
 
   // Build the next 7-day optimized schedule
-  const recommended = useMemo((): ShiftBlock[] => {
-    if (zones.length === 0) return [];
-
-    const today = new Date();
-    const blocks: ShiftBlock[] = [];
-
-    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-      const date = new Date(today);
-      date.setDate(today.getDate() + dayOffset);
-      const jsDay = date.getDay(); // 0=Sun … 6=Sat
-      const dayIndex = DOW_JS_TO_MON0[jsDay] ?? 0; // 0=Mon … 6=Sun
-
-      for (const block of PRIME_BLOCKS) {
-        const slotDate = new Date(date);
-        slotDate.setHours(block.startHour, 0, 0, 0);
-
-        // Score the top zone for this block
-        let bestScore = 0;
-        let bestZoneName = '';
-        let bestZoneId = '';
-
-        for (const zone of zones) {
-          const { score } = computeDemandScore(zone, slotDate, weatherCond);
-          if (score > bestScore) {
-            bestScore = score;
-            bestZoneName = zone.name;
-            bestZoneId = zone.id;
-          }
-        }
-
-        if (bestScore < 40) continue; // Skip very low demand blocks
-
-        // Try to use EMA-derived $/h for this day/slot if available
-        let earningsPerH = scoreToEarningsPerH(bestScore);
-        if (learningInsights) {
-          const slotIdx = block.startHour * 4; // 15-min slot index
-          const emaPattern = learningInsights.emaPatterns.find(
-            (p) =>
-              p.dayOfWeek === jsDay &&
-              Math.abs(p.slotIndex - slotIdx) < 8 &&
-              p.zoneId === bestZoneId
-          );
-          if (emaPattern && emaPattern.observationCount >= 2) {
-            // Blend EMA with score-based estimate (trust EMA more as observations grow)
-            const emaTrust = Math.min(0.85, emaPattern.observationCount * 0.1);
-            earningsPerH =
-              emaTrust * emaPattern.emaEarningsPerHour +
-              (1 - emaTrust) * earningsPerH;
-          }
-        }
-
-        const estimatedRevenue =
-          Math.round(earningsPerH * block.hours * 10) / 10;
-
-        const dateLabel = date.toLocaleDateString('fr-CA', {
-          day: 'numeric',
-          month: 'short',
-        });
-        const dayLabel = `${DAY_LABELS_FR[dayIndex] ?? 'Jour'} ${dateLabel}`;
-
-        // Build reason string
-        let reason = '';
-        if (block.startHour >= 20) {
-          reason =
-            dayIndex >= 4
-              ? 'Bars + nightlife (vendredi/samedi)'
-              : 'Soirée demande modérée';
-        } else if (block.startHour >= 16) {
-          reason = 'Rush heure de pointe soir';
-        } else if (block.startHour >= 11) {
-          reason = 'Heure de lunch';
-        } else {
-          reason = 'Rush matinal';
-        }
-
-        blocks.push({
-          dayLabel,
-          dayIndex,
-          startHour: block.startHour,
-          endHour: block.endHour,
-          label: `${DAY_LABELS_FR[dayIndex] ?? 'Jour'} ${fmt(block.startHour)}–${fmt(block.endHour)}`,
-          estimatedRevenue,
-          avgScore: Math.round(bestScore),
-          topZone: bestZoneName,
-          topZoneId: bestZoneId,
-          reason,
-        });
-      }
-    }
-
-    // Sort by estimated revenue desc, limit to top 14 blocks
-    return blocks
-      .sort((a, b) => b.estimatedRevenue - a.estimatedRevenue)
-      .slice(0, 14);
-  }, [zones, weatherCond, learningInsights]);
+  const recommended = useMemo(
+    () => buildRecommendedBlocks({ zones, weatherCond, learningInsights }),
+    [zones, weatherCond, learningInsights]
+  );
 
   // Greedy selection: pick blocks until target met, no day-overlap > 8h
-  const selectedBlocks = useMemo((): ShiftBlock[] => {
-    const selected: ShiftBlock[] = [];
-    const hoursPerDay = new Map<number, number>();
-    let accRevenue = 0;
-
-    for (const block of recommended) {
-      if (accRevenue >= targetRevenue) break;
-
-      const dayHours = hoursPerDay.get(block.dayIndex) ?? 0;
-      const blockHours = block.endHour - block.startHour;
-      if (dayHours + blockHours > 10) continue; // max 10h/day
-
-      selected.push(block);
-      hoursPerDay.set(block.dayIndex, dayHours + blockHours);
-      accRevenue += block.estimatedRevenue;
-    }
-
-    // Sort by dayIndex + startHour for display
-    return selected.sort((a, b) =>
-      a.dayIndex !== b.dayIndex
-        ? a.dayIndex - b.dayIndex
-        : a.startHour - b.startHour
-    );
-  }, [recommended, targetRevenue]);
+  const selectedBlocks = useMemo(
+    () => selectBlocksForTarget({ recommended, targetRevenue }),
+    [recommended, targetRevenue]
+  );
 
   const projectedRevenue = selectedBlocks.reduce(
     (s, b) => s + b.estimatedRevenue,
@@ -262,128 +533,21 @@ export function ShiftOptimizer({
             Shifts optimisés pour atteindre votre objectif
           </p>
         </div>
-        <div className="flex items-center gap-1">
-          <span className="text-[12px] text-muted-foreground font-body">
-            Objectif
-          </span>
-          <div className="flex items-center gap-0.5 bg-muted rounded-lg px-2 py-1">
-            <span className="text-[13px] text-muted-foreground">$</span>
-            <input
-              type="number"
-              value={targetRevenue}
-              min={100}
-              max={3000}
-              step={50}
-              onChange={(e) => setTargetRevenue(Number(e.target.value))}
-              className="w-16 bg-transparent text-[14px] font-mono font-bold text-foreground outline-none"
-            />
-            <span className="text-[12px] text-muted-foreground">/sem</span>
-          </div>
-        </div>
+        <TargetRevenueControl
+          targetRevenue={targetRevenue}
+          setTargetRevenue={setTargetRevenue}
+        />
       </div>
 
-      {/* Summary bar */}
-      <div className="rounded-xl bg-card border border-border p-3 flex items-center gap-4">
-        <div className="flex-1 text-center">
-          <span className="text-[22px] font-mono font-bold text-primary leading-tight block">
-            ${Math.round(projectedRevenue)}
-          </span>
-          <span className="text-[11px] text-muted-foreground font-body">
-            projeté
-          </span>
-        </div>
-        <div className="w-px h-10 bg-border" />
-        <div className="flex-1 text-center">
-          <span className="text-[22px] font-mono font-bold leading-tight block">
-            {totalHours}h
-          </span>
-          <span className="text-[11px] text-muted-foreground font-body">
-            heures planifiées
-          </span>
-        </div>
-        <div className="w-px h-10 bg-border" />
-        <div className="flex-1 text-center">
-          <span
-            className={cn(
-              'text-[22px] font-mono font-bold leading-tight block',
-              gapToTarget === 0 ? 'text-emerald-400' : 'text-orange-400'
-            )}
-          >
-            {gapToTarget === 0 ? '✓' : `-$${Math.round(gapToTarget)}`}
-          </span>
-          <span className="text-[11px] text-muted-foreground font-body">
-            {gapToTarget === 0 ? 'objectif atteint' : 'manquant'}
-          </span>
-        </div>
-      </div>
+      <ShiftOptimizerSummary
+        projectedRevenue={projectedRevenue}
+        totalHours={totalHours}
+        gapToTarget={gapToTarget}
+      />
 
-      {/* Shift blocks list */}
-      <div className="space-y-2">
-        {selectedBlocks.length === 0 ? (
-          <p className="text-center text-[14px] text-muted-foreground font-body py-4">
-            Aucun shift recommandé — ajustez votre objectif.
-          </p>
-        ) : (
-          selectedBlocks.map((block, i) => {
-            const dc = getDemandClass(block.avgScore);
-            return (
-              <div
-                key={`${block.dayIndex}-${block.startHour}`}
-                className={cn(
-                  'bg-card rounded-xl border-l-4 border border-border p-3',
-                  dc.border
-                )}
-              >
-                <div className="flex items-start justify-between gap-2">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      {i === 0 && (
-                        <span className="text-[10px] font-bold bg-primary/20 text-primary rounded px-1.5 py-0.5">
-                          TOP
-                        </span>
-                      )}
-                      <span className="text-[15px] font-display font-bold leading-tight">
-                        {block.label}
-                      </span>
-                    </div>
-                    <span className="text-[13px] text-primary font-body block mt-0.5">
-                      📍 {block.topZone}
-                    </span>
-                    <span className="text-[12px] text-muted-foreground font-body">
-                      {block.reason}
-                    </span>
-                  </div>
-                  <div className="text-right flex-shrink-0 space-y-1">
-                    <DemandBadge score={block.avgScore} size="sm" />
-                    <span className="text-[14px] font-mono font-bold text-foreground block">
-                      ~${block.estimatedRevenue}
-                    </span>
-                    <span className="text-[11px] text-muted-foreground font-body block">
-                      ({block.endHour - block.startHour}h)
-                    </span>
-                  </div>
-                </div>
-              </div>
-            );
-          })
-        )}
-      </div>
+      <ShiftBlocksList selectedBlocks={selectedBlocks} />
 
-      {learningInsights && learningInsights.predictions.length > 0 && (
-        <div className="rounded-xl bg-muted/40 border border-border/50 p-3">
-          <p className="text-[12px] text-muted-foreground font-body text-center">
-            📊 Calibré sur {learningInsights.predictions.length} courses ·
-            Précision :{' '}
-            <span className="text-foreground font-semibold">
-              {Math.round(learningInsights.accuracyPercent)}%
-            </span>{' '}
-            · MAE{' '}
-            <span className="text-foreground font-semibold">
-              ${Math.round(learningInsights.meanAbsoluteError)}/h
-            </span>
-          </p>
-        </div>
-      )}
+      <LearningCalibrationFooter learningInsights={learningInsights} />
     </div>
   );
 }
