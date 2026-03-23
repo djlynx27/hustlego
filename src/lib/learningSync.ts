@@ -222,6 +222,39 @@ function getErrorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
+function getLearningSyncFailureMessage(error: unknown, fallback: string) {
+  if (
+    typeof navigator !== 'undefined' &&
+    'onLine' in navigator &&
+    !navigator.onLine
+  ) {
+    return 'App hors ligne. Donnees locales sauvegardees, sync cloud en attente.';
+  }
+
+  const message = getErrorMessage(error, fallback);
+  const normalizedMessage = message.toLowerCase();
+
+  if (
+    normalizedMessage.includes('jwt') ||
+    normalizedMessage.includes('row-level security') ||
+    normalizedMessage.includes('permission denied') ||
+    normalizedMessage.includes('not authenticated') ||
+    normalizedMessage.includes('401') ||
+    normalizedMessage.includes('403')
+  ) {
+    return 'Connexion cloud absente ou expiree. Donnees locales sauvegardees.';
+  }
+
+  if (
+    normalizedMessage.includes('failed to fetch') ||
+    normalizedMessage.includes('network request failed')
+  ) {
+    return 'Reseau cloud temporairement indisponible. Donnees locales sauvegardees.';
+  }
+
+  return message;
+}
+
 export function buildSimilarContextRpcArgs(
   trip: TripWithZone,
   matchCount = 5
@@ -763,7 +796,10 @@ export async function syncLearningAggregates(
     return {
       ok: false,
       syncedCounts: createEmptySyncCounts(),
-      message: getErrorMessage(error, 'Sync Supabase impossible.'),
+      message: getLearningSyncFailureMessage(
+        error,
+        'Sync Supabase impossible.'
+      ),
     };
   }
 }
@@ -824,7 +860,10 @@ export async function syncShiftLearning(
     return {
       ok: false,
       syncedCounts: aggregateResult.syncedCounts,
-      message: getErrorMessage(error, 'Sync du shift impossible.'),
+      message: getLearningSyncFailureMessage(
+        error,
+        'Sync du shift impossible.'
+      ),
     };
   }
 }

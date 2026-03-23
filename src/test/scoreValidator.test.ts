@@ -1,9 +1,9 @@
-import { describe, it, expect } from 'vitest';
 import {
-  validateGeminiScore,
   computeFirewallMetrics,
   FIREWALL_MAX_DRIFT,
+  validateGeminiScore,
 } from '@/lib/scoreValidator';
+import { describe, expect, it } from 'vitest';
 
 describe('validateGeminiScore', () => {
   it('accepts a valid score within drift threshold', () => {
@@ -74,8 +74,8 @@ describe('computeFirewallMetrics', () => {
 
   it('computes acceptance rate correctly', () => {
     const results = [
-      validateGeminiScore(55, 50),  // accepted
-      validateGeminiScore(55, 50),  // accepted
+      validateGeminiScore(55, 50), // accepted
+      validateGeminiScore(55, 50), // accepted
       validateGeminiScore('x', 50), // invalid_type
     ];
     const metrics = computeFirewallMetrics(results);

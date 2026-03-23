@@ -1,5 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { useQuery } from '@tanstack/react-query';
 
 export type FirewallStatus = 'healthy' | 'warning' | 'critical';
 
@@ -48,7 +48,7 @@ async function fetchObservabilityMetrics(): Promise<ObservabilityMetrics> {
         .not('prediction_error', 'is', null),
       supabase
         .from('weight_history')
-        .select('mae, triggered_by, created_at, weights')
+        .select('prediction_mae, triggered_by, created_at, weights')
         .order('created_at', { ascending: false })
         .limit(10),
     ]);
@@ -86,7 +86,7 @@ async function fetchObservabilityMetrics(): Promise<ObservabilityMetrics> {
   const calibrationHistory: CalibrationEvent[] = (
     weightHistoryResult.data ?? []
   ).map((row) => ({
-    mae: typeof row.mae === 'number' ? Math.round(row.mae * 100) / 100 : 0,
+    mae: typeof row.prediction_mae === 'number' ? Math.round(row.prediction_mae * 100) / 100 : 0,
     triggeredBy: String(row.triggered_by ?? 'auto'),
     createdAt: String(row.created_at ?? ''),
     weights:

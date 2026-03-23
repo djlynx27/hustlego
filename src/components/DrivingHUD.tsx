@@ -1,7 +1,7 @@
 import { useHaptics } from '@/hooks/useHaptics';
 import { launchGoogleMapsNavigation } from '@/lib/venueCoordinates';
 import { Car, X } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 
 export interface DrivingHUDZone {
   id: string;
@@ -35,9 +35,7 @@ function formatMoney(n: number): string {
 }
 
 function getExitAriaLabel(exitHint: boolean) {
-  return exitHint
-    ? 'Appuyer encore pour quitter'
-    : 'Quitter mode conduite (appuyer 2×)';
+  return exitHint ? 'Quitter le mode conduite' : 'Quitter le mode conduite';
 }
 
 function ExitButton({
@@ -56,7 +54,7 @@ function ExitButton({
     >
       <X className="w-6 h-6 text-white/70" />
       {exitHint ? (
-        <span className="text-[10px] text-white/60 mt-0.5">encore</span>
+        <span className="text-[10px] text-white/60 mt-0.5">quitter</span>
       ) : null}
     </button>
   );
@@ -130,7 +128,7 @@ function NextZonePill({ nextZone }: { nextZone?: DrivingHUDZone | null }) {
  * - Minimum font size 24 px for critical information
  * - All tap targets ≥ 64 dp (minimum 56px on screen)
  * - A single gesture accesses every critical action
- * - Exit requires double-tap to prevent accidental dismissal
+ * - Exit stays visible at all times so the driver can return to the main screen quickly
  * - No text input, no scrolling while in HUD view
  */
 export function DrivingHUD({
@@ -142,9 +140,7 @@ export function DrivingHUD({
 }: DrivingHUDProps) {
   const { vibrate } = useHaptics();
   const [time, setTime] = useState(new Date());
-  const [exitHint, setExitHint] = useState(false);
-  const exitCountRef = useRef(0);
-  const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const [exitHint] = useState(true);
 
   // Keep clock updated every 30 s
   useEffect(() => {
@@ -162,34 +158,10 @@ export function DrivingHUD({
     );
   }
 
-  /**
-   * Double-tap to exit — prevents accidental dismissal while driving.
-   * First tap shows a hint, second tap within 2 s confirms.
-   */
   function handleExitClick() {
-    exitCountRef.current += 1;
-    if (exitCountRef.current >= 2) {
-      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
-      exitCountRef.current = 0;
-      setExitHint(false);
-      vibrate('accepted');
-      onExit();
-    } else {
-      setExitHint(true);
-      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
-      exitTimerRef.current = setTimeout(() => {
-        exitCountRef.current = 0;
-        setExitHint(false);
-      }, 2_000);
-    }
+    vibrate('accepted');
+    onExit();
   }
-
-  useEffect(
-    () => () => {
-      if (exitTimerRef.current) clearTimeout(exitTimerRef.current);
-    },
-    []
-  );
 
   const score = heroZone?.score ?? 0;
   const color = getDemandColor(score);

@@ -8,6 +8,10 @@ describe('nearestCityId', () => {
     expect(nearestCityId(45.608, -73.747)).toBe('lvl');
     expect(nearestCityId(45.531, -73.518)).toBe('lng');
   });
+
+  it('keeps Saint-Leonard attached to Montreal instead of Longueuil', () => {
+    expect(nearestCityId(45.5876, -73.595)).toBe('mtl');
+  });
 });
 
 describe('useAutoCity', () => {
@@ -122,5 +126,30 @@ describe('useAutoCity', () => {
     });
 
     expect(setCityId).not.toHaveBeenCalled();
+  });
+
+  it('waits for confirmation before switching on an ambiguous border case', () => {
+    const setCityId = vi.fn();
+    const { rerender } = renderHook(
+      ({ currentCityId, lat, lng }) =>
+        useAutoCity(currentCityId, setCityId, lat, lng),
+      {
+        initialProps: {
+          currentCityId: 'mtl',
+          lat: 45.543,
+          lng: -73.546,
+        },
+      }
+    );
+
+    expect(setCityId).not.toHaveBeenCalled();
+
+    rerender({
+      currentCityId: 'mtl',
+      lat: 45.5432,
+      lng: -73.5458,
+    });
+
+    expect(setCityId).toHaveBeenCalledTimes(1);
   });
 });

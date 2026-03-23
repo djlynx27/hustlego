@@ -1,11 +1,11 @@
 import { LearningInsightsPanel } from '@/components/LearningInsightsPanel';
 import { WeightCalibratorPanel } from '@/components/WeightCalibratorPanel';
 import { AdminPageShell } from '@/components/admin/AdminPageShell';
-import { AgentObservabilityPanel } from '@/components/admin/AgentObservabilityPanel';
 import {
   AdminAiAnalysisCard,
   AdminLearningAgentsCard,
 } from '@/components/admin/AdminPanelCards';
+import { AgentObservabilityPanel } from '@/components/admin/AgentObservabilityPanel';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export default function AdminLearningScreen() {

@@ -1,32 +1,46 @@
-import { Activity, Brain, Shield, TrendingDown } from 'lucide-react';
-import { useAgentObservability, type FirewallStatus } from '@/hooks/useAgentObservability';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  useAgentObservability,
+  type FirewallStatus,
+} from '@/hooks/useAgentObservability';
 import { cn } from '@/lib/utils';
+import { Activity, Brain, Shield, TrendingDown } from 'lucide-react';
 
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 function firewallStatusLabel(status: FirewallStatus): string {
   switch (status) {
-    case 'healthy':  return 'Nominal';
-    case 'warning':  return 'Attention';
-    case 'critical': return 'Critique';
+    case 'healthy':
+      return 'Nominal';
+    case 'warning':
+      return 'Attention';
+    case 'critical':
+      return 'Critique';
   }
 }
 
 function firewallStatusColor(status: FirewallStatus): string {
   switch (status) {
-    case 'healthy':  return 'text-green-400';
-    case 'warning':  return 'text-yellow-400';
-    case 'critical': return 'text-red-400';
+    case 'healthy':
+      return 'text-green-400';
+    case 'warning':
+      return 'text-yellow-400';
+    case 'critical':
+      return 'text-red-400';
   }
 }
 
-function firewallBadgeVariant(status: FirewallStatus): 'default' | 'secondary' | 'destructive' {
+function firewallBadgeVariant(
+  status: FirewallStatus
+): 'default' | 'secondary' | 'destructive' {
   switch (status) {
-    case 'healthy':  return 'default';
-    case 'warning':  return 'secondary';
-    case 'critical': return 'destructive';
+    case 'healthy':
+      return 'default';
+    case 'warning':
+      return 'secondary';
+    case 'critical':
+      return 'destructive';
   }
 }
 
@@ -53,7 +67,9 @@ interface MetricCardProps {
 function MetricCard({ icon, label, value, sub, colorClass }: MetricCardProps) {
   return (
     <div className="bg-muted/30 rounded-xl border border-border p-3 flex items-start gap-3">
-      <div className={cn('mt-0.5 shrink-0', colorClass ?? 'text-muted-foreground')}>
+      <div
+        className={cn('mt-0.5 shrink-0', colorClass ?? 'text-muted-foreground')}
+      >
         {icon}
       </div>
       <div className="min-w-0">

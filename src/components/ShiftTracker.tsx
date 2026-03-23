@@ -17,7 +17,15 @@ import { syncShiftLearning } from '@/lib/learningSync';
 import { DEFAULT_WEIGHTS } from '@/lib/scoringEngine';
 import { buildShiftSnapshot } from '@/lib/tripAnalytics';
 import { cn } from '@/lib/utils';
-import { Clock3, Flag, Play, Route, Smartphone, Wallet, Zap } from 'lucide-react';
+import {
+  Clock3,
+  Flag,
+  Play,
+  Route,
+  Smartphone,
+  Wallet,
+  Zap,
+} from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -271,10 +279,7 @@ export function ShiftTracker() {
     if (syncResult.ok) {
       toast.info(syncResult.message);
     } else {
-      // Shift ended locally — only the ML cloud sync failed (hors-ligne ou non authentifié)
-      toast.warning(
-        'Données synchronisées localement. Sync cloud indisponible.'
-      );
+      toast.warning(syncResult.message);
     }
   };
 

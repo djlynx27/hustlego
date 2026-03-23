@@ -13,7 +13,7 @@ import { WeeklyGoalDisplay } from '@/components/WeeklyGoal';
 import { useI18n } from '@/contexts/I18nContext';
 import { useActivityDetection } from '@/hooks/useActivityDetection';
 import { useArrivalCountdown } from '@/hooks/useArrivalCountdown';
-import { useAutoCity } from '@/hooks/useAutoCity';
+import { nearestCityId, useAutoCity } from '@/hooks/useAutoCity';
 import { useCityId } from '@/hooks/useCityId';
 import { useDemandScores } from '@/hooks/useDemandScores';
 import { useHaptics } from '@/hooks/useHaptics';
@@ -34,6 +34,7 @@ import {
 } from '@/lib/venueCoordinates';
 import { Car, Crosshair, Maximize2, Minimize2 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 interface WakeLockNavigator extends Navigator {
   wakeLock?: {
@@ -82,7 +83,7 @@ export default function DriveScreen() {
   const { t } = useI18n();
   const [cityId, setCityId] = useCityId();
   const { data: cities = [] } = useCities();
-  const { location, status } = useUserLocation(15000);
+  const { location, status, error, refresh } = useUserLocation(15000);
   useAutoCity(cityId, setCityId, location?.latitude, location?.longitude);
   const [conservativePresence, setConservativePresence] = useState(() =>
     getConservativePresencePreference()
@@ -102,6 +103,8 @@ export default function DriveScreen() {
   // Speed-based activity detection → auto-HUD
   const { isInVehicle, speedKmh } = useActivityDetection();
   const [hudActive, setHudActive] = useState(false);
+  const [hudDismissedManually, setHudDismissedManually] = useState(false);
+  const [isRefreshingLocation, setIsRefreshingLocation] = useState(false);
   const { vibrate } = useHaptics();
   const [wakeLockStatus, setWakeLockStatus] = useState<WakeLockStatus>(() => {
     const nav = navigator as WakeLockNavigator;
@@ -110,11 +113,17 @@ export default function DriveScreen() {
 
   // Auto-enable HUD when vehicle motion is confidently detected
   useEffect(() => {
-    if (isInVehicle && !hudActive) {
+    if (isInVehicle && !hudActive && !hudDismissedManually) {
       setHudActive(true);
       vibrate('newOrder'); // alert driver that HUD is now active
     }
-  }, [hudActive, isInVehicle, vibrate]);
+  }, [hudActive, hudDismissedManually, isInVehicle, vibrate]);
+
+  useEffect(() => {
+    if (!isInVehicle && hudDismissedManually) {
+      setHudDismissedManually(false);
+    }
+  }, [hudDismissedManually, isInVehicle]);
 
   const wakeLockRef = useRef<WakeLockSentinel | null>(null);
 
@@ -253,6 +262,46 @@ export default function DriveScreen() {
     location?.speed != null
       ? ` · spd ${Math.round(location.speed * 3.6)} km/h`
       : '';
+
+  const accuracyLabel =
+    location?.accuracy != null
+      ? ` · precision ±${Math.round(location.accuracy)} m`
+      : '';
+
+  async function handleManualLocate() {
+    setIsRefreshingLocation(true);
+
+    try {
+      const nextLocation = await refresh();
+      if (!nextLocation) {
+        toast.error(error ?? 'Le GPS ne repond pas pour le moment.');
+        return;
+      }
+
+      const detectedCityId = nearestCityId(
+        nextLocation.latitude,
+        nextLocation.longitude
+      );
+
+      if (detectedCityId !== cityId) {
+        setCityId(detectedCityId);
+      }
+
+      const detectedCityName =
+        cities.find((city) => city.id === detectedCityId)?.name ??
+        detectedCityId;
+
+      toast.success(`Position recalee sur ${detectedCityName}.`);
+    } catch (manualError) {
+      const message =
+        manualError instanceof Error
+          ? manualError.message
+          : 'Impossible d obtenir une position GPS precise.';
+      toast.error(message);
+    } finally {
+      setIsRefreshingLocation(false);
+    }
+  }
 
   return (
     <div
@@ -394,7 +443,10 @@ export default function DriveScreen() {
               : null
           }
           speedKmh={speedKmh}
-          onExit={() => setHudActive(false)}
+          onExit={() => {
+            setHudDismissedManually(true);
+            setHudActive(false);
+          }}
         />
       )}
       {/* Header */}
@@ -540,13 +592,19 @@ export default function DriveScreen() {
           variant={hudActive ? 'default' : 'outline'}
           className="w-full h-12 gap-2 font-display font-bold"
           onClick={() => {
-            setHudActive((v) => !v);
+            if (hudActive) {
+              setHudDismissedManually(true);
+              setHudActive(false);
+            } else {
+              setHudDismissedManually(false);
+              setHudActive(true);
+            }
             vibrate('accepted');
           }}
         >
           <Car className="w-5 h-5" />
           {hudActive
-            ? '✅ HUD actif — Appuyer 2× sur ✕ pour quitter'
+            ? '✅ HUD actif — Appuie sur ✕ pour quitter'
             : `🚗 Mode HUD conduite${speedKmh !== null ? ` · ${Math.round(speedKmh ?? 0)} km/h` : ''}`}
         </Button>
 
@@ -556,22 +614,22 @@ export default function DriveScreen() {
             variant="outline"
             className="gap-1.5 flex-shrink-0 h-9"
             onClick={() => {
-              if (navigator.geolocation) {
-                navigator.geolocation.getCurrentPosition(
-                  () => {},
-                  () => {},
-                  { enableHighAccuracy: true }
-                );
-              }
+              void handleManualLocate();
             }}
+            disabled={isRefreshingLocation}
           >
-            <Crosshair className="w-4 h-4" /> Localiser
+            <Crosshair className="w-4 h-4" />
+            {isRefreshingLocation ? 'GPS…' : 'Localiser'}
           </Button>
           <div className="min-w-0 flex-1">
             <p className="text-[12px] font-body text-muted-foreground truncate">
               {location
-                ? `GPS: lat ${location.latitude.toFixed(4)}, lng ${location.longitude.toFixed(4)}${speedLabel}`
+                ? `GPS: lat ${location.latitude.toFixed(4)}, lng ${location.longitude.toFixed(4)}${speedLabel}${accuracyLabel}`
                 : gpsLabel}
+            </p>
+            <p className="text-[11px] font-body text-muted-foreground/80 mt-1">
+              Localiser force un nouveau fix GPS precis pour recaler la ville et
+              les recommandations.
             </p>
           </div>
         </div>

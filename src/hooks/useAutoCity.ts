@@ -10,29 +10,66 @@
 import { haversineKm } from '@/hooks/useUserLocation';
 import { useEffect, useRef } from 'react';
 
-const CITY_CENTROIDS: { id: string; lat: number; lng: number }[] = [
-  { id: 'mtl', lat: 45.508, lng: -73.587 },
-  { id: 'lvl', lat: 45.608, lng: -73.747 },
-  { id: 'lng', lat: 45.531, lng: -73.518 },
-  { id: 'bsb', lat: 45.62, lng: -73.843 },
-  { id: 'sth', lat: 45.642, lng: -73.829 },
-  { id: 'blv', lat: 45.675, lng: -73.878 },
-  { id: 'rsm', lat: 45.638, lng: -73.799 },
-  { id: 'bdf', lat: 45.667, lng: -73.76 },
-  { id: 'trb', lat: 45.702, lng: -73.645 },
+const CITY_REFERENCE_POINTS: {
+  id: string;
+  points: Array<{ lat: number; lng: number }>;
+}[] = [
+  {
+    id: 'mtl',
+    points: [
+      { lat: 45.5017, lng: -73.5673 },
+      { lat: 45.5874, lng: -73.595 },
+      { lat: 45.5207, lng: -73.6156 },
+      { lat: 45.4706, lng: -73.7408 },
+    ],
+  },
+  {
+    id: 'lvl',
+    points: [
+      { lat: 45.608, lng: -73.747 },
+      { lat: 45.5607, lng: -73.7497 },
+      { lat: 45.5775, lng: -73.6921 },
+    ],
+  },
+  {
+    id: 'lng',
+    points: [
+      { lat: 45.531, lng: -73.518 },
+      { lat: 45.5369, lng: -73.5107 },
+      { lat: 45.5179, lng: -73.4659 },
+    ],
+  },
+  { id: 'bsb', points: [{ lat: 45.62, lng: -73.843 }] },
+  { id: 'sth', points: [{ lat: 45.642, lng: -73.829 }] },
+  { id: 'blv', points: [{ lat: 45.675, lng: -73.878 }] },
+  { id: 'rsm', points: [{ lat: 45.638, lng: -73.799 }] },
+  { id: 'bdf', points: [{ lat: 45.667, lng: -73.76 }] },
+  { id: 'trb', points: [{ lat: 45.702, lng: -73.645 }] },
 ];
 
+const IMMEDIATE_SWITCH_MARGIN_KM = 3;
+const CONFIRMED_SWITCH_SAMPLES = 2;
+
+function getNearestCityDetection(lat: number, lng: number) {
+  const rankedCities = CITY_REFERENCE_POINTS.map((city) => ({
+    id: city.id,
+    distanceKm: Math.min(
+      ...city.points.map((point) => haversineKm(lat, lng, point.lat, point.lng))
+    ),
+  })).sort((a, b) => a.distanceKm - b.distanceKm);
+
+  const bestMatch = rankedCities[0] ?? { id: 'mtl', distanceKm: Infinity };
+  const secondBestDistance = rankedCities[1]?.distanceKm ?? Infinity;
+
+  return {
+    cityId: bestMatch.id,
+    distanceKm: bestMatch.distanceKm,
+    marginKm: secondBestDistance - bestMatch.distanceKm,
+  };
+}
+
 export function nearestCityId(lat: number, lng: number): string {
-  let best = CITY_CENTROIDS[0];
-  let bestDist = haversineKm(lat, lng, best.lat, best.lng);
-  for (const city of CITY_CENTROIDS.slice(1)) {
-    const d = haversineKm(lat, lng, city.lat, city.lng);
-    if (d < bestDist) {
-      bestDist = d;
-      best = city;
-    }
-  }
-  return best.id;
+  return getNearestCityDetection(lat, lng).cityId;
 }
 
 /**
@@ -47,14 +84,19 @@ export function useAutoCity(
   userLng: number | null | undefined
 ) {
   const lastAutoCityRef = useRef<string | null>(null);
+  const pendingCityRef = useRef<{ id: string; confirmations: number } | null>(
+    null
+  );
 
   useEffect(() => {
     if (userLat == null || userLng == null) return;
 
-    const detectedCityId = nearestCityId(userLat, userLng);
+    const detectedCity = getNearestCityDetection(userLat, userLng);
+    const detectedCityId = detectedCity.cityId;
 
     if (detectedCityId === currentCityId) {
       lastAutoCityRef.current = detectedCityId;
+      pendingCityRef.current = null;
       return;
     }
 
@@ -62,7 +104,30 @@ export function useAutoCity(
       return;
     }
 
+    const requiresConfirmation =
+      detectedCity.marginKm < IMMEDIATE_SWITCH_MARGIN_KM;
+
+    if (requiresConfirmation) {
+      if (pendingCityRef.current?.id === detectedCityId) {
+        pendingCityRef.current = {
+          id: detectedCityId,
+          confirmations: pendingCityRef.current.confirmations + 1,
+        };
+      } else {
+        pendingCityRef.current = { id: detectedCityId, confirmations: 1 };
+      }
+
+      if (
+        (pendingCityRef.current?.confirmations ?? 0) < CONFIRMED_SWITCH_SAMPLES
+      ) {
+        return;
+      }
+    } else {
+      pendingCityRef.current = null;
+    }
+
     lastAutoCityRef.current = detectedCityId;
+    pendingCityRef.current = null;
     setCityId(detectedCityId);
   }, [currentCityId, userLat, userLng, setCityId]);
 }
