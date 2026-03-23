@@ -1,3 +1,4 @@
+import { useActivityDetection } from '@/hooks/useActivityDetection';
 import { AlertTriangle, Pause, Timer } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
@@ -61,8 +62,9 @@ interface Props {
 export function DeadTimeTimer({ nearestZoneName }: Props) {
   const [state, setState] = useState<DeadTimeState>(loadState);
   const [elapsed, setElapsed] = useState(0);
+  const { activity } = useActivityDetection();
 
-  // ── Persist state to localStorage on every change (fix: survives page nav) ──
+  // Persist state to localStorage on every change
   useEffect(() => {
     saveState(state);
   }, [state]);
@@ -98,6 +100,35 @@ export function DeadTimeTimer({ nearestZoneName }: Props) {
       window.removeEventListener('trip-end', onTripEnd);
     };
   }, []);
+
+  // Pause or resume timer based on detected activity
+  useEffect(() => {
+    if (activity === 'walking' || activity === 'in_vehicle') {
+      // Pause timer if user is moving
+      setState((prev) => {
+        if (prev.paused) return prev;
+        const now = Date.now();
+        const totalAccum =
+          prev.accumulated +
+          (prev.startedAt && !prev.paused ? now - prev.startedAt : 0);
+        const next = { startedAt: null, accumulated: totalAccum, paused: true };
+        saveState(next);
+        return next;
+      });
+    } else if (activity === 'stationary' || activity === 'unknown') {
+      // Resume timer if user is stationary or unknown
+      setState((prev) => {
+        if (!prev.paused) return prev;
+        const next = {
+          startedAt: Date.now(),
+          accumulated: prev.accumulated,
+          paused: false,
+        };
+        saveState(next);
+        return next;
+      });
+    }
+  }, [activity]);
 
   // Tick every second
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useHaptics } from '@/hooks/useHaptics';
-import { launchGoogleMapsNavigation } from '@/lib/venueCoordinates';
+import { launchGoogleMapsNavigation } from '@/lib/hotspots';
 import { Car, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 

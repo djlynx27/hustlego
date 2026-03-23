@@ -77,11 +77,15 @@ export function nearestCityId(lat: number, lng: number): string {
  * the same detection so a manual override can still stick until GPS resolves to
  * a different city.
  */
+/**
+ * Ajoute refreshKey pour forcer la détection même si la position n'a pas changé.
+ */
 export function useAutoCity(
   currentCityId: string,
   setCityId: (id: string) => void,
   userLat: number | null | undefined,
-  userLng: number | null | undefined
+  userLng: number | null | undefined,
+  refreshKey?: any
 ) {
   const lastAutoCityRef = useRef<string | null>(null);
   const pendingCityRef = useRef<{ id: string; confirmations: number } | null>(
@@ -129,5 +133,6 @@ export function useAutoCity(
     lastAutoCityRef.current = detectedCityId;
     pendingCityRef.current = null;
     setCityId(detectedCityId);
-  }, [currentCityId, userLat, userLng, setCityId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentCityId, userLat, userLng, setCityId, refreshKey]);
 }

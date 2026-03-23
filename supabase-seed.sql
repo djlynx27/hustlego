@@ -1,3 +1,147 @@
+-- Helper générique pour upsert sur weight_history
+DO $$
+BEGIN
+  CREATE OR REPLACE FUNCTION upsert_weight_history(
+    p_weights jsonb,
+    p_prediction_mae numeric,
+    p_triggered_by text,
+    p_created_at timestamptz
+  ) RETURNS void AS $$
+  BEGIN
+    UPDATE public.weight_history
+    SET weights = p_weights,
+        prediction_mae = p_prediction_mae
+    WHERE triggered_by = p_triggered_by
+      AND created_at = p_created_at;
+    IF NOT FOUND THEN
+      INSERT INTO public.weight_history (
+        weights, prediction_mae, triggered_by, created_at
+      ) VALUES (
+        p_weights, p_prediction_mae, p_triggered_by, p_created_at
+      );
+    END IF;
+  END;
+  $$ LANGUAGE plpgsql;
+END $$;
+
+-- Helper générique pour upsert sur session_zones
+DO $$
+BEGIN
+  CREATE OR REPLACE FUNCTION upsert_session_zone(
+    p_session_id bigint,
+    p_zone_id text,
+    p_entered_at timestamptz,
+    p_exited_at timestamptz,
+    p_rides_count integer,
+    p_earnings numeric,
+    p_predicted_score integer,
+    p_factors_snapshot jsonb
+  ) RETURNS void AS $$
+  BEGIN
+    UPDATE public.session_zones
+    SET exited_at = p_exited_at,
+        rides_count = p_rides_count,
+        earnings = p_earnings,
+        predicted_score = p_predicted_score,
+        factors_snapshot = p_factors_snapshot
+    WHERE session_id = p_session_id
+      AND zone_id = p_zone_id
+      AND entered_at = p_entered_at;
+    IF NOT FOUND THEN
+      INSERT INTO public.session_zones (
+        session_id, zone_id, entered_at, exited_at, rides_count, earnings, predicted_score, factors_snapshot
+      ) VALUES (
+        p_session_id, p_zone_id, p_entered_at, p_exited_at, p_rides_count, p_earnings, p_predicted_score, p_factors_snapshot
+      );
+    END IF;
+  END;
+  $$ LANGUAGE plpgsql;
+END $$;
+
+-- Helper générique pour upsert sur predictions
+DO $$
+BEGIN
+  CREATE OR REPLACE FUNCTION upsert_prediction(
+    p_zone_id text,
+    p_predicted_at timestamptz,
+    p_predicted_score integer,
+    p_factors_snapshot jsonb,
+    p_actual_earnings_per_hour numeric,
+    p_prediction_error numeric
+  ) RETURNS void AS $$
+  BEGIN
+    UPDATE public.predictions
+    SET factors_snapshot = p_factors_snapshot,
+        actual_earnings_per_hour = p_actual_earnings_per_hour,
+        prediction_error = p_prediction_error
+    WHERE zone_id = p_zone_id
+      AND predicted_at = p_predicted_at
+      AND predicted_score = p_predicted_score;
+    IF NOT FOUND THEN
+      INSERT INTO public.predictions (
+        zone_id, predicted_at, predicted_score, factors_snapshot, actual_earnings_per_hour, prediction_error
+      ) VALUES (
+        p_zone_id, p_predicted_at, p_predicted_score, p_factors_snapshot, p_actual_earnings_per_hour, p_prediction_error
+      );
+    END IF;
+  END;
+  $$ LANGUAGE plpgsql;
+END $$;
+
+-- Helper générique pour upsert sur demand_patterns
+DO $$
+BEGIN
+  CREATE OR REPLACE FUNCTION upsert_demand_pattern(
+    p_zone_id text,
+    p_context_vector vector,
+    p_actual_earnings_per_hour numeric
+  ) RETURNS void AS $$
+  BEGIN
+    UPDATE public.demand_patterns
+    SET actual_earnings_per_hour = p_actual_earnings_per_hour
+    WHERE zone_id = p_zone_id
+      AND context_vector = p_context_vector;
+    IF NOT FOUND THEN
+      INSERT INTO public.demand_patterns (
+        zone_id, context_vector, actual_earnings_per_hour
+      ) VALUES (
+        p_zone_id, p_context_vector, p_actual_earnings_per_hour
+      );
+    END IF;
+  END;
+  $$ LANGUAGE plpgsql;
+END $$;
+
+-- Helper générique pour upsert sur scores
+DO $$
+BEGIN
+  CREATE OR REPLACE FUNCTION upsert_score(
+    p_zone_id text,
+    p_score numeric,
+    p_weather_boost numeric,
+    p_event_boost numeric,
+    p_final_score numeric,
+    p_calculated_at timestamptz
+  ) RETURNS void AS $$
+  BEGIN
+    UPDATE public.scores
+    SET score = p_score,
+        weather_boost = p_weather_boost,
+        event_boost = p_event_boost,
+        final_score = p_final_score
+    WHERE zone_id = p_zone_id
+      AND calculated_at = p_calculated_at;
+    IF NOT FOUND THEN
+      INSERT INTO public.scores (
+        zone_id, score, weather_boost, event_boost, final_score, calculated_at
+      ) VALUES (
+        p_zone_id, p_score, p_weather_boost, p_event_boost, p_final_score, p_calculated_at
+      );
+    END IF;
+  END;
+  $$ LANGUAGE plpgsql;
+END $$;
+
 -- ============================================================
 -- Seed: Données réelles HustleGo
 -- Source: zones bubble.csv + QuickBooks_Mileage.csv
@@ -281,27 +425,7 @@ BEGIN
     WHERE id = seeded_session_id;
   END IF;
 
-  UPDATE public.session_zones
-  SET exited_at = '2026-03-16 23:10:00+00',
-      rides_count = 3,
-      earnings = 118.50,
-      predicted_score = 74,
-      factors_snapshot = jsonb_build_object('source', 'seed', 'zone_type', 'événements')
-  WHERE session_id = seeded_session_id
-    AND zone_id = 'mtl-cb'
-    AND entered_at = '2026-03-16 21:05:00+00';
-
-  INSERT INTO public.session_zones (
-    session_id,
-    zone_id,
-    entered_at,
-    exited_at,
-    rides_count,
-    earnings,
-    predicted_score,
-    factors_snapshot
-  )
-  SELECT
+  PERFORM upsert_session_zone(
     seeded_session_id,
     'mtl-cb',
     '2026-03-16 21:05:00+00',
@@ -310,35 +434,9 @@ BEGIN
     118.50,
     74,
     jsonb_build_object('source', 'seed', 'zone_type', 'événements')
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM public.session_zones sz
-    WHERE sz.session_id = seeded_session_id
-      AND sz.zone_id = 'mtl-cb'
-      AND sz.entered_at = '2026-03-16 21:05:00+00'
   );
 
-  UPDATE public.session_zones
-  SET exited_at = '2026-03-17 01:20:00+00',
-      rides_count = 2,
-      earnings = 64.00,
-      predicted_score = 56,
-      factors_snapshot = jsonb_build_object('source', 'seed', 'zone_type', 'métro')
-  WHERE session_id = seeded_session_id
-    AND zone_id = 'mtl-bq'
-    AND entered_at = '2026-03-16 23:20:00+00';
-
-  INSERT INTO public.session_zones (
-    session_id,
-    zone_id,
-    entered_at,
-    exited_at,
-    rides_count,
-    earnings,
-    predicted_score,
-    factors_snapshot
-  )
-  SELECT
+  PERFORM upsert_session_zone(
     seeded_session_id,
     'mtl-bq',
     '2026-03-16 23:20:00+00',
@@ -347,12 +445,24 @@ BEGIN
     64.00,
     56,
     jsonb_build_object('source', 'seed', 'zone_type', 'métro')
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM public.session_zones sz
-    WHERE sz.session_id = seeded_session_id
-      AND sz.zone_id = 'mtl-bq'
-      AND sz.entered_at = '2026-03-16 23:20:00+00'
+  );
+
+  PERFORM upsert_prediction(
+    'mtl-cb',
+    '2026-03-16 21:05:00+00',
+    74,
+    jsonb_build_object('source', 'seed', 'platform', 'uber'),
+    52.60,
+    14.0000
+  );
+
+  PERFORM upsert_prediction(
+    'mtl-bq',
+    '2026-03-16 23:20:00+00',
+    56,
+    jsonb_build_object('source', 'seed', 'platform', 'lyft'),
+    31.90,
+    -3.0000
   );
 
   UPDATE public.predictions
@@ -417,28 +527,7 @@ BEGIN
       AND p.predicted_score = 56
   );
 
-  UPDATE public.weight_history
-  SET weights = jsonb_build_object(
-        'timeOfDay', 0.24,
-        'dayOfWeek', 0.14,
-        'weather', 0.15,
-        'events', 0.18,
-        'historicalEarnings', 0.11,
-        'transitDisruption', 0.08,
-        'trafficCongestion', 0.06,
-        'winterConditions', 0.04
-      ),
-      prediction_mae = 8.5
-  WHERE triggered_by = 'seed_demo'
-    AND created_at = '2026-03-17 01:35:00+00';
-
-  INSERT INTO public.weight_history (
-    weights,
-    prediction_mae,
-    triggered_by,
-    created_at
-  )
-  SELECT
+  PERFORM upsert_weight_history(
     jsonb_build_object(
       'timeOfDay', 0.24,
       'dayOfWeek', 0.14,
@@ -452,11 +541,6 @@ BEGIN
     8.5,
     'seed_demo',
     '2026-03-17 01:35:00+00'
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM public.weight_history wh
-    WHERE wh.triggered_by = 'seed_demo'
-      AND wh.created_at = '2026-03-17 01:35:00+00'
   );
 
   INSERT INTO public.ema_patterns (
@@ -561,193 +645,26 @@ END $$;
 -- Données récentes pour alimenter le panneau Admin > Apprentissage IA.
 DO $$
 BEGIN
-  UPDATE public.scores
-  SET score = 68.00,
-      weather_boost = 4.00,
-      event_boost = 10.00,
-      final_score = 79.50
-  WHERE zone_id = 'mtl-cb'
-    AND calculated_at = '2026-03-22 19:00:00+00';
-
-  INSERT INTO public.scores (
-    zone_id,
-    score,
-    weather_boost,
-    event_boost,
-    final_score,
-    calculated_at
-  )
-  SELECT
-    'mtl-cb',
-    68.00,
-    4.00,
-    10.00,
-    79.50,
-    '2026-03-22 19:00:00+00'
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM public.scores s
-    WHERE s.zone_id = 'mtl-cb'
-      AND s.calculated_at = '2026-03-22 19:00:00+00'
-  );
-
-  UPDATE public.scores
-  SET score = 54.00,
-      weather_boost = 2.00,
-      event_boost = 1.50,
-      final_score = 50.00
-  WHERE zone_id = 'mtl-bq'
-    AND calculated_at = '2026-03-22 19:00:00+00';
-
-  INSERT INTO public.scores (
-    zone_id,
-    score,
-    weather_boost,
-    event_boost,
-    final_score,
-    calculated_at
-  )
-  SELECT
-    'mtl-bq',
-    54.00,
-    2.00,
-    1.50,
-    50.00,
-    '2026-03-22 19:00:00+00'
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM public.scores s
-    WHERE s.zone_id = 'mtl-bq'
-      AND s.calculated_at = '2026-03-22 19:00:00+00'
-  );
-
-  UPDATE public.scores
-  SET score = 82.00,
-      weather_boost = 3.00,
-      event_boost = 0.00,
-      final_score = 90.00
-  WHERE zone_id = 'mtl-yul'
-    AND calculated_at = '2026-03-22 19:30:00+00';
-
-  INSERT INTO public.scores (
-    zone_id,
-    score,
-    weather_boost,
-    event_boost,
-    final_score,
-    calculated_at
-  )
-  SELECT
+  PERFORM upsert_score(
+    'mtl-cb', 68.00, 4.00, 10.00, 79.50, '2026-03-22 19:00:00+00');
+  PERFORM upsert_score(
+    'mtl-bq', 54.00, 2.00, 1.50, 50.00, '2026-03-22 19:00:00+00');
+  PERFORM upsert_score(
+    'mtl-yul', 82.00, 3.00, 0.00, 90.00, '2026-03-22 19:30:00+00');
+  PERFORM upsert_score(
+    'lvl-cp', 61.00, 1.00, 6.00, 74.00, '2026-03-22 19:45:00+00');
+  PERFORM upsert_score(
+    'lng-us', 58.00, 0.50, 0.00, 55.50, '2026-03-22 20:00:00+00');
+  PERFORM upsert_score(
+    'trb-vt', 47.00, 0.00, 3.00, 62.00, '2026-03-22 20:15:00+00');
+  PERFORM upsert_prediction(
     'mtl-yul',
-    82.00,
-    3.00,
-    0.00,
-    90.00,
-    '2026-03-22 19:30:00+00'
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM public.scores s
-    WHERE s.zone_id = 'mtl-yul'
-      AND s.calculated_at = '2026-03-22 19:30:00+00'
+    '2026-03-19 17:00:00+00',
+    88,
+    jsonb_build_object('source', 'seed_observability', 'platform', 'lyft'),
+    61.20,
+    6.5000
   );
-
-  UPDATE public.scores
-  SET score = 61.00,
-      weather_boost = 1.00,
-      event_boost = 6.00,
-      final_score = 74.00
-  WHERE zone_id = 'lvl-cp'
-    AND calculated_at = '2026-03-22 19:45:00+00';
-
-  INSERT INTO public.scores (
-    zone_id,
-    score,
-    weather_boost,
-    event_boost,
-    final_score,
-    calculated_at
-  )
-  SELECT
-    'lvl-cp',
-    61.00,
-    1.00,
-    6.00,
-    74.00,
-    '2026-03-22 19:45:00+00'
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM public.scores s
-    WHERE s.zone_id = 'lvl-cp'
-      AND s.calculated_at = '2026-03-22 19:45:00+00'
-  );
-
-  UPDATE public.scores
-  SET score = 58.00,
-      weather_boost = 0.50,
-      event_boost = 0.00,
-      final_score = 55.50
-  WHERE zone_id = 'lng-us'
-    AND calculated_at = '2026-03-22 20:00:00+00';
-
-  INSERT INTO public.scores (
-    zone_id,
-    score,
-    weather_boost,
-    event_boost,
-    final_score,
-    calculated_at
-  )
-  SELECT
-    'lng-us',
-    58.00,
-    0.50,
-    0.00,
-    55.50,
-    '2026-03-22 20:00:00+00'
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM public.scores s
-    WHERE s.zone_id = 'lng-us'
-      AND s.calculated_at = '2026-03-22 20:00:00+00'
-  );
-
-  UPDATE public.scores
-  SET score = 47.00,
-      weather_boost = 0.00,
-      event_boost = 3.00,
-      final_score = 62.00
-  WHERE zone_id = 'trb-vt'
-    AND calculated_at = '2026-03-22 20:15:00+00';
-
-  INSERT INTO public.scores (
-    zone_id,
-    score,
-    weather_boost,
-    event_boost,
-    final_score,
-    calculated_at
-  )
-  SELECT
-    'trb-vt',
-    47.00,
-    0.00,
-    3.00,
-    62.00,
-    '2026-03-22 20:15:00+00'
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM public.scores s
-    WHERE s.zone_id = 'trb-vt'
-      AND s.calculated_at = '2026-03-22 20:15:00+00'
-  );
-
-  UPDATE public.predictions
-  SET factors_snapshot = jsonb_build_object('source', 'seed_observability', 'platform', 'lyft'),
-      actual_earnings_per_hour = 61.20,
-      prediction_error = 6.5000
-  WHERE zone_id = 'mtl-yul'
-    AND predicted_at = '2026-03-19 17:00:00+00'
-    AND predicted_score = 88;
 
   INSERT INTO public.predictions (
     zone_id,
@@ -772,13 +689,14 @@ BEGIN
       AND p.predicted_score = 88
   );
 
-  UPDATE public.predictions
-  SET factors_snapshot = jsonb_build_object('source', 'seed_observability', 'platform', 'uber'),
-      actual_earnings_per_hour = 45.80,
-      prediction_error = -4.2500
-  WHERE zone_id = 'lvl-cp'
-    AND predicted_at = '2026-03-20 16:00:00+00'
-    AND predicted_score = 72;
+  PERFORM upsert_prediction(
+    'lvl-cp',
+    '2026-03-20 16:00:00+00',
+    72,
+    jsonb_build_object('source', 'seed_observability', 'platform', 'uber'),
+    45.80,
+    -4.2500
+  );
 
   INSERT INTO public.predictions (
     zone_id,
@@ -803,13 +721,14 @@ BEGIN
       AND p.predicted_score = 72
   );
 
-  UPDATE public.predictions
-  SET factors_snapshot = jsonb_build_object('source', 'seed_observability', 'platform', 'lyft'),
-      actual_earnings_per_hour = 34.30,
-      prediction_error = 2.7500
-  WHERE zone_id = 'lng-us'
-    AND predicted_at = '2026-03-21 08:00:00+00'
-    AND predicted_score = 59;
+  PERFORM upsert_prediction(
+    'lng-us',
+    '2026-03-21 08:00:00+00',
+    59,
+    jsonb_build_object('source', 'seed_observability', 'platform', 'lyft'),
+    34.30,
+    2.7500
+  );
 
   INSERT INTO public.predictions (
     zone_id,
@@ -834,28 +753,7 @@ BEGIN
       AND p.predicted_score = 59
   );
 
-  UPDATE public.weight_history
-  SET weights = jsonb_build_object(
-        'timeOfDay', 0.26,
-        'dayOfWeek', 0.15,
-        'weather', 0.17,
-        'events', 0.19,
-        'historicalEarnings', 0.10,
-        'transitDisruption', 0.07,
-        'trafficCongestion', 0.04,
-        'winterConditions', 0.02
-      ),
-      prediction_mae = 7.40
-  WHERE triggered_by = 'seed_observability'
-    AND created_at = '2026-03-19 18:00:00+00';
-
-  INSERT INTO public.weight_history (
-    weights,
-    prediction_mae,
-    triggered_by,
-    created_at
-  )
-  SELECT
+  PERFORM upsert_weight_history(
     jsonb_build_object(
       'timeOfDay', 0.26,
       'dayOfWeek', 0.15,
@@ -869,53 +767,103 @@ BEGIN
     7.40,
     'seed_observability',
     '2026-03-19 18:00:00+00'
-  WHERE NOT EXISTS (
-    SELECT 1
-    FROM public.weight_history wh
-    WHERE wh.triggered_by = 'seed_observability'
-      AND wh.created_at = '2026-03-19 18:00:00+00'
   );
 
-  UPDATE public.weight_history
-  SET weights = jsonb_build_object(
-        'timeOfDay', 0.25,
-        'dayOfWeek', 0.16,
-        'weather', 0.16,
-        'events', 0.20,
-        'historicalEarnings', 0.10,
-        'transitDisruption', 0.07,
-        'trafficCongestion', 0.04,
-        'winterConditions', 0.02
-      ),
-      prediction_mae = 6.85
-  WHERE triggered_by = 'seed_observability'
-    AND created_at = '2026-03-21 08:00:00+00';
+  INSERT INTO public.ema_patterns (
+    zone_id,
+    day_of_week,
+    hour_block,
+    ema_earnings_per_hour,
+    ema_ride_count,
+    observation_count,
+    last_updated
+  ) VALUES
+    ('mtl-cb', 1, 84, 52.60, 2.40, 5, now()),
+    ('mtl-bq', 1, 93, 31.90, 1.60, 4, now())
+  ON CONFLICT (zone_id, day_of_week, hour_block) DO UPDATE SET
+    ema_earnings_per_hour = EXCLUDED.ema_earnings_per_hour,
+    ema_ride_count = EXCLUDED.ema_ride_count,
+    observation_count = EXCLUDED.observation_count,
+    last_updated = EXCLUDED.last_updated;
 
-  INSERT INTO public.weight_history (
-    weights,
-    prediction_mae,
-    triggered_by,
-    created_at
+  INSERT INTO public.zone_beliefs (
+    zone_id,
+    day_of_week,
+    hour_block,
+    prior_mean,
+    prior_variance,
+    observation_count,
+    last_updated
+  ) VALUES
+    ('mtl-cb', 1, 84, 49.25, 24.5000, 5, now()),
+    ('mtl-bq', 1, 93, 32.75, 28.0000, 4, now())
+  ON CONFLICT (zone_id, day_of_week, hour_block) DO UPDATE SET
+    prior_mean = EXCLUDED.prior_mean,
+    prior_variance = EXCLUDED.prior_variance,
+    observation_count = EXCLUDED.observation_count,
+    last_updated = EXCLUDED.last_updated;
+
+  UPDATE public.demand_patterns
+  SET actual_earnings_per_hour = 52.60
+  WHERE zone_id = 'mtl-cb'
+    AND context_vector = '[0.5,0.866025,0.781831,0.62349,0.876,0.425,0.3,0.2,1,0,0,0,0.25,1,1,0.88]'::vector;
+
+  INSERT INTO public.demand_patterns (
+    zone_id,
+    context_vector,
+    actual_earnings_per_hour
   )
   SELECT
-    jsonb_build_object(
-      'timeOfDay', 0.25,
-      'dayOfWeek', 0.16,
-      'weather', 0.16,
-      'events', 0.20,
-      'historicalEarnings', 0.10,
-      'transitDisruption', 0.07,
-      'trafficCongestion', 0.04,
-      'winterConditions', 0.02
-    ),
-    6.85,
-    'seed_observability',
-    '2026-03-21 08:00:00+00'
+    'mtl-cb',
+    '[0.5,0.866025,0.781831,0.62349,0.876,0.425,0.3,0.2,1,0,0,0,0.25,1,1,0.88]',
+    52.60
   WHERE NOT EXISTS (
     SELECT 1
-    FROM public.weight_history wh
-    WHERE wh.triggered_by = 'seed_observability'
-      AND wh.created_at = '2026-03-21 08:00:00+00'
+    FROM public.demand_patterns dp
+    WHERE dp.zone_id = 'mtl-cb'
+      AND dp.context_vector = '[0.5,0.866025,0.781831,0.62349,0.876,0.425,0.3,0.2,1,0,0,0,0.25,1,1,0.88]'::vector
+  );
+
+  UPDATE public.demand_patterns
+  SET actual_earnings_per_hour = 48.10
+  WHERE zone_id = 'mtl-cb'
+    AND context_vector = '[0.258819,0.965926,0.781831,0.62349,0.812,0.39,0.28,0.16,0,1,0,0,0.25,1,1,0.84]'::vector;
+
+  INSERT INTO public.demand_patterns (
+    zone_id,
+    context_vector,
+    actual_earnings_per_hour
+  )
+  SELECT
+    'mtl-cb',
+    '[0.258819,0.965926,0.781831,0.62349,0.812,0.39,0.28,0.16,0,1,0,0,0.25,1,1,0.84]',
+    48.10
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.demand_patterns dp
+    WHERE dp.zone_id = 'mtl-cb'
+      AND dp.context_vector = '[0.258819,0.965926,0.781831,0.62349,0.812,0.39,0.28,0.16,0,1,0,0,0.25,1,1,0.84]'::vector
+  );
+
+  UPDATE public.demand_patterns
+  SET actual_earnings_per_hour = 31.90
+  WHERE zone_id = 'mtl-bq'
+    AND context_vector = '[-0.258819,-0.965926,0.781831,0.62349,0.532,0.24,0.25,0.08,1,0,0,0,0.25,1,0,0.53]'::vector;
+
+  INSERT INTO public.demand_patterns (
+    zone_id,
+    context_vector,
+    actual_earnings_per_hour
+  )
+  SELECT
+    'mtl-bq',
+    '[-0.258819,-0.965926,0.781831,0.62349,0.532,0.24,0.25,0.08,1,0,0,0,0.25,1,0,0.53]',
+    31.90
+  WHERE NOT EXISTS (
+    SELECT 1
+    FROM public.demand_patterns dp
+    WHERE dp.zone_id = 'mtl-bq'
+      AND dp.context_vector = '[-0.258819,-0.965926,0.781831,0.62349,0.532,0.24,0.25,0.08,1,0,0,0,0.25,1,0,0.53]'::vector
   );
 END $$;
 

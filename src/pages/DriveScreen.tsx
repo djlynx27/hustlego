@@ -84,7 +84,25 @@ export default function DriveScreen() {
   const [cityId, setCityId] = useCityId();
   const { data: cities = [] } = useCities();
   const { location, status, error, refresh } = useUserLocation(15000);
-  useAutoCity(cityId, setCityId, location?.latitude, location?.longitude);
+  const [cityRefreshKey, setCityRefreshKey] = useState(0);
+  useAutoCity(
+    cityId,
+    setCityId,
+    location?.latitude,
+    location?.longitude,
+    cityRefreshKey
+  );
+
+  // Rafraîchit la ville toutes les 2 minutes automatiquement
+  useEffect(() => {
+    const interval = setInterval(
+      () => {
+        setCityRefreshKey((k) => k + 1);
+      },
+      2 * 60 * 1000
+    );
+    return () => clearInterval(interval);
+  }, []);
   const [conservativePresence, setConservativePresence] = useState(() =>
     getConservativePresencePreference()
   );
@@ -217,8 +235,12 @@ export default function DriveScreen() {
       .sort((a, b) => b.score - a.score);
   }, [rankedZones, driverMode]);
 
-  const heroZone = modeZones[0] ?? null;
-  const nextZones = modeZones.slice(1, 6);
+  // Exclude airport from hero zone, but allow in next recommendations
+  const heroZone = modeZones.find((z) => z.type !== 'aéroport') ?? null;
+  // Next zones: include airport if present, but never as hero
+  const nextZones = modeZones
+    .filter((z) => !heroZone || z.id !== heroZone.id)
+    .slice(0, 6);
 
   // 15-minute auto-routing: when driver arrives at heroZone, countdown then
   // auto-navigate to nextZones[0] in Google Maps.
@@ -270,27 +292,23 @@ export default function DriveScreen() {
 
   async function handleManualLocate() {
     setIsRefreshingLocation(true);
-
     try {
       const nextLocation = await refresh();
       if (!nextLocation) {
         toast.error(error ?? 'Le GPS ne repond pas pour le moment.');
         return;
       }
-
+      setCityRefreshKey((k) => k + 1); // force la détection de ville
       const detectedCityId = nearestCityId(
         nextLocation.latitude,
         nextLocation.longitude
       );
-
       if (detectedCityId !== cityId) {
         setCityId(detectedCityId);
       }
-
       const detectedCityName =
         cities.find((city) => city.id === detectedCityId)?.name ??
         detectedCityId;
-
       toast.success(`Position recalee sur ${detectedCityName}.`);
     } catch (manualError) {
       const message =

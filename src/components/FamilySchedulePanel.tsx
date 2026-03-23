@@ -3,7 +3,7 @@ import {
   type HomeConstraintAlert,
   type HomeConstraintsResult,
 } from '@/hooks/useHomeConstraints';
-import { launchGoogleMapsNavigation } from '@/lib/venueCoordinates';
+import { launchGoogleMapsNavigation } from '@/lib/hotspots';
 import { Home, MapPin, Settings } from 'lucide-react';
 import { useState } from 'react';
 

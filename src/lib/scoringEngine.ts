@@ -7,6 +7,7 @@
 import type { Zone } from '@/hooks/useSupabase';
 import { haversineKm } from '@/hooks/useUserLocation';
 import { applyLearningAgents, type ZoneHistory } from '@/lib/aiAgents';
+import { HOTSPOTS } from './hotspots';
 
 export interface ActiveEventBoost {
   latitude: number;
@@ -677,9 +678,24 @@ export function computeDemandScore(
   const legacyNormalized = clamp01(
     (legacyBaseScore + weatherBoostPoints * 0.6 + eventBoostPoints * 0.6) / 100
   );
-  const finalScore = Math.round(
-    clamp01(legacyNormalized * 0.35 + weightedScore * 0.65) * 100
+  let finalScore =
+    clamp01(legacyNormalized * 0.35 + weightedScore * 0.65) * 100;
+
+  // ── Boost scoring for strategic hotspots ──
+  const hotspot = HOTSPOTS.find(
+    (h) =>
+      h.id === zone.id ||
+      (h.name && zone.name && h.name.toLowerCase() === zone.name.toLowerCase())
   );
+  if (hotspot) {
+    // Bonus de base pour hotspot stratégique
+    finalScore *= 1.12;
+    // Modulation selon la rapidité de sortie (egressVelocity)
+    finalScore *=
+      0.98 + 0.02 * Math.min(10, Math.max(1, hotspot.egressVelocity));
+    // Clamp pour éviter de dépasser 100
+    finalScore = Math.min(100, finalScore);
+  }
 
   const factors: ScoreFactors = {
     hasWeatherBoost:
@@ -687,10 +703,13 @@ export function computeDemandScore(
     hasEventBoost: eventBoostPoints > 0,
     weatherBoostPoints,
     eventBoostPoints,
+    ...(hotspot
+      ? { hotspotId: hotspot.id, egressVelocity: hotspot.egressVelocity }
+      : {}),
   };
 
   return {
-    score: Math.max(0, Math.min(100, finalScore)),
+    score: Math.max(0, Math.min(100, Math.round(finalScore))),
     factors,
   };
 }
