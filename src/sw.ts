@@ -36,7 +36,23 @@ declare let self: ServiceWorkerGlobalScope & {
   }>;
 };
 
-self.skipWaiting();
+// NO unconditional self.skipWaiting() here — it silently defeats the
+// `registerType: 'prompt'` update flow. onNeedRefresh (main.tsx) only fires
+// while a new SW sits in the *waiting* state; skipping the wait activates
+// the new SW immediately, so the "Nouvelle version disponible" toast never
+// appears, and clientsClaim() then hands the already-open page to the new
+// SW while it keeps executing the PREVIOUS deploy's JS from memory. On a
+// resident Android TWA that stale bundle survives until the app is fully
+// killed — the "I'm looking at an old build" symptom.
+//
+// Instead: wait, and only skip when the client explicitly asks — the
+// { type: 'SKIP_WAITING' } message is exactly what updateSW(true) posts when
+// the driver taps "Recharger" on the toast.
+self.addEventListener('message', (event: ExtendableMessageEvent) => {
+  if (event.data?.type === 'SKIP_WAITING') void self.skipWaiting();
+});
+// Kept: the newly activated SW must claim the page so `controllerchange`
+// fires, which is what triggers registerSW's post-update reload.
 clientsClaim();
 cleanupOutdatedCaches();
 precacheAndRoute(self.__WB_MANIFEST);
