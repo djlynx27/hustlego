@@ -16,7 +16,8 @@
     "prepare": "husky",
     "seed:synthetic": "tsx --env-file=.env.local src/scripts/seedSyntheticTrips.ts",
     "ingest:taxi-stands": "tsx --env-file=.env.local src/scripts/mapTaxiStands.ts",
-    "ingest:mtl-trajet": "tsx --env-file=.env.local src/scripts/processMtlTrajet.ts"
+    "ingest:mtl-trajet": "tsx --env-file=.env.local src/scripts/processMtlTrajet.ts",
+    "ingest:gtfs-static": "tsx --env-file=.env.local src/scripts/processGtfsStatic.ts"
   },
   "dependencies": {
     "@capacitor/android": "^8.3.4",

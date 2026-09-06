@@ -115,15 +115,16 @@ export const TERMINUS_ALLOWLIST: Record<string, TerminusConfig> = {
     boostRadiusKm: 1.5,
     boostZoneTypes: ['transport'],
   },
-  // [À VÉRIFIER] coordonnées approximatives — pas de zone Delivroom à moins
-  // de MAX_ZONE_DISTANCE_M ici (~13km au nord de Blainville/Sainte-Thérèse).
+  // Coordonnées vérifiées via src/scripts/processGtfsStatic.ts (GTFS
+  // statique exo TRAINS, stop_id SJM1C) — remplace l'estimation approximative
+  // d'origine. Toujours à ~12km de la zone la plus proche (sth-gs/blv-*) :
   // alertToEventRows() détecte quand même l'alerte mais ne produira aucun
   // boost tant que le territoire ne s'étend pas jusque-là — comportement
   // voulu, pas un bug.
   'saint-jerome': {
     label: 'Gare Saint-Jérôme',
-    latitude: 45.7822,
-    longitude: -74.0026,
+    latitude: 45.773171,
+    longitude: -73.999138,
     capacity: 3000,
     boostRadiusKm: 1.5,
     boostZoneTypes: ['transport'],
