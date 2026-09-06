@@ -86,6 +86,31 @@ macro/PWA/native sur ces devices → `adb devices` d'abord, puis demander le
 code d'appairage si aucune session active, ne pas s'arrêter à des
 instructions manuelles non testées.
 
+### Topologie réelle sur le S23 Ultra (vérifiée par ADB 2026-09-05)
+
+⚠️ Les IDs du tableau « IDs externes » plus haut (`com.delivroom.app`
+Capacitor, `app.delivroom.driver` TWA) ne sont **pas installés** sur
+l'appareil. Delivroom y tourne comme **WebAPK Chrome** :
+
+| Rôle | Package réel |
+|---|---|
+| Delivroom (PWA) | `org.chromium.webapk.a723e1524e8ac6908_v2` (host: `com.android.chrome`) |
+| MacroDroid | `com.arlosoft.macrodroid` |
+| **Maxymo** | `com.tech.gm.pegasusdriver` (nom trompeur — c'est bien Maxymo) |
+| Lyft Driver | `com.lyft.android.driver` |
+
+Conséquence pratique : le Service Worker et le cache de Delivroom vivent dans
+le stockage **de Chrome**, pas dans le package WebAPK. Un `pm clear` sur le
+WebAPK ne nettoie donc **rien** du SW ; et `pm clear com.android.chrome`
+détruirait toute la session Supabase + la config auto-scan Maxymo. Pour
+buster un build périmé, passer par CDP (`adb forward tcp:9222
+localabstract:chrome_devtools_remote`) et poster `{type:'SKIP_WAITING'}` au
+SW en attente — non destructif, préserve auth/localStorage/IndexedDB.
+
+Le device a aussi un profil **Secure Folder (user 150)** : les commandes `pm`
+renvoient une `SecurityException` sur cet utilisateur, c'est normal et sans
+impact sur l'audit de l'utilisateur 0.
+
 ---
 
 ## Commandes fréquentes
