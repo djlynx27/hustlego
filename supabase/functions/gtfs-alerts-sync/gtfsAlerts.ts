@@ -146,14 +146,19 @@ export const TERMINUS_ALLOWLIST: Record<string, TerminusConfig> = {
 // stop_ids are kept in case CITLA's real-time feed ever attributes a stop
 // to it directly (regional GTFS-RT aggregators sometimes do).
 //
-// RTL's static GTFS was not present in the dataset (see
-// processGtfsStatic.ts's own run log) — Terminus Longueuil is only covered
-// via LRRS/CITCRC's few pass-through stop_ids below, not RTL's own (much
-// larger) set of platform stop_ids. Re-run the script and extend this list
-// once RTL's static GTFS is available.
+// RTL's static GTFS was added 2026-09-06 (D:/Documents/Transport
+// Dataset/RTL.zip) — Terminus Longueuil now carries its own real RTL
+// platform stop_ids below, on top of LRRS/CITCRC's pass-through ones.
 const TERMINUS_STOP_IDS: Record<string, keyof typeof TERMINUS_ALLOWLIST> = {
   'LRRS:75030': 'longueuil',
   'CITCRC:76066': 'longueuil',
+  'RTL:9999': 'longueuil',
+  'RTL:1001': 'longueuil',
+  'RTL:1002': 'longueuil',
+  'RTL:4415': 'longueuil',
+  'RTL:4416': 'longueuil',
+  'RTL:4417': 'longueuil',
+  'RTL:4418': 'longueuil',
   'CITLA:83720': 'sainte-therese',
   'CITLA:83721': 'sainte-therese',
   'CITLA:83722': 'sainte-therese',

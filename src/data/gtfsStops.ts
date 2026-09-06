@@ -1,10 +1,9 @@
 // Généré par `tsx src/scripts/processGtfsStatic.ts` depuis les archives
 // GTFS statiques exo/RTL dans D:/Documents/Transport Dataset. Ne pas éditer à la main —
-// re-lancer le script pour rafraîchir. 81 gares/terminus
-// majeurs, 38 mappés à une zone (seuil
-// 2000m), 43 hors territoire.
-// Agences traitées: CITCRC, CITLA, LRRS, MRCLM, TRAINS.
-// [À VÉRIFIER] agences ciblées absentes du dataset: RTL.
+// re-lancer le script pour rafraîchir. 92 gares/terminus
+// majeurs, 45 mappés à une zone (seuil
+// 2000m), 47 hors territoire.
+// Agences traitées: CITCRC, CITLA, LRRS, MRCLM, RTL, TRAINS.
 export type GtfsStop = {
   stopId: string
   stopIds: string[]
@@ -1197,5 +1196,159 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
     "zoneId": "lng-tl",
     "cityId": "lng",
     "distanceToZoneM": 81
+  },
+  {
+    "stopId": "9999",
+    "stopIds": [
+      "9999",
+      "1001",
+      "1002",
+      "4415",
+      "4416",
+      "4417",
+      "4418"
+    ],
+    "name": "Terminus Longueuil",
+    "agencyId": "RTL",
+    "latitude": 45.52397809711791,
+    "longitude": -73.52140864006763,
+    "zoneId": "lng-tl",
+    "cityId": "lng",
+    "distanceToZoneM": 36
+  },
+  {
+    "stopId": "3382",
+    "stopIds": [
+      "3382"
+    ],
+    "name": "Terminus Centre-Ville",
+    "agencyId": "RTL",
+    "latitude": 45.4984402900159,
+    "longitude": -73.5668389536944,
+    "zoneId": "mtl-gc",
+    "cityId": "mtl",
+    "distanceToZoneM": 209
+  },
+  {
+    "stopId": "4429",
+    "stopIds": [
+      "4429",
+      "5923",
+      "5925",
+      "5927"
+    ],
+    "name": "Terminus Panama",
+    "agencyId": "RTL",
+    "latitude": 45.46648137126388,
+    "longitude": -73.46898319906452,
+    "zoneId": "lng-mc",
+    "cityId": "lng",
+    "distanceToZoneM": 622
+  },
+  {
+    "stopId": "5117",
+    "stopIds": [
+      "5117"
+    ],
+    "name": "Terminus De Montarville",
+    "agencyId": "RTL",
+    "latitude": 45.6007686545747,
+    "longitude": -73.4503549968615,
+    "zoneId": "bch-c",
+    "cityId": "lng",
+    "distanceToZoneM": 1284
+  },
+  {
+    "stopId": "5417",
+    "stopIds": [
+      "5417"
+    ],
+    "name": "Gare St-Bruno",
+    "agencyId": "RTL",
+    "latitude": 45.5127806302333,
+    "longitude": -73.3743816931576,
+    "zoneId": "lng-psb",
+    "cityId": "lng",
+    "distanceToZoneM": 872
+  },
+  {
+    "stopId": "5624",
+    "stopIds": [
+      "5624"
+    ],
+    "name": "Gare Longueuil - St-Hubert",
+    "agencyId": "RTL",
+    "latitude": 45.5081017553201,
+    "longitude": -73.4365445738991,
+    "zoneId": null,
+    "cityId": null,
+    "distanceToZoneM": 4089
+  },
+  {
+    "stopId": "5767",
+    "stopIds": [
+      "5767"
+    ],
+    "name": "Terminus Brossard",
+    "agencyId": "RTL",
+    "latitude": 45.436900917515,
+    "longitude": -73.4315403720757,
+    "zoneId": "lng-rem",
+    "cityId": "lng",
+    "distanceToZoneM": 149
+  },
+  {
+    "stopId": "5869",
+    "stopIds": [
+      "5869"
+    ],
+    "name": "Terminus Radisson",
+    "agencyId": "RTL",
+    "latitude": 45.5897603319547,
+    "longitude": -73.5381375802226,
+    "zoneId": null,
+    "cityId": null,
+    "distanceToZoneM": 2459
+  },
+  {
+    "stopId": "6183",
+    "stopIds": [
+      "6183"
+    ],
+    "name": "Terminus Georges-Gagné",
+    "agencyId": "RTL",
+    "latitude": 45.3850686351167,
+    "longitude": -73.5478981538109,
+    "zoneId": null,
+    "cityId": null,
+    "distanceToZoneM": 5214
+  },
+  {
+    "stopId": "6184",
+    "stopIds": [
+      "6184",
+      "6223"
+    ],
+    "name": "Terminus Montcalm-Candiac",
+    "agencyId": "RTL",
+    "latitude": 45.39346661270175,
+    "longitude": -73.51683090054965,
+    "zoneId": null,
+    "cityId": null,
+    "distanceToZoneM": 2964
+  },
+  {
+    "stopId": "6187",
+    "stopIds": [
+      "6187",
+      "6222"
+    ],
+    "name": "Terminus La Prairie",
+    "agencyId": "RTL",
+    "latitude": 45.42581980742495,
+    "longitude": -73.48049898832289,
+    "zoneId": "lap-c",
+    "cityId": "lng",
+    "distanceToZoneM": 1745
   }
 ] as const
