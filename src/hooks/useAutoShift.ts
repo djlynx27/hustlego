@@ -22,6 +22,7 @@ import {
   readAutoShiftEnabled,
   writeAutoShiftEnabled,
 } from '@/lib/activeShift';
+import { startServerSession } from '@/lib/shiftSession';
 import { useActivityDetection } from './useActivityDetection';
 
 // Durée en véhicule avant démarrage auto (ms)
@@ -35,8 +36,9 @@ const CHECK_INTERVAL_MS = 10_000;
 
 function startShiftInStorage() {
   try {
-    const shift = { startedAt: new Date().toISOString() };
-    localStorage.setItem(ACTIVE_SHIFT_KEY, JSON.stringify(shift));
+    const startedAt = new Date().toISOString();
+    localStorage.setItem(ACTIVE_SHIFT_KEY, JSON.stringify({ startedAt }));
+    void startServerSession(startedAt);
   } catch {
     // ignore
   }

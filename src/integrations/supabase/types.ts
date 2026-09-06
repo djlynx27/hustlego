@@ -14,6 +14,42 @@ export type Database = {
   }
   public: {
     Tables: {
+      active_trip_tracking: {
+        Row: {
+          captured_at: string
+          created_at: string | null
+          distance_remaining_km: number | null
+          distance_total_km: number | null
+          driver_id: string
+          id: string
+          payout_cad: number | null
+          time_remaining_min: number | null
+          time_total_min: number | null
+        }
+        Insert: {
+          captured_at?: string
+          created_at?: string | null
+          distance_remaining_km?: number | null
+          distance_total_km?: number | null
+          driver_id: string
+          id?: string
+          payout_cad?: number | null
+          time_remaining_min?: number | null
+          time_total_min?: number | null
+        }
+        Update: {
+          captured_at?: string
+          created_at?: string | null
+          distance_remaining_km?: number | null
+          distance_total_km?: number | null
+          driver_id?: string
+          id?: string
+          payout_cad?: number | null
+          time_remaining_min?: number | null
+          time_total_min?: number | null
+        }
+        Relationships: []
+      }
       cities: {
         Row: {
           created_at: string
@@ -305,6 +341,7 @@ export type Database = {
           created_at: string
           demand_impact: number
           end_at: string
+          external_id: string | null
           id: string
           is_holiday: boolean
           latitude: number
@@ -323,6 +360,7 @@ export type Database = {
           created_at?: string
           demand_impact?: number
           end_at: string
+          external_id?: string | null
           id?: string
           is_holiday?: boolean
           latitude: number
@@ -341,6 +379,7 @@ export type Database = {
           created_at?: string
           demand_impact?: number
           end_at?: string
+          external_id?: string | null
           id?: string
           is_holiday?: boolean
           latitude?: number
@@ -714,9 +753,13 @@ export type Database = {
       }
       sessions: {
         Row: {
+          active_zone_id: string | null
           created_at: string
           ended_at: string | null
           id: number
+          last_heartbeat_at: string | null
+          last_lat: number | null
+          last_lng: number | null
           notes: string | null
           started_at: string
           total_earnings: number | null
@@ -726,9 +769,13 @@ export type Database = {
           weather_snapshot: Json | null
         }
         Insert: {
+          active_zone_id?: string | null
           created_at?: string
           ended_at?: string | null
           id?: never
+          last_heartbeat_at?: string | null
+          last_lat?: number | null
+          last_lng?: number | null
           notes?: string | null
           started_at: string
           total_earnings?: number | null
@@ -738,9 +785,13 @@ export type Database = {
           weather_snapshot?: Json | null
         }
         Update: {
+          active_zone_id?: string | null
           created_at?: string
           ended_at?: string | null
           id?: never
+          last_heartbeat_at?: string | null
+          last_lat?: number | null
+          last_lng?: number | null
           notes?: string | null
           started_at?: string
           total_earnings?: number | null
@@ -749,7 +800,15 @@ export type Database = {
           user_id?: string | null
           weather_snapshot?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "sessions_active_zone_id_fkey"
+            columns: ["active_zone_id"]
+            isOneToOne: false
+            referencedRelation: "zones"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       stripe_events: {
         Row: {

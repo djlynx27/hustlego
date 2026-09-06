@@ -8,6 +8,7 @@ import {
 } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { useAutoShiftEnabled } from '@/hooks/useAutoShift';
+import { useShift, useShiftElapsedSeconds } from '@/hooks/useShift';
 import { useTrips } from '@/hooks/useTrips';
 import {
   ACTIVE_SHIFT_KEY,
@@ -19,6 +20,7 @@ import {
 } from '@/lib/learningEngine';
 import { syncShiftLearning } from '@/lib/learningSync';
 import { DEFAULT_WEIGHTS } from '@/lib/scoringEngine';
+import { endServerSession, startServerSession } from '@/lib/shiftSession';
 import { buildShiftSnapshot } from '@/lib/tripAnalytics';
 import { cn } from '@/lib/utils';
 import {
@@ -216,37 +218,66 @@ function EmptyShiftContent({ onStartShift }: { onStartShift: () => void }) {
   );
 }
 
+/** Combines the server-known session (shift-tracker/MacroDroid) with the
+ * local cache into one "effective" started_at + a live now/elapsedSeconds
+ * pair, and reconciles local <- server one-way (see the comment inline).
+ * Split out of ShiftTracker to keep that component's complexity down. */
+function useEffectiveShift(
+  activeShift: ActiveShift | null,
+  setActiveShift: (shift: ActiveShift | null) => void
+) {
+  const { session: serverSession } = useShift();
+  const effectiveStartedAt = serverSession?.started_at ?? activeShift?.startedAt ?? null;
+  // Return value unused here — this hook's own 1s setInterval is what makes
+  // `now` below tick; ShiftTracker only needs the resulting Date.
+  useShiftElapsedSeconds(effectiveStartedAt ? { started_at: effectiveStartedAt } : null);
+
+  // Adopts a server-known active shift this tab's local cache doesn't have
+  // — e.g. MacroDroid started it while the PWA was closed/killed. One-way
+  // only (server -> local): a fresh local start is trusted immediately and
+  // never rolled back just because the server read hasn't caught up yet.
+  useEffect(() => {
+    if (serverSession && !activeShift) {
+      const synced = { startedAt: serverSession.started_at };
+      setActiveShift(synced);
+      saveActiveShift(synced);
+    }
+  }, [serverSession, activeShift, setActiveShift]);
+
+  // Recomputed on every elapsedSeconds tick (a single shared 1s interval in
+  // useShiftElapsedSeconds) rather than this component running its own
+  // 30s setInterval — a plain read, not memoized, since it must change
+  // every time elapsedSeconds does.
+  const now = new Date();
+
+  return { effectiveStartedAt, now };
+}
+
 export function ShiftTracker() {
   const { data: trips = [] } = useTrips({ limit: 500 });
   const [activeShift, setActiveShift] = useState<ActiveShift | null>(() =>
     loadActiveShift()
   );
-  const [now, setNow] = useState(() => new Date());
   const [lastShiftSummary, setLastShiftSummary] =
     useState<PostShiftSummary | null>(null);
   const [isSyncing, setIsSyncing] = useState(false);
   const { enabled: autoShiftEnabled, toggleEnabled: toggleAutoShift } =
     useAutoShiftEnabled();
+  const { effectiveStartedAt, now } = useEffectiveShift(activeShift, setActiveShift);
 
   // Ref stable pour les event listeners (évite les captures de closures périmées)
   const endShiftRef = useRef<() => Promise<void>>(async () => {});
 
-  useEffect(() => {
-    if (!activeShift) return;
-    const intervalId = window.setInterval(() => setNow(new Date()), 30_000);
-    return () => window.clearInterval(intervalId);
-  }, [activeShift]);
-
   const snapshot = useMemo(() => {
-    if (!activeShift) return null;
-    return buildShiftSnapshot(trips, activeShift.startedAt, now);
-  }, [activeShift, now, trips]);
+    if (!effectiveStartedAt) return null;
+    return buildShiftSnapshot(trips, effectiveStartedAt, now);
+  }, [effectiveStartedAt, now, trips]);
 
   const startShift = () => {
     const nextShift = { startedAt: new Date().toISOString() };
     setActiveShift(nextShift);
     saveActiveShift(nextShift);
-    setNow(new Date());
+    void startServerSession(nextShift.startedAt);
     toast.success('Shift démarré');
   };
 
@@ -262,6 +293,7 @@ export function ShiftTracker() {
     setLastShiftSummary(summary);
     setActiveShift(null);
     saveActiveShift(null);
+    void endServerSession();
     setIsSyncing(true);
     const syncResult = await syncShiftLearning(
       trips,

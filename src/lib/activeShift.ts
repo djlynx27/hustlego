@@ -4,6 +4,15 @@
 // state (sandboxed), so the shift is started from proxy signals: GPS vehicle
 // movement (useAutoShift) and in-app activity like analyzing a live ride
 // screenshot (ScreenshotAnalyzer).
+//
+// localStorage alone can't survive Android backgrounding/killing this tab's
+// JS entirely — if that happens before this file ever runs, no shift gets
+// marked "started" at all. ensureShiftStarted() now also best-effort mirrors
+// the start into public.sessions (see shiftSession.ts) so useShift() can
+// recover it server-side via visibilitychange/Realtime regardless of what
+// happens to this tab afterward.
+
+import { startServerSession } from './shiftSession';
 
 export const ACTIVE_SHIFT_KEY = 'delivroom_active_shift';
 export const AUTO_SHIFT_ENABLED_KEY = 'delivroom_auto_shift_enabled';
@@ -69,11 +78,10 @@ export function writeAutoShiftEnabled(val: boolean): void {
 export function ensureShiftStarted(): boolean {
   if (!readAutoShiftEnabled() || isShiftActive()) return false;
   try {
-    localStorage.setItem(
-      ACTIVE_SHIFT_KEY,
-      JSON.stringify({ startedAt: new Date().toISOString() })
-    );
+    const startedAt = new Date().toISOString();
+    localStorage.setItem(ACTIVE_SHIFT_KEY, JSON.stringify({ startedAt }));
     window.dispatchEvent(new CustomEvent('delivroom:shift-changed'));
+    void startServerSession(startedAt);
     return true;
   } catch {
     return false;
