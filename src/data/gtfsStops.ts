@@ -7,6 +7,7 @@
 // [À VÉRIFIER] agences ciblées absentes du dataset: RTL.
 export type GtfsStop = {
   stopId: string
+  stopIds: string[]
   name: string
   agencyId: string
   latitude: number
@@ -19,6 +20,9 @@ export type GtfsStop = {
 export const GTFS_STOPS: readonly GtfsStop[] = [
   {
     "stopId": "80015",
+    "stopIds": [
+      "80015"
+    ],
     "name": "Terminus Le Carrefour",
     "agencyId": "CITLA",
     "latitude": 45.568664,
@@ -29,6 +33,21 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "80310",
+    "stopIds": [
+      "80310",
+      "80311",
+      "80312",
+      "80313",
+      "80314",
+      "80315",
+      "80316",
+      "80317",
+      "81828",
+      "86075",
+      "86111",
+      "86112",
+      "86113"
+    ],
     "name": "Terminus Saint-Jérôme",
     "agencyId": "CITLA",
     "latitude": 45.77345276923076,
@@ -39,6 +58,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "81831",
+    "stopIds": [
+      "81831",
+      "81833"
+    ],
     "name": "Gare Rosemère",
     "agencyId": "CITLA",
     "latitude": 45.633487,
@@ -49,6 +72,11 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "82097",
+    "stopIds": [
+      "82097",
+      "82098",
+      "82127"
+    ],
     "name": "Terminus Montmorency",
     "agencyId": "CITLA",
     "latitude": 45.55832766666666,
@@ -59,6 +87,9 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "82126",
+    "stopIds": [
+      "82126"
+    ],
     "name": "Terminus Cartier",
     "agencyId": "CITLA",
     "latitude": 45.559588,
@@ -69,6 +100,20 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "83720",
+    "stopIds": [
+      "83720",
+      "83721",
+      "83722",
+      "83723",
+      "83724",
+      "83725",
+      "83726",
+      "83727",
+      "83728",
+      "83729",
+      "83730",
+      "84718"
+    ],
     "name": "Terminus Sainte-Thérèse",
     "agencyId": "CITLA",
     "latitude": 45.6357645,
@@ -79,6 +124,9 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "85156",
+    "stopIds": [
+      "85156"
+    ],
     "name": "Terminus Terrebonne",
     "agencyId": "CITLA",
     "latitude": 45.6979,
@@ -89,6 +137,9 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "75030",
+    "stopIds": [
+      "75030"
+    ],
     "name": "Terminus Longueuil",
     "agencyId": "LRRS",
     "latitude": 45.523619,
@@ -99,6 +150,9 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "75257",
+    "stopIds": [
+      "75257"
+    ],
     "name": "Gare Candiac",
     "agencyId": "LRRS",
     "latitude": 45.360823,
@@ -109,6 +163,13 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "75640",
+    "stopIds": [
+      "75640",
+      "75643",
+      "75644",
+      "75645",
+      "75646"
+    ],
     "name": "Terminus Montcalm-Candiac",
     "agencyId": "LRRS",
     "latitude": 45.393495,
@@ -119,6 +180,12 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "75648",
+    "stopIds": [
+      "75648",
+      "75649",
+      "75650",
+      "75651"
+    ],
     "name": "Terminus La Prairie",
     "agencyId": "LRRS",
     "latitude": 45.42596574999999,
@@ -129,6 +196,11 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "75658",
+    "stopIds": [
+      "75658",
+      "75659",
+      "75660"
+    ],
     "name": "Terminus Panama",
     "agencyId": "LRRS",
     "latitude": 45.466509333333335,
@@ -139,6 +211,12 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "75876",
+    "stopIds": [
+      "75876",
+      "75877",
+      "75878",
+      "75879"
+    ],
     "name": "Terminus Brossard",
     "agencyId": "LRRS",
     "latitude": 45.43709174999999,
@@ -149,6 +227,14 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "76047",
+    "stopIds": [
+      "76047",
+      "76080",
+      "76558",
+      "76559",
+      "76560",
+      "76561"
+    ],
     "name": "Terminus Georges-Gagné",
     "agencyId": "LRRS",
     "latitude": 45.384487500000006,
@@ -159,6 +245,9 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "76085",
+    "stopIds": [
+      "76085"
+    ],
     "name": "Gare Sainte-Catherine",
     "agencyId": "LRRS",
     "latitude": 45.382097,
@@ -169,6 +258,9 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "76149",
+    "stopIds": [
+      "76149"
+    ],
     "name": "Terminus Angrignon",
     "agencyId": "LRRS",
     "latitude": 45.446563,
@@ -179,6 +271,9 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "76401",
+    "stopIds": [
+      "76401"
+    ],
     "name": "Gare Saint-Constant",
     "agencyId": "LRRS",
     "latitude": 45.37415,
@@ -189,6 +284,9 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "82126",
+    "stopIds": [
+      "82126"
+    ],
     "name": "Terminus Cartier",
     "agencyId": "MRCLM",
     "latitude": 45.559588,
@@ -199,6 +297,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "83724",
+    "stopIds": [
+      "83724",
+      "83726"
+    ],
     "name": "Terminus Sainte-Thérèse",
     "agencyId": "MRCLM",
     "latitude": 45.6357855,
@@ -209,6 +311,9 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "84000",
+    "stopIds": [
+      "84000"
+    ],
     "name": "Terminus Montmorency",
     "agencyId": "MRCLM",
     "latitude": 45.558611,
@@ -219,6 +324,9 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "84656",
+    "stopIds": [
+      "84656"
+    ],
     "name": "Terminus Henri-Bourassa",
     "agencyId": "MRCLM",
     "latitude": 45.554209,
@@ -229,6 +337,11 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "84700",
+    "stopIds": [
+      "84700",
+      "84705",
+      "84707"
+    ],
     "name": "Gare Mascouche",
     "agencyId": "MRCLM",
     "latitude": 45.72923600000001,
@@ -239,6 +352,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "84701",
+    "stopIds": [
+      "84701",
+      "84702"
+    ],
     "name": "Gare Terrebonne",
     "agencyId": "MRCLM",
     "latitude": 45.7279755,
@@ -249,6 +366,27 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "84868",
+    "stopIds": [
+      "84868",
+      "84869",
+      "84871",
+      "84873",
+      "84875",
+      "85154",
+      "85155",
+      "85156",
+      "85157",
+      "85158",
+      "85159",
+      "85160",
+      "85161",
+      "85162",
+      "85163",
+      "85164",
+      "85165",
+      "85167",
+      "85168"
+    ],
     "name": "Terminus Terrebonne",
     "agencyId": "MRCLM",
     "latitude": 45.698049157894744,
@@ -259,6 +397,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "85078",
+    "stopIds": [
+      "85078",
+      "88643"
+    ],
     "name": "Terminus Radisson",
     "agencyId": "MRCLM",
     "latitude": 45.589537,
@@ -269,6 +411,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL5D",
+    "stopIds": [
+      "MTL5D",
+      "MTL5B"
+    ],
     "name": "Gare Centrale",
     "agencyId": "TRAINS",
     "latitude": 45.499971,
@@ -279,6 +425,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL3A",
+    "stopIds": [
+      "MTL3A",
+      "MTL3C"
+    ],
     "name": "Gare Lucien-L'Allier",
     "agencyId": "TRAINS",
     "latitude": 45.494751,
@@ -289,6 +439,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL2A",
+    "stopIds": [
+      "MTL2A",
+      "MTL2C"
+    ],
     "name": "Gare Vendôme",
     "agencyId": "TRAINS",
     "latitude": 45.473759,
@@ -299,6 +453,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL1A",
+    "stopIds": [
+      "MTL1A",
+      "MTL1C"
+    ],
     "name": "Gare Montréal-Ouest",
     "agencyId": "TRAINS",
     "latitude": 45.453666,
@@ -309,6 +467,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "LCH1D",
+    "stopIds": [
+      "LCH1D",
+      "LCH1B"
+    ],
     "name": "Gare Lachine",
     "agencyId": "TRAINS",
     "latitude": 45.448705,
@@ -319,6 +481,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "DVL2D",
+    "stopIds": [
+      "DVL2D",
+      "DVL2B"
+    ],
     "name": "Gare Dorval",
     "agencyId": "TRAINS",
     "latitude": 45.449216,
@@ -329,6 +495,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "DVL1D",
+    "stopIds": [
+      "DVL1D",
+      "DVL1B"
+    ],
     "name": "Gare Pine Beach",
     "agencyId": "TRAINS",
     "latitude": 45.449631,
@@ -339,6 +509,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "PCL3D",
+    "stopIds": [
+      "PCL3D",
+      "PCL3B"
+    ],
     "name": "Gare Valois",
     "agencyId": "TRAINS",
     "latitude": 45.449754,
@@ -349,6 +523,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "PCL2D",
+    "stopIds": [
+      "PCL2D",
+      "PCL2B"
+    ],
     "name": "Gare Pointe-Claire",
     "agencyId": "TRAINS",
     "latitude": 45.447257,
@@ -359,6 +537,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "PCL1D",
+    "stopIds": [
+      "PCL1D",
+      "PCL1B"
+    ],
     "name": "Gare Cedar Park",
     "agencyId": "TRAINS",
     "latitude": 45.442446,
@@ -369,6 +551,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "BEA2D",
+    "stopIds": [
+      "BEA2D",
+      "BEA2B"
+    ],
     "name": "Gare Beaconsfield",
     "agencyId": "TRAINS",
     "latitude": 45.435017,
@@ -379,6 +565,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "BEA1D",
+    "stopIds": [
+      "BEA1D",
+      "BEA1B"
+    ],
     "name": "Gare Beaurepaire",
     "agencyId": "TRAINS",
     "latitude": 45.427412,
@@ -389,6 +579,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "BUR1D",
+    "stopIds": [
+      "BUR1D",
+      "BUR1B"
+    ],
     "name": "Gare Baie-d'Urfé",
     "agencyId": "TRAINS",
     "latitude": 45.419929,
@@ -399,6 +593,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "SAB1D",
+    "stopIds": [
+      "SAB1D",
+      "SAB1B"
+    ],
     "name": "Gare Sainte-Anne-de-Bellevue",
     "agencyId": "TRAINS",
     "latitude": 45.407645,
@@ -409,6 +607,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "LIP1D",
+    "stopIds": [
+      "LIP1D",
+      "LIP1B"
+    ],
     "name": "Gare Île-Perrot",
     "agencyId": "TRAINS",
     "latitude": 45.395939,
@@ -419,6 +621,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "TVA1D",
+    "stopIds": [
+      "TVA1D",
+      "TVA1B"
+    ],
     "name": "Gare Pincourt",
     "agencyId": "TRAINS",
     "latitude": 45.38721,
@@ -429,6 +635,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "VAU1D",
+    "stopIds": [
+      "VAU1D",
+      "VAU1B"
+    ],
     "name": "Gare Dorion",
     "agencyId": "TRAINS",
     "latitude": 45.386428,
@@ -439,6 +649,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "VAU8D",
+    "stopIds": [
+      "VAU8D",
+      "VAU8B"
+    ],
     "name": "Gare Vaudreuil",
     "agencyId": "TRAINS",
     "latitude": 45.399007,
@@ -449,6 +663,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "HUD1D",
+    "stopIds": [
+      "HUD1D",
+      "HUD1B"
+    ],
     "name": "Gare Hudson",
     "agencyId": "TRAINS",
     "latitude": 45.459662,
@@ -459,6 +677,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL8D",
+    "stopIds": [
+      "MTL8D",
+      "MTL8B"
+    ],
     "name": "Gare Parc",
     "agencyId": "TRAINS",
     "latitude": 45.53152,
@@ -469,6 +691,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL37C",
+    "stopIds": [
+      "MTL37C",
+      "MTL37A"
+    ],
     "name": "Gare Chabanel",
     "agencyId": "TRAINS",
     "latitude": 45.537058,
@@ -479,6 +705,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL7D",
+    "stopIds": [
+      "MTL7D",
+      "MTL7B"
+    ],
     "name": "Gare Bois-de-Boulogne",
     "agencyId": "TRAINS",
     "latitude": 45.540273,
@@ -489,6 +719,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "LVL24C",
+    "stopIds": [
+      "LVL24C",
+      "LVL24A"
+    ],
     "name": "Gare De la Concorde",
     "agencyId": "TRAINS",
     "latitude": 45.560323,
@@ -499,6 +733,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "LVL22C",
+    "stopIds": [
+      "LVL22C",
+      "LVL22A"
+    ],
     "name": "Gare Vimont",
     "agencyId": "TRAINS",
     "latitude": 45.603774,
@@ -509,6 +747,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "LVL4C",
+    "stopIds": [
+      "LVL4C",
+      "LVL4A"
+    ],
     "name": "Gare Sainte-Rose",
     "agencyId": "TRAINS",
     "latitude": 45.625444,
@@ -519,6 +761,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "ROS2C",
+    "stopIds": [
+      "ROS2C",
+      "ROS2A"
+    ],
     "name": "Gare Rosemère",
     "agencyId": "TRAINS",
     "latitude": 45.634501,
@@ -529,6 +775,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "STR4D",
+    "stopIds": [
+      "STR4D",
+      "STR4B"
+    ],
     "name": "Gare Sainte-Thérèse",
     "agencyId": "TRAINS",
     "latitude": 45.636023,
@@ -539,6 +789,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "BLA1C",
+    "stopIds": [
+      "BLA1C",
+      "BLA1A"
+    ],
     "name": "Gare Blainville",
     "agencyId": "TRAINS",
     "latitude": 45.67242,
@@ -549,6 +803,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MIR1C",
+    "stopIds": [
+      "MIR1C",
+      "MIR1A"
+    ],
     "name": "Gare Mirabel",
     "agencyId": "TRAINS",
     "latitude": 45.711707,
@@ -559,6 +817,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "SJM1C",
+    "stopIds": [
+      "SJM1C",
+      "SJM1A"
+    ],
     "name": "Gare Saint-Jérôme",
     "agencyId": "TRAINS",
     "latitude": 45.773171,
@@ -569,6 +831,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "STL1B",
+    "stopIds": [
+      "STL1B",
+      "STL1D"
+    ],
     "name": "Gare Saint-Lambert",
     "agencyId": "TRAINS",
     "latitude": 45.49963,
@@ -579,6 +845,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "STH3B",
+    "stopIds": [
+      "STH3B",
+      "STH3D"
+    ],
     "name": "Gare Longueuil-Saint-Hubert",
     "agencyId": "TRAINS",
     "latitude": 45.508118,
@@ -589,6 +859,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "STB2B",
+    "stopIds": [
+      "STB2B",
+      "STB2D"
+    ],
     "name": "Gare Saint-Bruno",
     "agencyId": "TRAINS",
     "latitude": 45.512029,
@@ -599,6 +873,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "SBA2B",
+    "stopIds": [
+      "SBA2B",
+      "SBA2D"
+    ],
     "name": "Gare Saint-Basile-le-Grand",
     "agencyId": "TRAINS",
     "latitude": 45.523294,
@@ -609,6 +887,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MMS1B",
+    "stopIds": [
+      "MMS1B",
+      "MMS1D"
+    ],
     "name": "Gare McMasterville",
     "agencyId": "TRAINS",
     "latitude": 45.546059,
@@ -619,6 +901,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MSH1C",
+    "stopIds": [
+      "MSH1C",
+      "MSH1A"
+    ],
     "name": "Gare Mont-Saint-Hilaire",
     "agencyId": "TRAINS",
     "latitude": 45.577189,
@@ -629,6 +915,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "LCH4A",
+    "stopIds": [
+      "LCH4A",
+      "LCH4C"
+    ],
     "name": "Gare Du Canal",
     "agencyId": "TRAINS",
     "latitude": 45.437597,
@@ -639,6 +929,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "LSL1A",
+    "stopIds": [
+      "LSL1A",
+      "LSL1C"
+    ],
     "name": "Gare LaSalle",
     "agencyId": "TRAINS",
     "latitude": 45.425312,
@@ -649,6 +943,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "SCS2A",
+    "stopIds": [
+      "SCS2A",
+      "SCS2C"
+    ],
     "name": "Gare Sainte-Catherine",
     "agencyId": "TRAINS",
     "latitude": 45.382037,
@@ -659,6 +957,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "SCS1A",
+    "stopIds": [
+      "SCS1A",
+      "SCS1C"
+    ],
     "name": "Gare Saint-Constant",
     "agencyId": "TRAINS",
     "latitude": 45.373986,
@@ -669,6 +971,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "DEL1A",
+    "stopIds": [
+      "DEL1A",
+      "DEL1C"
+    ],
     "name": "Gare Delson",
     "agencyId": "TRAINS",
     "latitude": 45.366859,
@@ -679,6 +985,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "CAN1A",
+    "stopIds": [
+      "CAN1A",
+      "CAN1C"
+    ],
     "name": "Gare Candiac",
     "agencyId": "TRAINS",
     "latitude": 45.360623,
@@ -689,6 +999,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL59C",
+    "stopIds": [
+      "MTL59C",
+      "MTL59A"
+    ],
     "name": "Gare Ahuntsic",
     "agencyId": "TRAINS",
     "latitude": 45.535014,
@@ -699,6 +1013,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL60C",
+    "stopIds": [
+      "MTL60C",
+      "MTL60A"
+    ],
     "name": "Gare Côte-de-Liesse",
     "agencyId": "TRAINS",
     "latitude": 45.522252,
@@ -709,6 +1027,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL58C",
+    "stopIds": [
+      "MTL58C",
+      "MTL58A"
+    ],
     "name": "Gare Sauvé",
     "agencyId": "TRAINS",
     "latitude": 45.549408,
@@ -719,6 +1041,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL57C",
+    "stopIds": [
+      "MTL57C",
+      "MTL57A"
+    ],
     "name": "Gare Saint-Michel-Montréal-Nord",
     "agencyId": "TRAINS",
     "latitude": 45.583,
@@ -729,6 +1055,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL56C",
+    "stopIds": [
+      "MTL56C",
+      "MTL56A"
+    ],
     "name": "Gare Saint-Léonard-Montréal-Nord",
     "agencyId": "TRAINS",
     "latitude": 45.600339,
@@ -739,6 +1069,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL55C",
+    "stopIds": [
+      "MTL55C",
+      "MTL55A"
+    ],
     "name": "Gare Anjou",
     "agencyId": "TRAINS",
     "latitude": 45.617888,
@@ -749,6 +1083,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL54C",
+    "stopIds": [
+      "MTL54C",
+      "MTL54A"
+    ],
     "name": "Gare Rivière-des-Prairies",
     "agencyId": "TRAINS",
     "latitude": 45.660656,
@@ -759,6 +1097,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MTL53C",
+    "stopIds": [
+      "MTL53C",
+      "MTL53A"
+    ],
     "name": "Gare Pointe-aux-Trembles",
     "agencyId": "TRAINS",
     "latitude": 45.674894,
@@ -769,6 +1111,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "LEG1C",
+    "stopIds": [
+      "LEG1C",
+      "LEG1A"
+    ],
     "name": "Gare Repentigny",
     "agencyId": "TRAINS",
     "latitude": 45.734595,
@@ -779,6 +1125,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "LCN1C",
+    "stopIds": [
+      "LCN1C",
+      "LCN1A"
+    ],
     "name": "Gare Terrebonne",
     "agencyId": "TRAINS",
     "latitude": 45.728479,
@@ -789,6 +1139,10 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "MAS1C",
+    "stopIds": [
+      "MAS1C",
+      "MAS1A"
+    ],
     "name": "Gare Mascouche",
     "agencyId": "TRAINS",
     "latitude": 45.729678,
@@ -799,6 +1153,15 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "74104",
+    "stopIds": [
+      "74104",
+      "74116",
+      "74117",
+      "74119",
+      "74129",
+      "74130",
+      "74131"
+    ],
     "name": "Terminus Chambly",
     "agencyId": "CITCRC",
     "latitude": 45.432453571428574,
@@ -809,6 +1172,11 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "75870",
+    "stopIds": [
+      "75870",
+      "75873",
+      "75875"
+    ],
     "name": "Terminus Brossard",
     "agencyId": "CITCRC",
     "latitude": 45.43706566666666,
@@ -819,6 +1187,9 @@ export const GTFS_STOPS: readonly GtfsStop[] = [
   },
   {
     "stopId": "76066",
+    "stopIds": [
+      "76066"
+    ],
     "name": "Terminus Longueuil",
     "agencyId": "CITCRC",
     "latitude": 45.523806,

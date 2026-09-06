@@ -134,6 +134,10 @@ function parseMajorStops(stopsCsv: string): RawStop[] {
 
 interface GtfsStopRow {
   stopId: string;
+  /** Every raw GTFS stop_id folded into this canonical station (all quais/
+   *  portes) — this is what a real-time alert's informedEntity.stopId
+   *  actually references, not the single representative `stopId` above. */
+  stopIds: string[];
   name: string;
   agencyId: string;
   latitude: number;
@@ -161,6 +165,7 @@ function groupAndMapStops(agencyId: string, stops: readonly RawStop[], zones: re
 
     rows.push({
       stopId: group[0].stopId,
+      stopIds: group.map((s) => s.stopId),
       name: canonicalName,
       agencyId,
       latitude,
@@ -234,6 +239,7 @@ function buildOutput(
   }
 export type GtfsStop = {
   stopId: string
+  stopIds: string[]
   name: string
   agencyId: string
   latitude: number

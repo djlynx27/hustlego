@@ -67,6 +67,68 @@ Deno.test('alertToEventRows: routine detour mentioning a tracked terminus is ski
   assertEquals(rows, []);
 });
 
+Deno.test('alertToEventRows: real stop_id match bypasses text matching and the stop-scope guard', () => {
+  // CITLA:83720 is Terminus Sainte-Thérèse's own platform (see
+  // TERMINUS_STOP_IDS) — confirmed by stop_id, no terminus name needs to
+  // appear in the text at all, and single-stop scoping is fine here since
+  // it's confirmed to BE the terminus, not some unrelated street stop.
+  const rows = alertToEventRows(
+    alertEntity({
+      effect: 1, // NO_SERVICE
+      headerText: null,
+      descriptionText: { translation: [{ text: 'Panne électrique au quai.' }] },
+      informedEntity: [{ agencyId: 'CITLA', routeId: '249', stopId: '83720' }],
+    }),
+    'CITLA',
+    Date.now(),
+    ZONES
+  );
+  assertEquals(rows.length, 1);
+  assertEquals(rows[0].city_id, 'sth');
+});
+
+Deno.test('alertToEventRows: stop_id match falls back to the feed agency when informedEntity omits agencyId', () => {
+  // No agencyId on the selector — stopIdMatchedTerminus falls back to the
+  // polled feed's own agency ('TRAINS'), which is exactly how
+  // TRAINS:SJM1C (Gare Saint-Jérôme) is keyed. A local zone near
+  // Saint-Jérôme's real coordinates (outside the module-level ZONES, which
+  // deliberately has none in range) proves the fallback actually resolved
+  // the terminus rather than merely returning an empty result either way.
+  const zonesNearSaintJerome: ZoneRow[] = [
+    ...ZONES,
+    { id: 'sjr-test', city_id: 'sjr', latitude: 45.7735, longitude: -73.9995 },
+  ];
+  const rows = alertToEventRows(
+    alertEntity({
+      effect: 2, // REDUCED_SERVICE
+      headerText: null,
+      descriptionText: { translation: [{ text: 'Service réduit.' }] },
+      informedEntity: [{ stopId: 'SJM1C' }],
+    }),
+    'TRAINS',
+    Date.now(),
+    zonesNearSaintJerome
+  );
+  assertEquals(rows.length, 1);
+  assertEquals(rows[0].venue, 'Gare Saint-Jérôme');
+  assertEquals(rows[0].city_id, 'sjr');
+});
+
+Deno.test('alertToEventRows: stop_id match for a different agency than the informedEntity claims finds nothing (documents the limitation)', () => {
+  const rows = alertToEventRows(
+    alertEntity({
+      effect: 2,
+      headerText: null,
+      descriptionText: { translation: [{ text: 'Service réduit.' }] },
+      informedEntity: [{ agencyId: 'RTL', routeId: '901', stopId: '75030' }], // 75030 is only registered under LRRS
+    }),
+    'RTL',
+    Date.now(),
+    ZONES
+  );
+  assertEquals(rows, []);
+});
+
 Deno.test('alertToEventRows: single-stop-scoped alert is skipped even with effect=NO_SERVICE (real CITLA false-positive pattern)', () => {
   // Regression: CITLA tags a single moved bus stop as effect=NO_SERVICE
   // (true for that ONE stop, not the terminus) with informedEntity scoped
@@ -177,6 +239,27 @@ Deno.test('tripUpdateToEventRows: major delay on an unmapped route produces no r
     ZONES
   );
   assertEquals(rows, []);
+});
+
+Deno.test('tripUpdateToEventRows: major delay at a real terminus stop_id matches without ROUTE_TERMINUS_MAP', () => {
+  // CITLA is one of the 3 feeds actually polled (Agency = TRAINS|RTL|CITLA
+  // — CITCRC/MRCLM/LRRS have no real-time feed of their own, so a tripUpdate
+  // can only ever arrive tagged with one of those three). CITLA:83720 is
+  // Terminus Sainte-Thérèse's own platform (see TERMINUS_STOP_IDS).
+  const rows = tripUpdateToEventRows(
+    {
+      id: 'tu-3',
+      tripUpdate: {
+        trip: { routeId: 'unmapped-route' },
+        stopTimeUpdate: [{ stopId: '83720', arrival: { delay: 900 } }],
+      },
+    },
+    'CITLA',
+    Date.now(),
+    ZONES
+  );
+  assertEquals(rows.length, 1);
+  assertEquals(rows[0].city_id, 'sth');
 });
 
 Deno.test('feedToEventRows: dedupes when alert and tripUpdate would collide (same external_id shape stays distinct by kind)', () => {

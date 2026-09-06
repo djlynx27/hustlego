@@ -82,11 +82,14 @@ export type Agency = 'TRAINS' | 'RTL' | 'CITLA';
 
 // ── Terminus allowlist ──────────────────────────────────────────────────────
 // Coordinates + boost tuning follow the same convention as event-sync's
-// VENUE_ALLOWLIST. Matching against free-text alert headers/descriptions
-// (rather than GTFS stop_id) because Exo/RTL/CITLA's static GTFS stops.txt
-// hasn't been pulled into this repo yet — text matching works today with
-// zero extra data. Once stop IDs are available, extend GtfsEntitySelector
-// matching in place of (or alongside) matchTerminiInText.
+// VENUE_ALLOWLIST. Two ways to attribute an alert/tripUpdate to one of these
+// termini, tried in order (see stopIdMatchedTerminus / alertToEventRows):
+//   1. informedEntity.stopId matches a real GTFS stop_id in
+//      TERMINUS_STOP_IDS below — positive confirmation, bypasses text
+//      matching and the single-stop-scope rejection entirely.
+//   2. Free-text terminus-name matching via matchTerminiInText, gated by
+//      isStopScopedOnly() to reject the false-positive pattern documented
+//      there (a route detour that merely passes near/toward the terminus).
 export interface TerminusConfig {
   label: string;
   latitude: number;
@@ -131,6 +134,74 @@ export const TERMINUS_ALLOWLIST: Record<string, TerminusConfig> = {
   },
 };
 
+// Real GTFS stop_ids per tracked terminus — extracted 2026-09-06 via
+// `tsx src/scripts/processGtfsStatic.ts` from the exo GTFS static bundle
+// (D:/Documents/Transport Dataset). Keyed "<agencyId>:<stopId>" because
+// stop_id is only unique within its own agency's namespace, and a shared
+// physical terminus can carry a different stop_id per agency (e.g. Gare
+// Sainte-Thérèse is TRAINS:STR4D/STR4B *and* CITLA:8372x *and*
+// MRCLM:83724/83726 — all the same platform, three GTFS feeds). agencyId
+// here is Chrono SAEIV's real-time feed key (matches Agency below) except
+// for MRCLM, which has no real-time feed of its own but whose static
+// stop_ids are kept in case CITLA's real-time feed ever attributes a stop
+// to it directly (regional GTFS-RT aggregators sometimes do).
+//
+// RTL's static GTFS was not present in the dataset (see
+// processGtfsStatic.ts's own run log) — Terminus Longueuil is only covered
+// via LRRS/CITCRC's few pass-through stop_ids below, not RTL's own (much
+// larger) set of platform stop_ids. Re-run the script and extend this list
+// once RTL's static GTFS is available.
+const TERMINUS_STOP_IDS: Record<string, keyof typeof TERMINUS_ALLOWLIST> = {
+  'LRRS:75030': 'longueuil',
+  'CITCRC:76066': 'longueuil',
+  'CITLA:83720': 'sainte-therese',
+  'CITLA:83721': 'sainte-therese',
+  'CITLA:83722': 'sainte-therese',
+  'CITLA:83723': 'sainte-therese',
+  'CITLA:83724': 'sainte-therese',
+  'CITLA:83725': 'sainte-therese',
+  'CITLA:83726': 'sainte-therese',
+  'CITLA:83727': 'sainte-therese',
+  'CITLA:83728': 'sainte-therese',
+  'CITLA:83729': 'sainte-therese',
+  'CITLA:83730': 'sainte-therese',
+  'CITLA:84718': 'sainte-therese',
+  'MRCLM:83724': 'sainte-therese',
+  'MRCLM:83726': 'sainte-therese',
+  'TRAINS:STR4D': 'sainte-therese',
+  'TRAINS:STR4B': 'sainte-therese',
+  'CITLA:80310': 'saint-jerome',
+  'CITLA:80311': 'saint-jerome',
+  'CITLA:80312': 'saint-jerome',
+  'CITLA:80313': 'saint-jerome',
+  'CITLA:80314': 'saint-jerome',
+  'CITLA:80315': 'saint-jerome',
+  'CITLA:80316': 'saint-jerome',
+  'CITLA:80317': 'saint-jerome',
+  'CITLA:81828': 'saint-jerome',
+  'CITLA:86075': 'saint-jerome',
+  'CITLA:86111': 'saint-jerome',
+  'CITLA:86112': 'saint-jerome',
+  'CITLA:86113': 'saint-jerome',
+  'TRAINS:SJM1C': 'saint-jerome',
+  'TRAINS:SJM1A': 'saint-jerome',
+};
+
+/** Positive stop_id match: an informedEntity entry whose (agencyId, stopId)
+ * pair is a real platform of a tracked terminus. Falls back to the polled
+ * feed's own agency when an entry omits agencyId. Authoritative when it
+ * hits — the caller should skip text matching and isStopScopedOnly()
+ * entirely in that case. */
+function stopIdMatchedTerminus(alert: GtfsAlert, feedAgency: Agency): TerminusConfig | null {
+  for (const entity of alert.informedEntity ?? []) {
+    if (!entity.stopId) continue;
+    const key = `${entity.agencyId ?? feedAgency}:${entity.stopId}`;
+    const terminusKey = TERMINUS_STOP_IDS[key];
+    if (terminusKey) return TERMINUS_ALLOWLIST[terminusKey];
+  }
+  return null;
+}
+
 export const MAX_ZONE_DISTANCE_M = 3000;
 export const MAJOR_DELAY_THRESHOLD_SECONDS = 600; // 10 min
 
@@ -153,13 +224,14 @@ export const MAJOR_ALERT_EFFECTS = new Set([1, 2, 3]);
 // `effect` alone isn't reliable either — verified against live CITLA data:
 // a single moved bus stop on a route that happens to terminate at Gare
 // Sainte-Thérèse comes back tagged effect=NO_SERVICE (true for that ONE
-// stop, not for the terminus) with informedEntity scoped to that stop's
-// own stopId. Without the terminus's real GTFS stop_id (see
-// ROUTE_TERMINUS_MAP note below), we can't positively confirm a stop-scoped
-// alert IS the terminus — so any alert whose informedEntity entries are
-// *all* stop-scoped is treated as too localized to attribute here. An
-// alert with no informedEntity, or at least one route/agency/trip-scoped
-// entry (no stopId), is allowed through.
+// stop, not for the terminus) with informedEntity scoped to that stop's own
+// stopId. This gate only runs when stopIdMatchedTerminus() (below) found no
+// positive match — i.e. every stop_id on the alert is confirmed NOT one of
+// our tracked termini's real platforms — so any alert whose informedEntity
+// entries are *all* stop-scoped is too localized to attribute via text
+// alone. An alert with no informedEntity, or at least one
+// route/agency/trip-scoped entry (no stopId), is allowed through to text
+// matching.
 function isStopScopedOnly(alert: GtfsAlert): boolean {
   const entities = alert.informedEntity ?? [];
   return entities.length > 0 && entities.every((e) => e.stopId != null);
@@ -242,11 +314,17 @@ export function alertToEventRows(
   const alert = entity.alert;
   if (!alert) return [];
   if (alert.effect == null || !MAJOR_ALERT_EFFECTS.has(alert.effect)) return [];
-  if (isStopScopedOnly(alert)) return [];
 
-  const text = `${extractText(alert.headerText)} ${extractText(alert.descriptionText)}`;
-  const termini = matchTerminiInText(text);
-  if (termini.length === 0) return [];
+  const stopMatch = stopIdMatchedTerminus(alert, agency);
+  let termini: TerminusConfig[];
+  if (stopMatch) {
+    termini = [stopMatch]; // confirmed by real stop_id — bypasses the localized-scope guard and text matching
+  } else {
+    if (isStopScopedOnly(alert)) return [];
+    const text = `${extractText(alert.headerText)} ${extractText(alert.descriptionText)}`;
+    termini = matchTerminiInText(text);
+    if (termini.length === 0) return [];
+  }
 
   const period = alert.activePeriod?.[0];
   const startMs = period?.start ? period.start * 1000 : nowMs;
@@ -270,17 +348,17 @@ export function alertToEventRows(
   return rows;
 }
 
-// Route → terminus mapping for tripUpdate-based delay detection. Empty by
-// default: Exo/RTL/CITLA route_ids for the tracked termini haven't been
-// pulled from static GTFS (routes.txt) yet. [À VÉRIFIER] fill this in per
-// agency once that reference data is available; until then, major-delay
-// tripUpdates are decoded but produce no zone boost (alerts still cover the
-// "service interrompu" case via text matching above).
+// Route → terminus mapping for tripUpdate-based delay detection, used only
+// as a fallback when no individual stop_id in the update matches
+// TERMINUS_STOP_IDS. Empty by default: Exo/RTL/CITLA route_ids for the
+// tracked termini haven't been pulled from static GTFS (routes.txt) yet.
+// [À VÉRIFIER] fill this in per agency once that reference data is
+// available.
 export const ROUTE_TERMINUS_MAP: Record<string, TerminusConfig> = {};
 
 /** Maps one `tripUpdate` FeedEntity to zero or more events rows when any
- * stop's arrival/departure delay exceeds MAJOR_DELAY_THRESHOLD_SECONDS and
- * the trip's route is in ROUTE_TERMINUS_MAP. */
+ * stop's arrival/departure delay exceeds MAJOR_DELAY_THRESHOLD_SECONDS.
+ * Prefers a real stop_id match (TERMINUS_STOP_IDS) over ROUTE_TERMINUS_MAP. */
 export function tripUpdateToEventRows(
   entity: GtfsFeedEntity,
   agency: Agency,
@@ -290,18 +368,19 @@ export function tripUpdateToEventRows(
   const tripUpdate = entity.tripUpdate;
   if (!tripUpdate) return [];
 
-  const routeId = tripUpdate.trip.routeId;
-  const terminus = routeId ? ROUTE_TERMINUS_MAP[routeId] : undefined;
-  if (!terminus) return [];
-
+  const stopTimeUpdates = tripUpdate.stopTimeUpdate ?? [];
   const maxDelay = Math.max(
     0,
-    ...(tripUpdate.stopTimeUpdate ?? []).flatMap((s) => [
-      s.arrival?.delay ?? 0,
-      s.departure?.delay ?? 0,
-    ])
+    ...stopTimeUpdates.flatMap((s) => [s.arrival?.delay ?? 0, s.departure?.delay ?? 0])
   );
   if (maxDelay < MAJOR_DELAY_THRESHOLD_SECONDS) return [];
+
+  const stopMatch = stopTimeUpdates
+    .map((s) => (s.stopId ? TERMINUS_STOP_IDS[`${agency}:${s.stopId}`] : undefined))
+    .find((key): key is keyof typeof TERMINUS_ALLOWLIST => key != null);
+  const routeId = tripUpdate.trip.routeId;
+  const terminus = (stopMatch ? TERMINUS_ALLOWLIST[stopMatch] : undefined) ?? (routeId ? ROUTE_TERMINUS_MAP[routeId] : undefined);
+  if (!terminus) return [];
 
   const row = terminusToEventRow(
     terminus,
