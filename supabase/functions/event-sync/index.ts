@@ -12,7 +12,7 @@
 // games run longer than a comedy set) — see eventSync.ts.
 //
 // Triggered by:
-//   - pg_cron every 6h (see 20260906000000_events_external_id_and_sync_cron.sql)
+//   - pg_cron every 6h (see 20260905131542_events_external_id_and_sync_cron.sql)
 //   - Manual call: supabase.functions.invoke('event-sync')
 //
 // Secrets required (set via `supabase secrets set`):

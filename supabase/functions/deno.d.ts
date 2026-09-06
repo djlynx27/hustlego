@@ -54,3 +54,58 @@ declare module 'npm:web-push@3.6.7' {
   const webpush: WebPushModule;
   export default webpush;
 }
+
+declare module 'npm:gtfs-realtime-bindings@2.2.0' {
+  namespace transit_realtime {
+    interface ITranslation {
+      text: string;
+      language?: string | null;
+    }
+    interface ITranslatedString {
+      translation?: ITranslation[] | null;
+    }
+    interface IEntitySelector {
+      agencyId?: string | null;
+      routeId?: string | null;
+      stopId?: string | null;
+    }
+    interface ITimeRange {
+      start?: number | null;
+      end?: number | null;
+    }
+    interface IAlert {
+      activePeriod?: ITimeRange[] | null;
+      informedEntity?: IEntitySelector[] | null;
+      effect?: number | null;
+      headerText?: ITranslatedString | null;
+      descriptionText?: ITranslatedString | null;
+    }
+    interface IStopTimeEvent {
+      delay?: number | null;
+    }
+    interface IStopTimeUpdate {
+      stopId?: string | null;
+      arrival?: IStopTimeEvent | null;
+      departure?: IStopTimeEvent | null;
+    }
+    interface ITripUpdate {
+      trip: { tripId?: string | null; routeId?: string | null };
+      stopTimeUpdate?: IStopTimeUpdate[] | null;
+    }
+    interface IFeedEntity {
+      id: string;
+      alert?: IAlert | null;
+      tripUpdate?: ITripUpdate | null;
+    }
+    interface IFeedMessage {
+      entity?: IFeedEntity[] | null;
+    }
+    class FeedMessage implements IFeedMessage {
+      entity?: IFeedEntity[] | null;
+      static decode(bytes: Uint8Array): FeedMessage;
+    }
+  }
+
+  const GtfsRealtimeBindings: { transit_realtime: typeof transit_realtime };
+  export default GtfsRealtimeBindings;
+}
