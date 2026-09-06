@@ -101,8 +101,15 @@ export const HOTSPOTS: Hotspot[] = [
     id: 'station-montmorency',
     name: 'Station Montmorency',
     address: '1 Place Montmorency, Laval',
-    lat: 45.5605,
-    lng: -73.7433,
+    // OSM-verified terminus coordinates, synced with zone `lvl-mm`
+    // (migration 20260731130000_fix_zone_coordinates.sql). The previous
+    // value (45.5605, -73.7433) sat 1.71 km away — and only 0.48 km from
+    // Centropolis — so a driver searching "Station Montmorency" got sent to
+    // the Centropolis / av. Pierre-Péladeau area instead. That migration
+    // fixed the zones table but never this curated hub list, and
+    // matchLocalHubs ranks these ABOVE Mapbox, so the stale copy won.
+    lat: 45.558353,
+    lng: -73.721518,
     category: 'Transport',
     platforms: ['Uber', 'Lyft', 'Eva'],
     egressVelocity: 9,
