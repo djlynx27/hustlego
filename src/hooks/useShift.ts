@@ -16,11 +16,18 @@
 // started/stopped/heartbeated the instant Lyft Driver flips Online/Offline,
 // independent of whether the PWA tab is even open, and keeps public.sessions
 // self-updating (elapsed time is just `now - started_at`, no drift; revenue
-// is server-recomputed from `trips` on every heartbeat). This hook reads
-// that row directly (RLS-safe, no Edge Function call needed for reads) and
-// refreshes on visibilitychange/focus (recovering from a fully backgrounded/
-// killed tab) plus a live Realtime subscription (catching a MacroDroid
-// heartbeat that lands while the tab is open).
+// is server-recomputed from `trips` on every heartbeat).
+//
+// This hook calls the Edge Function's STATUS action rather than querying
+// public.sessions directly — that table's RLS is strict per-owner
+// (auth.uid() = user_id) precisely so the public anon key can't read/write
+// the shared MacroDroid-driven session directly (see shift-tracker/
+// index.ts's SECURITY NOTE); only that service-role-backed function can
+// reach it. Refreshes on visibilitychange/focus (recovering from a fully
+// backgrounded/killed tab) plus a light poll while visible (catching a
+// MacroDroid heartbeat that lands while the tab is open — no Realtime
+// subscription, since that would need the same direct-table RLS access
+// this design deliberately avoids).
 
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
@@ -30,17 +37,17 @@ import { useEffect, useState } from 'react';
 export type ActiveSession = Database['public']['Tables']['sessions']['Row'];
 
 const ACTIVE_SESSION_QUERY_KEY = ['shift-tracker', 'active-session'] as const;
+const POLL_INTERVAL_MS = 45_000;
 
 async function fetchActiveSession(): Promise<ActiveSession | null> {
-  const { data, error } = await supabase
-    .from('sessions')
-    .select('*')
-    .is('ended_at', null)
-    .order('started_at', { ascending: false })
-    .limit(1)
-    .maybeSingle();
+  const { data, error } = await supabase.functions.invoke<{
+    ok: boolean;
+    session: ActiveSession | null;
+    error?: string;
+  }>('shift-tracker', { body: { action: 'STATUS' } });
   if (error) throw error;
-  return data;
+  if (!data?.ok) throw new Error(data?.error ?? 'shift-tracker STATUS failed');
+  return data.session;
 }
 
 /** The current active session (or null), kept fresh across backgrounding. */
@@ -51,6 +58,7 @@ export function useShift() {
     queryKey: ACTIVE_SESSION_QUERY_KEY,
     queryFn: fetchActiveSession,
     staleTime: 15_000,
+    refetchInterval: () => (document.visibilityState === 'visible' ? POLL_INTERVAL_MS : false),
   });
 
   // Recovers from a fully backgrounded/killed tab: whatever shift-tracker
@@ -67,24 +75,6 @@ export function useShift() {
     return () => {
       document.removeEventListener('visibilitychange', refetch);
       window.removeEventListener('focus', refetch);
-    };
-  }, [queryClient]);
-
-  // Live updates while foregrounded — a MacroDroid heartbeat/STOP lands in
-  // public.sessions independently of any PWA action.
-  useEffect(() => {
-    const channel = supabase
-      .channel('shift-tracker-sessions')
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'sessions' },
-        () => {
-          void queryClient.invalidateQueries({ queryKey: ACTIVE_SESSION_QUERY_KEY });
-        }
-      )
-      .subscribe();
-    return () => {
-      void supabase.removeChannel(channel);
     };
   }, [queryClient]);
 

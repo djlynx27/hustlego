@@ -17,11 +17,12 @@ const ZONES: ZoneRow[] = [
   { id: 'mtl-gc', city_id: 'mtl', latitude: 45.5003, longitude: -73.5672 },
 ];
 
-Deno.test('isShiftAction: accepts the 4 known actions, rejects everything else', () => {
+Deno.test('isShiftAction: accepts the 5 known actions, rejects everything else', () => {
   assertEquals(isShiftAction('START'), true);
   assertEquals(isShiftAction('STOP'), true);
   assertEquals(isShiftAction('HEARTBEAT'), true);
   assertEquals(isShiftAction('ADD_EARNINGS'), true);
+  assertEquals(isShiftAction('STATUS'), true);
   assertEquals(isShiftAction('DELETE'), false);
   assertEquals(isShiftAction(123), false);
   assertEquals(isShiftAction(undefined), false);

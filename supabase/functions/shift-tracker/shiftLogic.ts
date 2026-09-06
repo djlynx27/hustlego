@@ -27,7 +27,7 @@ export function nearestZoneId(lat: number, lng: number, zones: readonly ZoneRow[
   return best && best.distanceM <= MAX_ZONE_DISTANCE_M ? best.id : null;
 }
 
-export const ACTIONS = ['START', 'STOP', 'HEARTBEAT', 'ADD_EARNINGS'] as const;
+export const ACTIONS = ['START', 'STOP', 'HEARTBEAT', 'ADD_EARNINGS', 'STATUS'] as const;
 export type ShiftAction = (typeof ACTIONS)[number];
 
 export function isShiftAction(value: unknown): value is ShiftAction {

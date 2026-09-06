@@ -9,25 +9,34 @@
 // this endpoint the instant Lyft Driver flips Online/Offline, independent of
 // whether Delivroom's tab is even open.
 //
-// POST body: { action: 'START'|'STOP'|'HEARTBEAT'|'ADD_EARNINGS',
+// POST body: { action: 'START'|'STOP'|'HEARTBEAT'|'ADD_EARNINGS'|'STATUS',
 //               lat?, lng?, amount?, platform? }
 //
-// Auth (either one):
+// Auth (either one) — this is a *gate*, not a per-caller partition key (see
+// "single-tenant bucket" below):
 //   1. Header  Authorization: Bearer <SHIFT_TRACKER_API_KEY>  — the
-//      MacroDroid path. Writes/reads sessions with user_id = NULL.
+//      MacroDroid path.
 //   2. Header  Authorization: Bearer <supabase-session-access-token>  — a
 //      real (anon or real) Supabase session, e.g. the PWA calling this
-//      itself. Writes/reads sessions scoped to that auth.uid().
+//      itself (supabase.functions.invoke attaches this automatically).
 //
-// Why NULL user_id for the API-key path instead of a fixed driver uuid: this
-// project's anonymous-auth model has already produced 5+ distinct anon uids
-// in user_profiles over time (a fresh signInAnonymously() per browser-data
-// reset) and public.trips has no per-user isolation in practice (every real
-// trip's user_id is NULL already) — hardcoding "the driver's" current anon
-// uid here would silently break the day that uid rotates. NULL is the
-// single-tenant bucket that can't go stale; see the migration for the
-// relaxed RLS that makes this safe (session_zones_user_isolation etc. also
-// treat NULL as its own visible bucket).
+// SECURITY NOTE — single-tenant bucket, on purpose, and why it's safe here:
+// every session this function reads/writes uses user_id = NULL, a shared
+// bucket that only THIS service-role code (bypassing RLS entirely) can
+// reach — public.sessions' RLS is strict `auth.uid() = user_id`, which
+// NULL never satisfies, so no client holding just the public anon key can
+// read or write it directly via PostgREST. An earlier version of this
+// migration/function mistakenly made NULL a *client-visible* RLS bucket
+// (`auth.uid() = user_id OR user_id IS NULL`) specifically so the PWA could
+// read it directly too — that was a real IDOR (flagged by security review
+// and fixed in 20260906000006_fix_sessions_rls_idor.sql): any holder of the
+// public anon key could mutate the shared session directly. The fix moves
+// all shared-bucket access behind this function instead: the PWA now calls
+// STATUS/START/STOP here rather than querying public.sessions itself.
+// The remaining trust boundary is intentional and narrower than before —
+// anyone with a valid Supabase auth token (not just the anon key) can drive
+// the one shared shift, matching this app's actual single-driver reality.
+// Multi-driver support would need real per-account partitioning, not NULL.
 //
 // Deploy with: supabase functions deploy shift-tracker --no-verify-jwt
 // Secrets required (supabase secrets set ...):
@@ -85,32 +94,31 @@ interface SessionRow {
   active_zone_id: string | null;
 }
 
-/** Resolves which "bucket" (NULL for the API-key/MacroDroid path, or a real
- * auth.uid()) this request is allowed to read/write. Returns null when
- * neither credential checks out. */
-async function resolveUserId(
-  req: Request,
-  supabaseAdmin: SupabaseClient
-): Promise<{ userId: string | null } | null> {
+/** Authorization gate only — NOT a per-caller partition key. Every request
+ * that passes operates on the same shared (user_id = NULL) bucket; see the
+ * SECURITY NOTE above for why that's safe now that it's only reachable
+ * through this service-role code, never directly via RLS. */
+async function isAuthorized(req: Request, supabaseAdmin: SupabaseClient): Promise<boolean> {
   const authHeader = req.headers.get('Authorization') ?? '';
   const token = authHeader.replace(/^Bearer\s+/i, '').trim();
-  if (!token) return null;
+  if (!token) return false;
 
   const apiKey = Deno.env.get('SHIFT_TRACKER_API_KEY');
-  if (apiKey && token === apiKey) return { userId: null };
+  if (apiKey && token === apiKey) return true;
 
   const { data, error } = await supabaseAdmin.auth.getUser(token);
-  if (error || !data.user) return null;
-  return { userId: data.user.id };
+  return !error && !!data.user;
 }
 
-async function findActiveSession(
-  client: SupabaseClient,
-  userId: string | null
-): Promise<SessionRow | null> {
-  let query = client.from('sessions').select('*').is('ended_at', null);
-  query = userId === null ? query.is('user_id', null) : query.eq('user_id', userId);
-  const { data, error } = await query.order('started_at', { ascending: false }).limit(1).maybeSingle();
+async function findActiveSession(client: SupabaseClient): Promise<SessionRow | null> {
+  const { data, error } = await client
+    .from('sessions')
+    .select('*')
+    .is('ended_at', null)
+    .is('user_id', null)
+    .order('started_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
   if (error) throw new Error(`findActiveSession failed: ${error.message}`);
   return (data as SessionRow | null) ?? null;
 }
@@ -186,8 +194,7 @@ serve(async (req: Request) => {
     }
     const client = createClient(supabaseUrl, serviceKey);
 
-    const auth = await resolveUserId(req, client);
-    if (!auth) return json({ error: 'Non autorisé' }, 401);
+    if (!(await isAuthorized(req, client))) return json({ error: 'Non autorisé' }, 401);
 
     if (await isRateLimited(client, 'shift-tracker', 60)) {
       return json({ error: 'Trop de requêtes, réessaie dans une minute' }, 429);
@@ -195,22 +202,31 @@ serve(async (req: Request) => {
 
     const body: RequestBody = await req.json().catch(() => ({}));
     if (!isShiftAction(body.action)) {
-      return json({ error: 'action requis: START | STOP | HEARTBEAT | ADD_EARNINGS' }, 400);
+      return json({ error: 'action requis: START | STOP | HEARTBEAT | ADD_EARNINGS | STATUS' }, 400);
     }
 
     const now = new Date();
     const nowIso = now.toISOString();
     const coords = parseCoordinates(body);
 
+    if (body.action === 'STATUS') {
+      const active = await findActiveSession(client);
+      return json({
+        ok: true,
+        session: active,
+        elapsedSeconds: active ? elapsedSeconds(active.started_at, now.getTime()) : null,
+      });
+    }
+
     if (body.action === 'START') {
-      const existing = await findActiveSession(client, auth.userId);
+      const existing = await findActiveSession(client);
       if (existing) {
         return json({ ok: true, alreadyActive: true, session: existing, elapsedSeconds: elapsedSeconds(existing.started_at, now.getTime()) });
       }
       const { data, error } = await client
         .from('sessions')
         .insert({
-          user_id: auth.userId,
+          user_id: null,
           started_at: nowIso,
           last_heartbeat_at: nowIso,
           last_lat: coords?.lat ?? null,
@@ -225,11 +241,11 @@ serve(async (req: Request) => {
     // Every other action requires an active session — HEARTBEAT auto-starts
     // one defensively (a MacroDroid automation added mid-drive, or one that
     // only wires the heartbeat trigger, shouldn't just silently no-op).
-    let session = await findActiveSession(client, auth.userId);
+    let session = await findActiveSession(client);
     if (!session && body.action === 'HEARTBEAT') {
       const { data, error } = await client
         .from('sessions')
-        .insert({ user_id: auth.userId, started_at: nowIso, last_heartbeat_at: nowIso })
+        .insert({ user_id: null, started_at: nowIso, last_heartbeat_at: nowIso })
         .select('*')
         .single();
       if (error) throw new Error(`session insert failed: ${error.message}`);
@@ -245,7 +261,7 @@ serve(async (req: Request) => {
       const { data: trip, error: tripError } = await client
         .from('trips')
         .insert({
-          user_id: auth.userId,
+          user_id: null,
           earnings: amount,
           tips: 0,
           platform,
